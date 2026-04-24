@@ -1,0 +1,59 @@
+# Dependencies
+node_modules
+
+# Build output
+.next
+out
+dist
+coverage
+
+# Source backup (not needed)
+src_backup
+
+# Environment files
+.env
+.env.*
+.env.local
+.env.production.local
+.env.development.local
+
+# Data directory (mounted as volume)
+data
+
+# Git
+.git
+.gitignore
+
+# AI assistant configs
+.claude
+CLAUDE.md
+
+# IDE / Editor
+.vscode
+.idea
+.cursor
+.cursorrules
+*.swp
+*.swo
+.DS_Store
+
+# Documentation & mobile app
+docs
+mobile
+
+# Scripts (deployment, not needed in image)
+scripts
+
+# TypeScript build caches
+tsconfig.tsbuildinfo
+tsconfig.codex.tsbuildinfo
+
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Docker
+Dockerfile
+docker-compose.yml
+docker-compose*.yml

@@ -1,0 +1,20 @@
+services:
+  tainer:
+    image: tainersh/tainer:latest
+    ports:
+      - "3000:3000"
+    volumes:
+      - tainer-data:/app/data
+    restart: unless-stopped
+    # Optional settings — only needed for password reset emails or custom port
+    # environment:
+    #   PORT: "3000"
+    #   APP_URL: https://tainer.example.com
+    #   SMTP_HOST: smtp.example.com
+    #   SMTP_PORT: "587"
+    #   SMTP_USER: user@example.com
+    #   SMTP_PASS: yourpassword
+    #   SMTP_FROM: tainer@example.com
+
+volumes:
+  tainer-data:

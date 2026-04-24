@@ -1,0 +1,387 @@
+"use server";
+
+import { randomUUID } from "node:crypto";
+
+import { revalidatePath } from "next/cache";
+
+import type { ProxmoxActionState } from "@/lib/action-states";
+import { getAppSettings } from "@/lib/app-settings";
+import { requireSitePermission, requireSession } from "@/lib/auth";
+import { recordDeploymentActivity } from "@/lib/deployment-activity-log";
+import { createRateLimiterOrThrow } from "@/lib/rate-limit";
+
+const enforceRateLimit = createRateLimiterOrThrow("backup-actions", 10, 5 * 60_000);
+import { reapplySkippedCustomLxcConfig } from "@/lib/proxmox-host";
+import { isCloudBackupEnabled, requestCloudUpload } from "@/lib/cloud-backup";
+import {
+  decodeDeploymentId,
+  deleteBackup,
+  encodeDeploymentId,
+  getSkippedCustomLxcConfigLines,
+  getNextId,
+  listBackupStoragePools,
+  listBackupsForVm,
+  restoreBackup,
+  runContainerLifecycleAction,
+  runVmLifecycleAction,
+  triggerBackup,
+  waitForTask,
+  validateUpid,
+  withSiteConfig,
+} from "@/lib/proxmox";
+import { resolveSiteConfigBySlug } from "@/lib/site-resolver";
+
+export async function triggerBackupAction(
+  _previousState: ProxmoxActionState,
+  formData: FormData,
+): Promise<ProxmoxActionState> {
+  try {
+    const session = await requireSession();
+    const siteSlug = String(formData.get("siteSlug") ?? "");
+    if (!siteSlug) {
+      return { message: "Missing site context.", requestId: randomUUID(), status: "error", task: null };
+    }
+    const siteConfig = await resolveSiteConfigBySlug(siteSlug);
+    requireSitePermission(session, siteConfig.siteId, "manage-backups");
+    enforceRateLimit(session.user.id);
+
+    return withSiteConfig(siteConfig, async () => {
+
+    const deploymentId = String(formData.get("deploymentId") ?? "").trim();
+    const storageOverride = String(formData.get("storage") ?? "").trim();
+
+    if (!deploymentId) {
+      return {
+        message: "No deployment specified.",
+        requestId: randomUUID(),
+        status: "error",
+        task: null,
+      };
+    }
+
+    const { node, vmid } = decodeDeploymentId(deploymentId);
+
+    // Resolve backup storage
+    let storage = storageOverride;
+    if (!storage) {
+      const settings = await getAppSettings();
+      storage = settings.defaultBackupStorage;
+    }
+
+    if (!storage) {
+      // Fall back to first healthy backup pool
+      const { pools } = await listBackupStoragePools();
+      const healthy = pools.find((p) => p.issues.length === 0);
+      if (!healthy) {
+        return {
+          message: "No healthy backup storage available. Configure a backup-capable storage pool in Proxmox.",
+          requestId: randomUUID(),
+          status: "error",
+          task: null,
+        };
+      }
+      storage = healthy.storage;
+    }
+
+    const upid = await triggerBackup(node, vmid, storage);
+    const validUpid = validateUpid(upid);
+
+    // Cloud backup: after vzdump completes, agent uploads directly to SaaS via HTTPS
+    if (isCloudBackupEnabled()) {
+      waitForTask(node, validUpid).then(async () => {
+        try {
+          const { archives } = await listBackupsForVm(node, vmid);
+          const latest = archives
+            .filter((a) => a.storage === storage)
+            .sort((a, b) => b.ctime - a.ctime)[0];
+
+          if (latest) {
+            const filename = latest.volid.includes("/")
+              ? latest.volid.split("/").pop()!
+              : latest.volid;
+
+            console.log(`[cloud-backup] Uploading ${filename} for VMID ${vmid}...`);
+            const result = await requestCloudUpload(node, storage, filename);
+
+            if (result.success) {
+              console.log(`[cloud-backup] Upload OK (${result.sizeBytes} bytes), deleting local copy`);
+              await deleteBackup(node, storage, latest.volid);
+            } else {
+              console.error(`[cloud-backup] Upload failed: ${result.error}`);
+            }
+          }
+        } catch (err) {
+          console.error("[cloud-backup] Post-backup upload failed:", err);
+        }
+      }).catch((err) => {
+        console.error("[cloud-backup] Wait for vzdump task failed:", err);
+      });
+    }
+
+    recordDeploymentActivity({
+      action: "backup-created",
+      deploymentId,
+      message: `Backup started for VMID ${vmid} on ${storage}${isCloudBackupEnabled() ? " (cloud)" : ""}`,
+      userEmail: session.user.email,
+      userName: session.user.name,
+      vmid,
+    }).catch(() => {});
+
+    revalidatePath(`/sites/${siteSlug}/backups`);
+    revalidatePath(`/sites/${siteSlug}/deployments/${deploymentId}`);
+
+    return {
+      message: isCloudBackupEnabled()
+        ? `Backup started for VMID ${vmid}. Will upload to cloud after completion.`
+        : `Backup started for VMID ${vmid} on ${storage}.`,
+      requestId: randomUUID(),
+      status: "success",
+      task: {
+        node,
+        siteSlug,
+        submittedMessage: `Backup of VMID ${vmid} submitted to ${storage}.`,
+        successHref: `/sites/${siteSlug}/deployments/${deploymentId}`,
+        successMessage: isCloudBackupEnabled()
+          ? `Backup of VMID ${vmid} completed. Cloud upload in progress...`
+          : `Backup of VMID ${vmid} completed successfully.`,
+        title: `Backing up VMID ${vmid}`,
+        upid: validUpid,
+      },
+    };
+
+    });
+  } catch (error) {
+    return {
+      message: error instanceof Error ? error.message : "Failed to start backup.",
+      requestId: randomUUID(),
+      status: "error",
+      task: null,
+    };
+  }
+}
+
+export async function restoreBackupAction(
+  _previousState: ProxmoxActionState,
+  formData: FormData,
+): Promise<ProxmoxActionState> {
+  try {
+    const session = await requireSession();
+    const siteSlug = String(formData.get("siteSlug") ?? "");
+    if (!siteSlug) {
+      return { message: "Missing site context.", requestId: randomUUID(), status: "error", task: null };
+    }
+    const siteConfig = await resolveSiteConfigBySlug(siteSlug);
+    requireSitePermission(session, siteConfig.siteId, "manage-backups");
+
+    return withSiteConfig(siteConfig, async () => {
+
+    const volid = String(formData.get("volid") ?? "").trim();
+    const targetNode = String(formData.get("node") ?? "").trim();
+    const storage = String(formData.get("storage") ?? "").trim();
+    const targetVmidStr = String(formData.get("targetVmid") ?? "").trim();
+    const replaceMode = formData.get("replace") === "1";
+
+    if (!volid) {
+      return {
+        message: "No backup archive specified.",
+        requestId: randomUUID(),
+        status: "error",
+        task: null,
+      };
+    }
+
+    if (!targetNode) {
+      return {
+        message: "Target node is required.",
+        requestId: randomUUID(),
+        status: "error",
+        task: null,
+      };
+    }
+
+    if (!storage) {
+      return {
+        message: "Target storage for restored rootfs is required.",
+        requestId: randomUUID(),
+        status: "error",
+        task: null,
+      };
+    }
+
+    // Use explicit target VMID or allocate next available
+    let targetVmid: number;
+    if (targetVmidStr) {
+      targetVmid = Number.parseInt(targetVmidStr, 10);
+      if (Number.isNaN(targetVmid) || targetVmid <= 0) {
+        return {
+          message: "Invalid target VMID.",
+          requestId: randomUUID(),
+          status: "error",
+          task: null,
+        };
+      }
+    } else {
+      const nextIdStr = await getNextId();
+      if (!nextIdStr) {
+        return {
+          message: "Could not allocate a new VMID from Proxmox.",
+          requestId: randomUUID(),
+          status: "error",
+          task: null,
+        };
+      }
+      targetVmid = Number.parseInt(nextIdStr, 10);
+    }
+
+    // When replacing an existing container, stop it first so
+    // Proxmox accepts the force-restore over the same VMID.
+    if (replaceMode) {
+      const restoredType = volid.includes("vzdump-lxc-") ? "lxc" : "qemu";
+      try {
+        const stopUpid = restoredType === "lxc"
+          ? await runContainerLifecycleAction(targetNode, targetVmid, "stop")
+          : await runVmLifecycleAction(targetNode, targetVmid, "stop");
+        await waitForTask(targetNode, validateUpid(stopUpid));
+      } catch {
+        // Already stopped — that's fine, continue with restore.
+      }
+    }
+
+    const upid = await restoreBackup(targetNode, targetVmid, volid, storage, replaceMode ? { force: true } : undefined);
+    const validUpid = validateUpid(upid);
+    const restoredType = volid.includes("vzdump-lxc-") ? "lxc" : "qemu";
+    const restoredDeploymentId = encodeDeploymentId(targetNode, targetVmid, restoredType);
+
+    if (restoredType === "lxc") {
+      waitForTask(targetNode, validUpid)
+        .then(async () => {
+          const skippedLines = await getSkippedCustomLxcConfigLines(targetNode, validUpid);
+
+          if (skippedLines.length === 0) {
+            console.info(
+              `Post-restore custom LXC config replay found no skipped lines for VMID ${targetVmid}.`,
+            );
+            return;
+          }
+
+          await reapplySkippedCustomLxcConfig(targetNode, targetVmid, skippedLines);
+          console.info(
+            `Post-restore custom LXC config replay applied ${skippedLines.length} line(s) for VMID ${targetVmid}.`,
+          );
+        })
+        .catch((error) => {
+          console.error(
+            `Post-restore custom LXC config replay failed for VMID ${targetVmid}:`,
+            error,
+          );
+        });
+    }
+
+    recordDeploymentActivity({
+      action: "backup-restored",
+      deploymentId: restoredDeploymentId,
+      message: `Restored backup to VMID ${targetVmid} on ${targetNode}`,
+      userEmail: session.user.email,
+      userName: session.user.name,
+      vmid: targetVmid,
+    }).catch(() => {});
+
+    revalidatePath(`/sites/${siteSlug}/backups`);
+    revalidatePath(`/sites/${siteSlug}/deployments`);
+    revalidatePath(`/sites/${siteSlug}/deployments/${restoredDeploymentId}`);
+
+    return {
+      message: `Restore started as VMID ${targetVmid} on ${targetNode}.`,
+      requestId: randomUUID(),
+      status: "success",
+      task: {
+        node: targetNode,
+        siteSlug,
+        submittedMessage: `Restoring backup to VMID ${targetVmid}.`,
+        successHref: `/sites/${siteSlug}/deployments/${restoredDeploymentId}`,
+        successMessage: restoredType === "lxc"
+          ? `Backup restored as VMID ${targetVmid} on ${targetNode}. Any skipped custom LXC config will be replayed in the background.`
+          : `Backup restored as VMID ${targetVmid} on ${targetNode}.`,
+        title: `Restoring to VMID ${targetVmid}`,
+        upid: validUpid,
+      },
+    };
+
+    });
+  } catch (error) {
+    return {
+      message: error instanceof Error ? error.message : "Failed to start restore.",
+      requestId: randomUUID(),
+      status: "error",
+      task: null,
+    };
+  }
+}
+
+export async function deleteBackupAction(
+  _previousState: ProxmoxActionState,
+  formData: FormData,
+): Promise<ProxmoxActionState> {
+  try {
+    const session = await requireSession();
+    const siteSlug = String(formData.get("siteSlug") ?? "");
+    if (!siteSlug) {
+      return { message: "Missing site context.", requestId: randomUUID(), status: "error", task: null };
+    }
+    const siteConfig = await resolveSiteConfigBySlug(siteSlug);
+    requireSitePermission(session, siteConfig.siteId, "manage-backups");
+
+    return withSiteConfig(siteConfig, async () => {
+
+    const volid = String(formData.get("volid") ?? "").trim();
+    const node = String(formData.get("node") ?? "").trim();
+    const storage = String(formData.get("storage") ?? "").trim();
+
+    if (!volid || !node || !storage) {
+      return {
+        message: "Missing backup archive details.",
+        requestId: randomUUID(),
+        status: "error",
+        task: null,
+      };
+    }
+
+    const upid = await deleteBackup(node, storage, volid);
+
+    revalidatePath(`/sites/${siteSlug}/backups`);
+
+    if (upid) {
+      const validUpid = validateUpid(upid);
+
+      return {
+        message: "Backup deletion started.",
+        requestId: randomUUID(),
+        status: "success",
+        task: {
+          node,
+          siteSlug,
+          submittedMessage: "Deleting backup archive...",
+          successMessage: "Backup archive deleted successfully.",
+          title: "Deleting backup",
+          upid: validUpid,
+        },
+      };
+    }
+
+    return {
+      message: "Backup archive deleted.",
+      requestId: randomUUID(),
+      status: "success",
+      task: null,
+    };
+
+    });
+  } catch (error) {
+    return {
+      message: error instanceof Error ? error.message : "Failed to delete backup.",
+      requestId: randomUUID(),
+      status: "error",
+      task: null,
+    };
+  }
+}
