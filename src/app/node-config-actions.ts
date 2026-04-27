@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 
 import { revalidatePath } from "next/cache";
 
+import type { RestoreActionState } from "@/app/node-config-action-states";
 import type { BasicActionState } from "@/lib/action-states";
 import { requirePermission, requireSession } from "@/lib/auth";
 import {
@@ -11,20 +12,9 @@ import {
   restoreConfigSnapshot,
   takeConfigSnapshot,
 } from "@/lib/node-config-backup";
-import type { RestoreResult, RestoreSection, RestoreSelection } from "@/lib/node-config-backup";
+import type { RestoreSection, RestoreSelection } from "@/lib/node-config-backup";
 import { withSiteConfig } from "@/lib/proxmox";
 import { resolveSiteConfigBySlug } from "@/lib/site-resolver";
-
-export type RestoreActionState = BasicActionState & {
-  result: RestoreResult | null;
-};
-
-export const initialRestoreActionState: RestoreActionState = {
-  message: "",
-  requestId: "",
-  result: null,
-  status: "idle",
-};
 
 const ALL_SECTIONS: RestoreSection[] = [
   "dns",

@@ -3,10 +3,8 @@
 import { AlertTriangle, History, ShieldAlert } from "lucide-react";
 import { useActionState, useState } from "react";
 
-import {
-  initialRestoreActionState,
-  restoreConfigSnapshotAction,
-} from "@/app/node-config-actions";
+import { initialRestoreActionState } from "@/app/node-config-action-states";
+import { restoreConfigSnapshotAction } from "@/app/node-config-actions";
 import { useActionFlashFeedback } from "@/components/task-toast-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
