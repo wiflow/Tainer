@@ -2,9 +2,7 @@
 
 import { useActionState } from "react";
 import {
-  ArrowRight,
   CircleAlert,
-  Clock,
   Save,
   Server,
   ShieldCheck,
@@ -136,42 +134,6 @@ function NodeScoreTable({
           })}
         </tbody>
       </table>
-    </div>
-  );
-}
-
-function MigrationLog({
-  migrations,
-}: {
-  migrations: LoadBalancerStatus["pendingMigrations"];
-}) {
-  if (migrations.length === 0) {
-    return (
-      <div className="flex items-center justify-center py-8 text-[13px] text-zinc-500">
-        No migrations recorded.
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-2">
-      {migrations.map((m, i) => (
-        <div
-          key={`${m.vmid}-${m.triggeredAt}-${i}`}
-          className="flex items-center gap-3 rounded-md border border-white/5 bg-zinc-900/50 px-4 py-3 text-[12px]"
-        >
-          <Badge variant={m.completed ? "neutral" : "info"} className="text-[10px]">
-            {m.type.toUpperCase()} {m.vmid}
-          </Badge>
-          <span className="text-zinc-400">{m.sourceNode}</span>
-          <ArrowRight className="w-3 h-3 text-zinc-600" />
-          <span className="text-zinc-300">{m.targetNode}</span>
-          <span className="ml-auto flex items-center gap-1 text-zinc-500">
-            <Clock className="w-3 h-3" />
-            {new Date(m.triggeredAt).toLocaleTimeString()}
-          </span>
-        </div>
-      ))}
     </div>
   );
 }
@@ -445,12 +407,9 @@ export function LoadBalancerDashboard({
         />
       </SectionPanel>
 
-      <SectionPanel
-        title="Migration Log"
-        description="Automatic migrations triggered by the hysteresis-based migration engine."
-      >
-        <MigrationLog migrations={status.pendingMigrations} />
-      </SectionPanel>
+      {/* Migration Log section removed — superseded by the Activity Log
+          (load-balancer-event-viewer) which records every migration,
+          failure, and tick error persistently across restarts. */}
 
       <SectionPanel
         title="Settings"
