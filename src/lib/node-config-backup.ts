@@ -26,6 +26,8 @@ import {
 } from "@/lib/proxmox";
 import type { ProxmoxDnsConfig, ProxmoxNetworkInterface } from "@/lib/proxmox";
 
+export type NodeConfigSnapshotTrigger = "manual" | "scheduled";
+
 export type NodeConfigSnapshot = {
   configs: {
     dns: unknown;
@@ -40,6 +42,10 @@ export type NodeConfigSnapshot = {
   id: string;
   label: string;
   nodeName: string;
+  /** Set when the snapshot was created by a scheduled policy. */
+  policyId?: string | null;
+  /** Defaults to "manual" for legacy / pre-existing snapshots. */
+  trigger?: NodeConfigSnapshotTrigger;
 };
 
 export type ConfigDiff = {
@@ -103,6 +109,12 @@ export async function takeConfigSnapshot(
   nodeName: string,
   createdBy: string,
   label: string,
+  options: {
+    policyId?: string | null;
+    /** Per-policy retention: keep at most this many snapshots from the same policy (0 = unlimited). */
+    policyRetention?: number;
+    trigger?: NodeConfigSnapshotTrigger;
+  } = {},
 ): Promise<NodeConfigSnapshot> {
   const [networkResult, dnsResult, hostsResult, timeResult, storageResult, firewallResult] =
     await Promise.allSettled([
@@ -128,11 +140,27 @@ export async function takeConfigSnapshot(
     id: randomUUID(),
     label: label.trim() || `${nodeName} — ${new Date().toLocaleDateString()}`,
     nodeName,
+    policyId: options.policyId ?? null,
+    trigger: options.trigger ?? "manual",
   };
 
   return mutateStore((store) => {
     store.snapshots.unshift(snapshot);
 
+    // Per-policy retention: drop the oldest snapshots from the SAME policy that
+    // exceed the policy's retention count. Manual snapshots are unaffected.
+    if (snapshot.policyId && options.policyRetention && options.policyRetention > 0) {
+      const sameFromPolicy = store.snapshots
+        .filter((s) => s.policyId === snapshot.policyId)
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      const stale = sameFromPolicy.slice(options.policyRetention);
+      if (stale.length > 0) {
+        const staleIds = new Set(stale.map((s) => s.id));
+        store.snapshots = store.snapshots.filter((s) => !staleIds.has(s.id));
+      }
+    }
+
+    // Global cap (keeps the file from growing unbounded).
     if (store.snapshots.length > MAX_SNAPSHOTS) {
       store.snapshots = store.snapshots.slice(0, MAX_SNAPSHOTS);
     }
@@ -147,6 +175,76 @@ function prettyJson(value: unknown): string {
   } catch {
     return String(value);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Scheduled-snapshot tick
+// ---------------------------------------------------------------------------
+
+import {
+  listConfigSnapshotPolicies,
+  markConfigSnapshotPolicyRun,
+  type ConfigSnapshotPolicy,
+} from "@/lib/config-snapshot-policies";
+
+export type ConfigSnapshotTickResult = {
+  errors: string[];
+  policiesEvaluated: number;
+  snapshotsTaken: number;
+};
+
+/**
+ * Iterate the active site's config-snapshot policies and capture a snapshot
+ * for each one whose `nextRunAt` is due. Caller is responsible for setting
+ * up site context (use `runConfigSnapshotTickAllSites()` for cluster-wide).
+ */
+export async function runConfigSnapshotTick(): Promise<ConfigSnapshotTickResult> {
+  const errors: string[] = [];
+  let snapshotsTaken = 0;
+  let policies: ConfigSnapshotPolicy[] = [];
+
+  try {
+    policies = await listConfigSnapshotPolicies();
+  } catch (error) {
+    errors.push(
+      `Failed to load config snapshot policies: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    return { errors, policiesEvaluated: 0, snapshotsTaken: 0 };
+  }
+
+  const now = Date.now();
+  const due = policies.filter((p) => {
+    if (!p.enabled) return false;
+    if (!p.nodeName) return false;
+    if (!p.nextRunAt) return true;
+    return now >= new Date(p.nextRunAt).getTime();
+  });
+
+  for (const policy of due) {
+    const runAt = new Date().toISOString();
+    try {
+      const label = `${policy.name} — ${new Date(runAt).toLocaleString()}`;
+      await takeConfigSnapshot(policy.nodeName, `schedule:${policy.name}`, label, {
+        policyId: policy.id,
+        policyRetention: policy.retentionCount,
+        trigger: "scheduled",
+      });
+      await markConfigSnapshotPolicyRun(policy.id, runAt);
+      snapshotsTaken++;
+    } catch (error) {
+      errors.push(
+        `Policy "${policy.name}": ${error instanceof Error ? error.message : String(error)}`,
+      );
+      // Still mark the run so we don't immediately retry on every tick.
+      try {
+        await markConfigSnapshotPolicyRun(policy.id, runAt);
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+
+  return { errors, policiesEvaluated: policies.length, snapshotsTaken };
 }
 
 // ---------------------------------------------------------------------------

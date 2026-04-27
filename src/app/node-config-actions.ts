@@ -8,8 +8,17 @@ import type { RestoreActionState } from "@/app/node-config-action-states";
 import type { BasicActionState } from "@/lib/action-states";
 import { requirePermission, requireSession } from "@/lib/auth";
 import {
+  createConfigSnapshotPolicy,
+  deleteConfigSnapshotPolicy,
+  forceConfigSnapshotPolicyDue,
+  toggleConfigSnapshotPolicy,
+  updateConfigSnapshotPolicy,
+  type ConfigSnapshotPolicyInput,
+} from "@/lib/config-snapshot-policies";
+import {
   deleteConfigSnapshot,
   restoreConfigSnapshot,
+  runConfigSnapshotTick,
   takeConfigSnapshot,
 } from "@/lib/node-config-backup";
 import type { RestoreSection, RestoreSelection } from "@/lib/node-config-backup";
@@ -194,6 +203,231 @@ export async function deleteConfigSnapshotAction(
   } catch (error) {
     return {
       message: error instanceof Error ? error.message : "Failed to delete snapshot.",
+      requestId: randomUUID(),
+      status: "error",
+    };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Scheduled-snapshot policy actions
+// ---------------------------------------------------------------------------
+
+function parsePolicyInput(formData: FormData): ConfigSnapshotPolicyInput {
+  const intervalRaw = Number(formData.get("intervalMinutes"));
+  const retentionRaw = Number(formData.get("retentionCount"));
+  return {
+    description: String(formData.get("description") ?? "").trim(),
+    enabled: formData.get("enabled") === "on",
+    intervalMinutes:
+      Number.isFinite(intervalRaw) && intervalRaw > 0 ? Math.max(15, Math.round(intervalRaw)) : 1440,
+    name: String(formData.get("name") ?? "").trim() || "Unnamed schedule",
+    nodeName: String(formData.get("nodeName") ?? "").trim(),
+    retentionCount:
+      Number.isFinite(retentionRaw) && retentionRaw >= 0 ? Math.max(0, Math.round(retentionRaw)) : 14,
+  };
+}
+
+export async function createConfigSnapshotPolicyAction(
+  _previousState: BasicActionState,
+  formData: FormData,
+): Promise<BasicActionState> {
+  try {
+    const session = await requireSession();
+    requirePermission(session, "manage-settings");
+
+    const siteSlug = String(formData.get("siteSlug") ?? "");
+    if (!siteSlug)
+      return { message: "Missing site context.", requestId: randomUUID(), status: "error" };
+
+    const input = parsePolicyInput(formData);
+    if (!input.nodeName)
+      return { message: "Node is required.", requestId: randomUUID(), status: "error" };
+
+    const siteConfig = await resolveSiteConfigBySlug(siteSlug);
+    return withSiteConfig(siteConfig, async () => {
+      const policy = await createConfigSnapshotPolicy(input);
+      revalidatePath(`/sites/${siteSlug}/node-configs`);
+      return {
+        message: `Schedule "${policy.name}" created.`,
+        requestId: randomUUID(),
+        status: "success",
+      };
+    });
+  } catch (error) {
+    return {
+      message: error instanceof Error ? error.message : "Failed to create schedule.",
+      requestId: randomUUID(),
+      status: "error",
+    };
+  }
+}
+
+export async function updateConfigSnapshotPolicyAction(
+  _previousState: BasicActionState,
+  formData: FormData,
+): Promise<BasicActionState> {
+  try {
+    const session = await requireSession();
+    requirePermission(session, "manage-settings");
+
+    const siteSlug = String(formData.get("siteSlug") ?? "");
+    if (!siteSlug)
+      return { message: "Missing site context.", requestId: randomUUID(), status: "error" };
+
+    const id = String(formData.get("policyId") ?? "");
+    if (!id)
+      return { message: "Schedule ID is required.", requestId: randomUUID(), status: "error" };
+
+    const input = parsePolicyInput(formData);
+    if (!input.nodeName)
+      return { message: "Node is required.", requestId: randomUUID(), status: "error" };
+
+    const siteConfig = await resolveSiteConfigBySlug(siteSlug);
+    return withSiteConfig(siteConfig, async () => {
+      const policy = await updateConfigSnapshotPolicy(id, input);
+      if (!policy)
+        return { message: "Schedule not found.", requestId: randomUUID(), status: "error" };
+      revalidatePath(`/sites/${siteSlug}/node-configs`);
+      return {
+        message: `Schedule "${policy.name}" updated.`,
+        requestId: randomUUID(),
+        status: "success",
+      };
+    });
+  } catch (error) {
+    return {
+      message: error instanceof Error ? error.message : "Failed to update schedule.",
+      requestId: randomUUID(),
+      status: "error",
+    };
+  }
+}
+
+export async function deleteConfigSnapshotPolicyAction(
+  _previousState: BasicActionState,
+  formData: FormData,
+): Promise<BasicActionState> {
+  try {
+    const session = await requireSession();
+    requirePermission(session, "manage-settings");
+
+    const siteSlug = String(formData.get("siteSlug") ?? "");
+    if (!siteSlug)
+      return { message: "Missing site context.", requestId: randomUUID(), status: "error" };
+
+    const id = String(formData.get("policyId") ?? "");
+    if (!id)
+      return { message: "Schedule ID is required.", requestId: randomUUID(), status: "error" };
+
+    const siteConfig = await resolveSiteConfigBySlug(siteSlug);
+    return withSiteConfig(siteConfig, async () => {
+      const deleted = await deleteConfigSnapshotPolicy(id);
+      if (!deleted)
+        return { message: "Schedule not found.", requestId: randomUUID(), status: "error" };
+      revalidatePath(`/sites/${siteSlug}/node-configs`);
+      return {
+        message: "Schedule deleted.",
+        requestId: randomUUID(),
+        status: "success",
+      };
+    });
+  } catch (error) {
+    return {
+      message: error instanceof Error ? error.message : "Failed to delete schedule.",
+      requestId: randomUUID(),
+      status: "error",
+    };
+  }
+}
+
+export async function toggleConfigSnapshotPolicyAction(
+  _previousState: BasicActionState,
+  formData: FormData,
+): Promise<BasicActionState> {
+  try {
+    const session = await requireSession();
+    requirePermission(session, "manage-settings");
+
+    const siteSlug = String(formData.get("siteSlug") ?? "");
+    if (!siteSlug)
+      return { message: "Missing site context.", requestId: randomUUID(), status: "error" };
+
+    const id = String(formData.get("policyId") ?? "");
+    if (!id)
+      return { message: "Schedule ID is required.", requestId: randomUUID(), status: "error" };
+
+    const enabled = formData.get("enabled") === "on";
+
+    const siteConfig = await resolveSiteConfigBySlug(siteSlug);
+    return withSiteConfig(siteConfig, async () => {
+      const policy = await toggleConfigSnapshotPolicy(id, enabled);
+      if (!policy)
+        return { message: "Schedule not found.", requestId: randomUUID(), status: "error" };
+      revalidatePath(`/sites/${siteSlug}/node-configs`);
+      return {
+        message: `Schedule "${policy.name}" ${enabled ? "enabled" : "paused"}.`,
+        requestId: randomUUID(),
+        status: "success",
+      };
+    });
+  } catch (error) {
+    return {
+      message: error instanceof Error ? error.message : "Failed to toggle schedule.",
+      requestId: randomUUID(),
+      status: "error",
+    };
+  }
+}
+
+/**
+ * "Run now" — fires the same scheduler tick the cron loop runs, but immediately
+ * (only the requested policy is forced due by clearing nextRunAt first).
+ */
+export async function runConfigSnapshotPolicyNowAction(
+  _previousState: BasicActionState,
+  formData: FormData,
+): Promise<BasicActionState> {
+  try {
+    const session = await requireSession();
+    requirePermission(session, "manage-settings");
+
+    const siteSlug = String(formData.get("siteSlug") ?? "");
+    if (!siteSlug)
+      return { message: "Missing site context.", requestId: randomUUID(), status: "error" };
+
+    const id = String(formData.get("policyId") ?? "");
+    if (!id)
+      return { message: "Schedule ID is required.", requestId: randomUUID(), status: "error" };
+
+    const siteConfig = await resolveSiteConfigBySlug(siteSlug);
+    return withSiteConfig(siteConfig, async () => {
+      const forced = await forceConfigSnapshotPolicyDue(id);
+      if (!forced)
+        return { message: "Schedule not found.", requestId: randomUUID(), status: "error" };
+
+      const result = await runConfigSnapshotTick();
+      revalidatePath(`/sites/${siteSlug}/node-configs`);
+
+      if (result.snapshotsTaken === 0 && result.errors.length > 0) {
+        return {
+          message: `Run failed: ${result.errors[0]}`,
+          requestId: randomUUID(),
+          status: "error",
+        };
+      }
+      return {
+        message:
+          result.snapshotsTaken > 0
+            ? `Snapshot taken (${result.snapshotsTaken} run${result.snapshotsTaken === 1 ? "" : "s"}).`
+            : "No snapshot was taken — schedule may be paused.",
+        requestId: randomUUID(),
+        status: result.snapshotsTaken > 0 ? "success" : "error",
+      };
+    });
+  } catch (error) {
+    return {
+      message: error instanceof Error ? error.message : "Failed to run schedule.",
       requestId: randomUUID(),
       status: "error",
     };

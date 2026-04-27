@@ -1,4 +1,5 @@
 import {
+  CalendarClock,
   FileJson2,
   Server,
 } from "lucide-react";
@@ -6,9 +7,11 @@ import { Badge } from "@/components/ui/badge";
 import { MetricCard } from "@/components/ui/metric-card";
 import { SectionPanel } from "@/components/ui/section-panel";
 import { requirePermission, requireSession } from "@/lib/auth";
+import { listConfigSnapshotPolicies } from "@/lib/config-snapshot-policies";
 import { listConfigSnapshots, compareConfigSnapshots, getConfigSnapshot } from "@/lib/node-config-backup";
 import { getNodes, withSiteConfig } from "@/lib/proxmox";
 import { ensureSiteConfig } from "@/lib/site-context";
+import { ConfigSnapshotSchedules } from "./config-snapshot-schedules";
 import { NodeConfigSnapshots } from "./node-config-snapshots";
 
 export const dynamic = "force-dynamic";
@@ -26,10 +29,11 @@ export default async function NodeConfigsPage({
   const session = await requireSession();
   requirePermission(session, "manage-settings");
 
-  const [snapshots, nodesData] = await withSiteConfig(siteConfig, () =>
+  const [snapshots, nodesData, schedules] = await withSiteConfig(siteConfig, () =>
     Promise.all([
       listConfigSnapshots(),
       getNodes(),
+      listConfigSnapshotPolicies(),
     ]),
   );
 
@@ -62,7 +66,7 @@ export default async function NodeConfigsPage({
   return (
     <div className="space-y-4">
       {/* Stats */}
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-3">
         <MetricCard
           icon={<FileJson2 className="w-3.5 h-3.5" />}
           label="Snapshots"
@@ -74,7 +78,16 @@ export default async function NodeConfigsPage({
           value={String(groupedByNode.size)}
           description={`of ${nodeNames.length} total nodes`}
         />
+        <MetricCard
+          icon={<CalendarClock className="w-3.5 h-3.5" />}
+          label="Active schedules"
+          value={String(schedules.filter((s) => s.enabled).length)}
+          description={`${schedules.length} total`}
+        />
       </div>
+
+      {/* Schedules */}
+      <ConfigSnapshotSchedules nodeNames={nodeNames} policies={schedules} />
 
       {/* Take snapshot + list */}
       <NodeConfigSnapshots
