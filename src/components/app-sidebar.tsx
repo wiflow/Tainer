@@ -4,6 +4,7 @@ import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import Cookies from "js-cookie";
+import { AnimatePresence, motion } from "framer-motion";
 
 import {
   Activity,
@@ -302,40 +303,181 @@ export function AppSidebar({
           </div>
         )}
 
-        {/* Main Nav */}
-        <nav className="flex flex-col gap-0.5 mb-8">
-          <NavLink icon={Home} label="Dashboard" active={effectiveSlug ? pathname === `/sites/${effectiveSlug}` : false} href={effectiveSlug ? `/sites/${effectiveSlug}` : "/"} />
-          <NavLink icon={RefreshCw} label="Deployments" active={isActive("/deployments")} href={effectiveSlug ? `/sites/${effectiveSlug}/deployments` : "/deployments"} />
-          <NavLink icon={ShieldCheck} label="Backups" active={isActive("/backups")} href={effectiveSlug ? `/sites/${effectiveSlug}/backups` : "/backups"} />
-          <NavLink icon={Bell} label="Alerts" active={isActive("/alerts")} href={effectiveSlug ? `/sites/${effectiveSlug}/alerts` : "/alerts"} />
-          {currentUser.role === "admin" && (
-            <NavLink icon={Activity} label="Heartbeat" active={pathname.startsWith("/heartbeat")} href="/heartbeat" />
-          )}
-          <NavLink icon={Settings2} label="Node Configs" active={isActive("/node-configs")} href={effectiveSlug ? `/sites/${effectiveSlug}/node-configs` : "/node-configs"} />
-          <NavLink icon={ShieldAlert} label="CVE Scanner" active={isActive("/cve-scanner")} href={effectiveSlug ? `/sites/${effectiveSlug}/cve-scanner` : "/cve-scanner"} />
-          {currentUser.role === "admin" && (
-            <NavLink icon={Scale} label="Load Balancer" active={isActive("/load-balancer")} href={effectiveSlug ? `/sites/${effectiveSlug}/load-balancer` : "/load-balancer"} />
-          )}
-        </nav>
+        {/* Sectioned nav. Each section auto-expands when its current route is
+            active; otherwise the user's last collapsed/expanded state from
+            localStorage wins. Default-open for first-time visitors is
+            controlled per-section below. */}
+        <nav className="flex flex-col gap-3 mb-4">
+          {/* Workloads — primary day-to-day flow */}
+          <NavSection
+            defaultOpen={
+              (effectiveSlug && pathname === `/sites/${effectiveSlug}`) ||
+              isActive("/deployments") ||
+              isActive("/backups") ||
+              isActive("/tags") ||
+              true /* default open on first visit */
+            }
+            id="workloads"
+            label="Workloads"
+          >
+            <NavLink
+              active={effectiveSlug ? pathname === `/sites/${effectiveSlug}` : false}
+              href={effectiveSlug ? `/sites/${effectiveSlug}` : "/"}
+              icon={Home}
+              label="Dashboard"
+            />
+            <NavLink
+              active={isActive("/deployments")}
+              href={effectiveSlug ? `/sites/${effectiveSlug}/deployments` : "/deployments"}
+              icon={RefreshCw}
+              label="Deployments"
+            />
+            <NavLink
+              active={isActive("/backups")}
+              href={effectiveSlug ? `/sites/${effectiveSlug}/backups` : "/backups"}
+              icon={ShieldCheck}
+              label="Backups"
+            />
+            <NavLink
+              active={isActive("/tags")}
+              href={effectiveSlug ? `/sites/${effectiveSlug}/tags` : "/tags"}
+              icon={Tags}
+              label="Tags"
+            />
+          </NavSection>
 
-        <div className="mb-2 px-3 text-[11px] font-medium text-zinc-500 uppercase tracking-widest">Library</div>
-        <nav className="flex flex-col gap-0.5 mb-auto">
-          <NavLink icon={FileBox} label="Templates" active={isActive("/templates")} href={effectiveSlug ? `/sites/${effectiveSlug}/templates` : "/templates"} />
-          <NavLink icon={Database} label="Images" active={isActive("/images")} href={effectiveSlug ? `/sites/${effectiveSlug}/images` : "/images"} />
-          <NavLink icon={Disc3} label="ISOs" active={isActive("/iso-images")} href={effectiveSlug ? `/sites/${effectiveSlug}/iso-images` : "/iso-images"} />
-        </nav>
+          {/* Reliability — alerts + monitoring + security scans */}
+          <NavSection
+            defaultOpen={
+              isActive("/alerts") ||
+              pathname.startsWith("/heartbeat") ||
+              isActive("/node-configs") ||
+              isActive("/cve-scanner") ||
+              isActive("/load-balancer")
+            }
+            id="reliability"
+            label="Reliability"
+          >
+            <NavLink
+              active={isActive("/alerts")}
+              href={effectiveSlug ? `/sites/${effectiveSlug}/alerts` : "/alerts"}
+              icon={Bell}
+              label="Alerts"
+            />
+            {currentUser.role === "admin" && (
+              <NavLink
+                active={pathname.startsWith("/heartbeat")}
+                href="/heartbeat"
+                icon={Activity}
+                label="Heartbeat"
+              />
+            )}
+            <NavLink
+              active={isActive("/node-configs")}
+              href={effectiveSlug ? `/sites/${effectiveSlug}/node-configs` : "/node-configs"}
+              icon={Settings2}
+              label="Node Configs"
+            />
+            <NavLink
+              active={isActive("/cve-scanner")}
+              href={effectiveSlug ? `/sites/${effectiveSlug}/cve-scanner` : "/cve-scanner"}
+              icon={ShieldAlert}
+              label="CVE Scanner"
+            />
+            {currentUser.role === "admin" && (
+              <NavLink
+                active={isActive("/load-balancer")}
+                href={effectiveSlug ? `/sites/${effectiveSlug}/load-balancer` : "/load-balancer"}
+                icon={Scale}
+                label="Load Balancer"
+              />
+            )}
+          </NavSection>
 
-        <div className="mx-2 my-4 border-t border-white/5" />
-        <nav className="flex flex-col gap-0.5 mb-4">
-          <NavLink icon={Tags} label="Tags" active={isActive("/tags")} href={effectiveSlug ? `/sites/${effectiveSlug}/tags` : "/tags"} />
-          <NavLink icon={FolderOpen} label="Groups" active={pathname.startsWith("/groups")} href="/groups" />
+          {/* Library — templates and images, used while creating new things */}
+          <NavSection
+            defaultOpen={
+              isActive("/templates") || isActive("/images") || isActive("/iso-images")
+            }
+            id="library"
+            label="Library"
+          >
+            <NavLink
+              active={isActive("/templates")}
+              href={effectiveSlug ? `/sites/${effectiveSlug}/templates` : "/templates"}
+              icon={FileBox}
+              label="Templates"
+            />
+            <NavLink
+              active={isActive("/images")}
+              href={effectiveSlug ? `/sites/${effectiveSlug}/images` : "/images"}
+              icon={Database}
+              label="Images"
+            />
+            <NavLink
+              active={isActive("/iso-images")}
+              href={effectiveSlug ? `/sites/${effectiveSlug}/iso-images` : "/iso-images"}
+              icon={Disc3}
+              label="ISOs"
+            />
+          </NavSection>
+
+          {/* Access — admin-only management. Hide the section entirely for
+              non-admins so they don't see an empty header. */}
           {currentUser.role === "admin" && (
-            <>
-              <NavLink icon={Users} label="Users" active={pathname.startsWith("/users")} href="/users" />
-              <NavLink icon={KeyRound} label="Identity Providers" active={pathname.startsWith("/identity-providers")} href="/identity-providers" />
-              <NavLink icon={ScrollText} label="Audit Log" active={pathname.startsWith("/audit-log")} href="/audit-log" />
-              <NavLink icon={Globe} label="Site Manager" active={pathname === "/sites"} href="/sites" />
-            </>
+            <NavSection
+              defaultOpen={
+                pathname.startsWith("/users") ||
+                pathname.startsWith("/groups") ||
+                pathname.startsWith("/identity-providers") ||
+                pathname.startsWith("/audit-log") ||
+                pathname === "/sites"
+              }
+              id="access"
+              label="Access"
+            >
+              <NavLink
+                active={pathname.startsWith("/users")}
+                href="/users"
+                icon={Users}
+                label="Users"
+              />
+              <NavLink
+                active={pathname.startsWith("/groups")}
+                href="/groups"
+                icon={FolderOpen}
+                label="Groups"
+              />
+              <NavLink
+                active={pathname.startsWith("/identity-providers")}
+                href="/identity-providers"
+                icon={KeyRound}
+                label="Identity Providers"
+              />
+              <NavLink
+                active={pathname.startsWith("/audit-log")}
+                href="/audit-log"
+                icon={ScrollText}
+                label="Audit Log"
+              />
+              <NavLink
+                active={pathname === "/sites"}
+                href="/sites"
+                icon={Globe}
+                label="Site Manager"
+              />
+            </NavSection>
+          )}
+
+          {/* Groups available to non-admins too. Show as a small flat link
+              under the sectioned nav rather than a one-item section. */}
+          {currentUser.role !== "admin" && (
+            <NavLink
+              active={pathname.startsWith("/groups")}
+              href="/groups"
+              icon={FolderOpen}
+              label="Groups"
+            />
           )}
         </nav>
 
@@ -441,5 +583,101 @@ function NavLink({
       <Icon className="w-4 h-4" />
       {label}
     </IntentLink>
+  );
+}
+
+/**
+ * Collapsible nav section. Header is a button with a chevron that rotates
+ * 180° when expanded. Body slides open/closed via framer-motion height
+ * animation, kept short (160ms) so it feels responsive, not animated-for-the-
+ * sake-of-animation.
+ *
+ * State is persisted in localStorage keyed by `id`, so refreshing remembers
+ * what the user had open. The section is also auto-expanded if it contains
+ * the active route — the caller passes `defaultOpen` for that.
+ */
+function NavSection({
+  children,
+  defaultOpen,
+  id,
+  label,
+}: {
+  children: React.ReactNode;
+  defaultOpen: boolean;
+  id: string;
+  label: string;
+}) {
+  const storageKey = `tainer_nav_section_${id}`;
+
+  // Initial state must match server-render (defaultOpen) to avoid hydration
+  // mismatch. localStorage value is read in an effect after mount.
+  const [open, setOpen] = useState(defaultOpen);
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(storageKey);
+      if (stored === "1") setOpen(true);
+      else if (stored === "0") setOpen(false);
+      // If not stored, keep defaultOpen.
+    } catch {
+      /* ignore */
+    }
+    setHydrated(true);
+  }, [storageKey]);
+
+  // Re-open the section whenever the active route falls inside it (e.g.
+  // user clicks a link that's collapsed via search/cmd-k). defaultOpen
+  // changing is the signal.
+  useEffect(() => {
+    if (defaultOpen && !open) setOpen(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [defaultOpen]);
+
+  function toggle() {
+    setOpen((current) => {
+      const next = !current;
+      try {
+        localStorage.setItem(storageKey, next ? "1" : "0");
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  }
+
+  return (
+    <div className="flex flex-col">
+      <button
+        aria-expanded={open}
+        className="group mb-1 flex w-full items-center justify-between rounded-md px-3 py-1.5 text-[10.5px] font-medium uppercase tracking-[0.16em] text-zinc-500 transition-colors hover:text-zinc-300"
+        onClick={toggle}
+        type="button"
+      >
+        <span>{label}</span>
+        <motion.span
+          animate={{ rotate: open ? 0 : -90 }}
+          className="text-zinc-600 group-hover:text-zinc-400"
+          initial={false}
+          transition={{ duration: 0.16 }}
+        >
+          <ChevronDown className="h-3 w-3" />
+        </motion.span>
+      </button>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            animate={{ height: "auto", opacity: 1 }}
+            className="overflow-hidden"
+            exit={{ height: 0, opacity: 0 }}
+            initial={hydrated ? { height: 0, opacity: 0 } : false}
+            key="body"
+            transition={{ duration: 0.16, ease: "easeOut" }}
+          >
+            <div className="flex flex-col gap-0.5 pb-1">{children}</div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
