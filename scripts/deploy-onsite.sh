@@ -124,15 +124,15 @@ ${TAINER_HOSTNAME}, ${VM_HOST} {
   ${TLS_DIRECTIVE}
   encode zstd gzip
 
-  # Surface the original host/proto so Tainer's OIDC redirect-URI builder
-  # and IP-allowlists see the real client + scheme rather than the docker
-  # network's internal IP.
-  header_up Host {host}
-  header_up X-Forwarded-For {remote}
-  header_up X-Forwarded-Proto {scheme}
-  header_up X-Forwarded-Host {host}
-
-  reverse_proxy tainer:3000
+  reverse_proxy tainer:3000 {
+    # Surface the original host/proto so Tainer's OIDC redirect-URI
+    # builder and IP-allowlists see the real client + scheme rather
+    # than the docker network's internal IP. Caddy auto-sets
+    # X-Forwarded-* by default; we override Host explicitly so
+    # upstream code that reads `host` (not x-forwarded-host) gets
+    # the right value.
+    header_up Host {host}
+  }
 }
 CADDYFILE
 
