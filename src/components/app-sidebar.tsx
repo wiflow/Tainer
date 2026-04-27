@@ -15,6 +15,7 @@ import {
   FolderOpen,
   HelpCircle,
   Home,
+  KeyRound,
   LogOut,
   Mail,
   Menu,
@@ -306,6 +307,7 @@ export function AppSidebar({
           {currentUser.role === "admin" && (
             <>
               <NavLink icon={Users} label="Users" active={pathname.startsWith("/users")} href="/users" />
+              <NavLink icon={KeyRound} label="Identity Providers" active={pathname.startsWith("/identity-providers")} href="/identity-providers" />
               <NavLink icon={Globe} label="Site Manager" active={pathname === "/sites"} href="/sites" />
             </>
           )}
