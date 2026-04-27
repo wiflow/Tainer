@@ -87,8 +87,30 @@ export function AppSidebar({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const siteSlug = pathname.match(/^\/sites\/([^/]+)/)?.[1] ?? sites[0]?.slug ?? "";
+
+  // Resolve the active site:
+  //   1. URL path (when on a /sites/{slug}/... page) — most authoritative.
+  //   2. `tainer_site` cookie (last site the user visited) — preserves the
+  //      site selection across global admin pages (Users, Audit Log, etc.)
+  //      so coming back to a per-site page goes back to the same site
+  //      instead of jumping to whatever sites[0] happens to be.
+  //   3. First site as a final fallback.
+  const pathSlug = pathname.match(/^\/sites\/([^/]+)/)?.[1] ?? "";
+  const cookieSlug = Cookies.get("tainer_site") ?? "";
+  const siteSlug =
+    pathSlug ||
+    (sites.some((s) => s.slug === cookieSlug) ? cookieSlug : "") ||
+    sites[0]?.slug ||
+    "";
   const effectiveSlug = siteSlug;
+
+  // Persist the active site whenever the URL tells us which one it is, so
+  // navigating to a global page later still remembers where the user was.
+  useEffect(() => {
+    if (pathSlug && pathSlug !== Cookies.get("tainer_site")) {
+      Cookies.set("tainer_site", pathSlug, { path: "/", expires: 365 });
+    }
+  }, [pathSlug]);
 
   const currentSite = sites.find((s) => s.slug === effectiveSlug) ?? sites[0];
   const currentSiteHealth = currentSite ? getSiteHealth(currentSite) : "unknown";
@@ -286,6 +308,9 @@ export function AppSidebar({
           <NavLink icon={RefreshCw} label="Deployments" active={isActive("/deployments")} href={effectiveSlug ? `/sites/${effectiveSlug}/deployments` : "/deployments"} />
           <NavLink icon={ShieldCheck} label="Backups" active={isActive("/backups")} href={effectiveSlug ? `/sites/${effectiveSlug}/backups` : "/backups"} />
           <NavLink icon={Bell} label="Alerts" active={isActive("/alerts")} href={effectiveSlug ? `/sites/${effectiveSlug}/alerts` : "/alerts"} />
+          {currentUser.role === "admin" && (
+            <NavLink icon={Activity} label="Heartbeat" active={pathname.startsWith("/heartbeat")} href="/heartbeat" />
+          )}
           <NavLink icon={Settings2} label="Node Configs" active={isActive("/node-configs")} href={effectiveSlug ? `/sites/${effectiveSlug}/node-configs` : "/node-configs"} />
           <NavLink icon={ShieldAlert} label="CVE Scanner" active={isActive("/cve-scanner")} href={effectiveSlug ? `/sites/${effectiveSlug}/cve-scanner` : "/cve-scanner"} />
           {currentUser.role === "admin" && (
@@ -303,7 +328,6 @@ export function AppSidebar({
         <div className="mx-2 my-4 border-t border-white/5" />
         <nav className="flex flex-col gap-0.5 mb-4">
           <NavLink icon={Tags} label="Tags" active={isActive("/tags")} href={effectiveSlug ? `/sites/${effectiveSlug}/tags` : "/tags"} />
-          <NavLink icon={Activity} label="Heartbeat" active={pathname.startsWith("/heartbeat")} href="/heartbeat" />
           <NavLink icon={FolderOpen} label="Groups" active={pathname.startsWith("/groups")} href="/groups" />
           {currentUser.role === "admin" && (
             <>
