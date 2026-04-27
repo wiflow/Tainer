@@ -110,7 +110,11 @@ export default async function RootLayout({
             version={packageJson.version}
             sites={sites.map((s) => ({ id: s.id, slug: s.slug, name: s.name, healthy: s.lastValidationOk }))}
           />
-          <main className="min-h-screen lg:pl-[220px]" id="main-content" tabIndex={-1}>
+          <main
+            className="min-h-screen transition-[padding] duration-200 ease-out lg:pl-[var(--sidebar-width,240px)]"
+            id="main-content"
+            tabIndex={-1}
+          >
             <div className="mx-auto max-w-[1100px] px-6 py-8 lg:px-10 lg:py-10" data-content-wrapper>
               {children}
             </div>

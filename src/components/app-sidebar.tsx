@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import Cookies from "js-cookie";
 import { AnimatePresence, motion } from "framer-motion";
 
@@ -10,6 +10,8 @@ import {
   Activity,
   Box,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Database,
   Disc3,
   FileBox,
@@ -51,6 +53,15 @@ type SiteInfo = {
   name: string;
   healthy: boolean | null;
 };
+
+/**
+ * Collapsed-state context. Avoids prop-drilling `collapsed` down to every
+ * NavLink + NavSection. AppSidebar wraps its content in a Provider.
+ */
+const SidebarCollapsedContext = createContext(false);
+function useSidebarCollapsed() {
+  return useContext(SidebarCollapsedContext);
+}
 
 function getSiteHealth(site: SiteInfo) {
   if (site.healthy === true) return "connected";
@@ -119,6 +130,40 @@ export function AppSidebar({
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  // Desktop sidebar collapse state. Persists in localStorage so refresh
+  // remembers it. Initial value is `false` for SSR consistency; the real
+  // stored value is loaded after mount in the effect below.
+  const [collapsed, setCollapsed] = useState(false);
+
+  useEffect(() => {
+    try {
+      if (localStorage.getItem("tainer_sidebar_collapsed") === "1") {
+        setCollapsed(true);
+      }
+    } catch {
+      /* ignore — private mode etc. */
+    }
+  }, []);
+
+  // Sync the collapsed width to a CSS variable on <html> so the main content
+  // padding (in app/layout.tsx) tracks the sidebar width without prop
+  // drilling. 240px expanded, 64px collapsed = just enough for icons.
+  useEffect(() => {
+    const width = collapsed ? 64 : 240;
+    document.documentElement.style.setProperty("--sidebar-width", `${width}px`);
+  }, [collapsed]);
+
+  function toggleCollapsed() {
+    setCollapsed((current) => {
+      const next = !current;
+      try {
+        localStorage.setItem("tainer_sidebar_collapsed", next ? "1" : "0");
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  }
   const switcherRef = useRef<HTMLDivElement>(null);
   const toggleClickedRef = useRef(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -203,22 +248,61 @@ export function AppSidebar({
     <>
       <div className="flex flex-1 flex-col overflow-y-auto px-3 py-4">
 
-        <div className="flex items-center gap-1 mb-4">
-          <nav className="flex-1">
-            <NavLink icon={MapIcon} label="Overview" active={pathname === "/"} href="/" />
-          </nav>
+        {/* ── Brand header ── */}
+        <div className="mb-3 flex items-center gap-2 px-1">
+          <Image
+            alt="Tainer"
+            className="rounded-md"
+            height={28}
+            priority
+            src="/logo.png"
+            width={28}
+          />
+          {!collapsed && (
+            <span className="font-display text-[15px] font-semibold tracking-wide text-zinc-100">
+              Tainer
+            </span>
+          )}
+          <div className="flex-1" />
+          {/* Mobile close button (collapse toggle replaces it on desktop) */}
           <button
-            className="shrink-0 flex items-center justify-center w-9 h-9 rounded-md text-zinc-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer lg:hidden"
-            onClick={() => setMobileOpen(false)}
             aria-label="Close navigation menu"
+            className="shrink-0 flex items-center justify-center w-8 h-8 rounded-md text-zinc-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer lg:hidden"
+            onClick={() => setMobileOpen(false)}
             type="button"
           >
             <X className="w-4 h-4" />
           </button>
+          {/* Desktop collapse toggle */}
+          <button
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            className="hidden shrink-0 lg:flex items-center justify-center w-7 h-7 rounded-md text-zinc-500 hover:text-zinc-200 hover:bg-white/5 transition-colors cursor-pointer"
+            onClick={toggleCollapsed}
+            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            type="button"
+          >
+            {collapsed ? (
+              <ChevronRight className="w-3.5 h-3.5" />
+            ) : (
+              <ChevronLeft className="w-3.5 h-3.5" />
+            )}
+          </button>
         </div>
 
-        {/* Site Switcher */}
-        {sites.length > 0 && (
+        {/* ── Overview (top-level, separate from sectioned nav) ── */}
+        <nav className="mb-4">
+          <NavLink
+            active={pathname === "/"}
+            href="/"
+            icon={MapIcon}
+            label="Overview"
+          />
+        </nav>
+
+        {/* Site Switcher — hidden in collapsed mode (no room for the name).
+            Users expand to change sites; the active-site state is preserved
+            via the `tainer_site` cookie. */}
+        {sites.length > 0 && !collapsed && (
           <div className="relative mb-2" ref={switcherRef}>
             <div className="flex items-center gap-1">
               <button
@@ -483,28 +567,42 @@ export function AppSidebar({
 
       </div>
 
-      {/* Bottom Nav */}
+      {/* Bottom Nav — flex-row when expanded (avatar + name + actions),
+          stacked column when collapsed (just the icons, vertically). */}
       <div className="p-3 border-t border-white/5">
-        <div className="flex items-center gap-3 px-3 py-2">
-          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-zinc-800 border border-white/10 text-[11px] font-bold text-zinc-400 shrink-0">
-             {initials}
+        <div
+          className={cn(
+            "px-1 py-1",
+            collapsed
+              ? "flex flex-col items-center gap-1"
+              : "flex items-center gap-3 px-3 py-2",
+          )}
+        >
+          <div
+            className="flex items-center justify-center w-8 h-8 rounded-full bg-zinc-800 border border-white/10 text-[11px] font-bold text-zinc-400 shrink-0"
+            title={collapsed ? `${currentUser.name} (${currentUser.role})` : undefined}
+          >
+            {initials}
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-[13px] font-medium text-zinc-200 truncate">{currentUser.name}</p>
-            <p className="text-[11px] text-zinc-400 truncate">{currentUser.role} · v{version}</p>
-          </div>
+          {!collapsed && (
+            <div className="flex-1 min-w-0">
+              <p className="text-[13px] font-medium text-zinc-200 truncate">{currentUser.name}</p>
+              <p className="text-[11px] text-zinc-400 truncate">{currentUser.role} · v{version}</p>
+            </div>
+          )}
           <IntentLink
+            aria-label="Account settings"
             className="shrink-0 flex items-center justify-center w-9 h-9 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-white/5 transition-colors cursor-pointer"
             href="/account"
-            aria-label="Account settings"
+            title={collapsed ? "Account settings" : undefined}
           >
             <Settings className="w-4 h-4" />
           </IntentLink>
-
           <Form action={signOutAction}>
             <button
-              className="shrink-0 flex items-center justify-center w-9 h-9 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-white/5 transition-colors cursor-pointer"
               aria-label="Sign out"
+              className="shrink-0 flex items-center justify-center w-9 h-9 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-white/5 transition-colors cursor-pointer"
+              title={collapsed ? "Sign out" : undefined}
               type="submit"
             >
               <LogOut className="w-4 h-4" />
@@ -536,24 +634,33 @@ export function AppSidebar({
         />
       )}
 
-      {/* Mobile sidebar */}
-      <aside
-        className={cn(
-          "fixed inset-y-0 left-0 z-50 w-[280px] border-r border-white/5 bg-[#0a0a0a] flex flex-col transition-transform duration-300 ease-out lg:hidden",
-          mobileOpen ? "translate-x-0" : "-translate-x-full",
-        )}
-        aria-label="Main navigation"
-      >
-        {sidebarContent}
-      </aside>
+      {/* Mobile sidebar — always full width regardless of desktop collapse */}
+      <SidebarCollapsedContext.Provider value={false}>
+        <aside
+          className={cn(
+            "fixed inset-y-0 left-0 z-50 w-[280px] border-r border-white/5 bg-[#0a0a0a] flex flex-col transition-transform duration-300 ease-out lg:hidden",
+            mobileOpen ? "translate-x-0" : "-translate-x-full",
+          )}
+          aria-label="Main navigation"
+        >
+          {sidebarContent}
+        </aside>
+      </SidebarCollapsedContext.Provider>
 
-      {/* Desktop sidebar */}
-      <aside
-        className="hidden fixed inset-y-0 left-0 z-30 border-r border-white/5 bg-[#0a0a0a] lg:flex lg:w-[240px] lg:flex-col"
-        aria-label="Main navigation"
-      >
-        {sidebarContent}
-      </aside>
+      {/* Desktop sidebar — width tracks `collapsed` state via inline style.
+          The CSS var --sidebar-width is also written to <html> so the main
+          content padding in app/layout.tsx tracks it without prop drilling. */}
+      <SidebarCollapsedContext.Provider value={collapsed}>
+        <aside
+          aria-label="Main navigation"
+          className={cn(
+            "hidden fixed inset-y-0 left-0 z-30 border-r border-white/5 bg-[#0a0a0a] lg:flex lg:flex-col transition-[width] duration-200 ease-out",
+          )}
+          style={{ width: collapsed ? 64 : 240 }}
+        >
+          {sidebarContent}
+        </aside>
+      </SidebarCollapsedContext.Provider>
     </>
   );
 }
@@ -569,19 +676,24 @@ function NavLink({
   active: boolean;
   href: string;
 }) {
+  const collapsed = useSidebarCollapsed();
   return (
     <IntentLink
       href={href}
       className={cn(
-        "flex items-center gap-3 rounded-md px-3 py-2 text-[13px] font-medium transition-colors cursor-pointer",
+        "flex items-center rounded-md text-[13px] font-medium transition-colors cursor-pointer",
+        // In collapsed mode: centre the icon, square hit-box, native tooltip
+        // shows the label on hover so users can still identify the icon.
+        collapsed ? "justify-center h-9 w-9 mx-auto" : "gap-3 px-3 py-2",
         active
           ? "bg-white/10 text-white"
           : "text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
       )}
       aria-current={active ? "page" : undefined}
+      title={collapsed ? label : undefined}
     >
-      <Icon className="w-4 h-4" />
-      {label}
+      <Icon className="w-4 h-4 shrink-0" />
+      {!collapsed && label}
     </IntentLink>
   );
 }
@@ -607,7 +719,19 @@ function NavSection({
   id: string;
   label: string;
 }) {
+  const collapsed = useSidebarCollapsed();
   const storageKey = `tainer_nav_section_${id}`;
+
+  // When the sidebar itself is collapsed, sections lose their headers and
+  // animations — there's no room for them. Just render the items as a flat
+  // group with a thin divider so categories are still visually grouped.
+  if (collapsed) {
+    return (
+      <div className="flex flex-col gap-1 border-t border-white/[0.04] pt-2 first:border-t-0 first:pt-0">
+        {children}
+      </div>
+    );
+  }
 
   // Initial state must match server-render (defaultOpen) to avoid hydration
   // mismatch. localStorage value is read in an effect after mount.
