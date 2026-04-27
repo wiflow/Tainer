@@ -257,32 +257,37 @@ async function tick(): Promise<void> {
 
     const sites = await listEnabledSites();
 
-    for (const site of sites) {
-      try {
-        const { withSiteConfig } = await import("@/lib/proxmox");
-        const { resolveSiteConfig } = await import("@/lib/site-resolver");
-        const config = await resolveSiteConfig(site);
+    // Run all sites in parallel — they're isolated (different Proxmox
+    // clusters, different agent pools). Sequential iteration meant a single
+    // unresponsive site blocked all others for up to tickTimeoutSeconds.
+    const { withSiteConfig } = await import("@/lib/proxmox");
+    const { resolveSiteConfig } = await import("@/lib/site-resolver");
 
-        const settings = await withSiteConfig(config, () => getLoadBalancerSettings());
+    await Promise.all(
+      sites.map(async (site) => {
+        try {
+          const config = await resolveSiteConfig(site);
+          const settings = await withSiteConfig(config, () => getLoadBalancerSettings());
 
-        if (!settings.enabled) {
-          state.siteStates.delete(site.id);
-          continue;
+          if (!settings.enabled) {
+            state.siteStates.delete(site.id);
+            return;
+          }
+
+          const timeoutMs = settings.tickTimeoutSeconds * 1000;
+          await withTimeout(
+            tickSite(site.id, settings),
+            timeoutMs,
+            `tickSite(${site.name})`,
+          );
+        } catch (error) {
+          console.error(
+            `[load-balancer] Tick error for site ${site.name}:`,
+            error instanceof Error ? error.message : error,
+          );
         }
-
-        const timeoutMs = settings.tickTimeoutSeconds * 1000;
-        await withTimeout(
-          tickSite(site.id, settings),
-          timeoutMs,
-          `tickSite(${site.name})`,
-        );
-      } catch (error) {
-        console.error(
-          `[load-balancer] Tick error for site ${site.name}:`,
-          error instanceof Error ? error.message : error,
-        );
-      }
-    }
+      }),
+    );
 
     state.lastTickAt = new Date().toISOString();
     state.lastError = null;

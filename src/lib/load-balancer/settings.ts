@@ -21,7 +21,12 @@ export const DEFAULT_LB_SETTINGS: LoadBalancerSettings = {
   failcntPenalty: 50,
   ewmaAlpha: 0.3,
   latencyMaxMs: 500,
-  tickTimeoutSeconds: 30,
+  // Lowered from 30s -> 10s. Anything over 10s on a load-balancer tick means
+  // the site's Proxmox is genuinely broken; spinning for 30 seconds just
+  // chains delays into the next tick and burns sockets. The per-request
+  // 15s timeout in proxmoxRequest will kick in well before this anyway —
+  // this is the cumulative budget across ALL requests in the tick.
+  tickTimeoutSeconds: 10,
   excludedNodes: [],
   excludedVmids: [],
   updatedAt: null,

@@ -912,9 +912,20 @@ const httpAgentCache = new Map<string, http.Agent>();
 const KEEP_ALIVE_AGENT_OPTS = {
   keepAlive: true,
   keepAliveMsecs: 5000,
-  maxSockets: 16,
+  // Bumped from 16 to 32. The deployments page can fan out 90+ parallel
+  // requests during a cold load; with maxSockets=16 most of them queued.
+  // 32 gives enough headroom that backgrounded ticks (load balancer, alerts)
+  // don't starve user-facing pages.
+  maxSockets: 32,
   scheduling: "lifo" as const,
 };
+
+// Hard ceiling on any single Proxmox HTTP request. Without this a hung
+// endpoint can hold a socket forever — Node's default socket timeout doesn't
+// apply once the request has connected and Proxmox is just being slow to
+// respond. 15s is generous for legitimate calls; broken endpoints fail fast
+// instead of stalling the page that's waiting on them.
+const REQUEST_TIMEOUT_MS = 15_000;
 
 function getHttpsAgent(
   siteId: string,
@@ -1204,6 +1215,16 @@ async function proxmoxRequest<T>(endpoint: string, options: RequestOptions = {})
 
     request.on("error", (error) => {
       reject(new ProxmoxApiError(error.message, endpoint));
+    });
+
+    // Per-request timeout. Without this, a hung Proxmox endpoint (RRD on a
+    // loaded host, a flaky network path, a node that's gone unresponsive)
+    // ties up a keep-alive socket indefinitely. Pages that share that socket
+    // pool then queue waiting. 15s is generous — most calls finish in <1s,
+    // anything over that is broken.
+    request.setTimeout(REQUEST_TIMEOUT_MS, () => {
+      request.destroy();
+      reject(new ProxmoxApiError(`Request timed out after ${REQUEST_TIMEOUT_MS}ms`, endpoint));
     });
 
     if (body) {
