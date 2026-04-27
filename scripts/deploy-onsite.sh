@@ -136,15 +136,17 @@ ${TAINER_HOSTNAME}, ${VM_HOST} {
 }
 CADDYFILE
 
-# Generate docker-compose.yml: tainer (internal-only) + caddy (public).
+# Generate docker-compose.yml: tainer publishes 3000 (direct HTTP, legacy URLs)
+# AND caddy serves 443 (HTTPS, canonical). Both routes reach the same app.
+# Once all clients are on HTTPS we can drop the 3000 publish.
 remote "cat > ${APP_DIR}/docker-compose.yml" <<COMPOSE
 services:
   tainer:
     image: ${IMAGE_FULL}
-    # No published ports — only Caddy reaches Tainer, on the internal docker
-    # network.
-    expose:
-      - "3000"
+    ports:
+      # Direct HTTP access on :3000 kept for transition compatibility.
+      # Old bookmarks / scripts pointing at http://...:3000 keep working.
+      - "3000:3000"
     volumes:
       - ${DATA_DIR}:/app/data
     environment:
@@ -194,7 +196,8 @@ remote "docker logs \$(cd ${APP_DIR} && docker compose ps -q) 2>&1 | tail -5"
 
 echo ""
 echo "=== Deploy complete ==="
-echo "   Tainer is running at https://${TAINER_HOSTNAME}/  (also: https://${VM_HOST}/)"
+echo "   HTTPS (canonical):  https://${TAINER_HOSTNAME}/"
+echo "   HTTP (legacy):      http://${VM_HOST}:3000/   ← transitional, plan to retire"
 echo ""
 echo "   First-time HTTPS notes:"
 echo "   - DNS: ensure ${TAINER_HOSTNAME} resolves to ${VM_HOST}"
