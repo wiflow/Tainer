@@ -192,6 +192,10 @@ async function tickSite(siteId: string, settings: LoadBalancerSettings): Promise
         metrics,
       );
 
+      // Lazy-import the event log so the LB module doesn't depend on
+      // server-only at import time when used by lighter call sites.
+      const { recordLbEvent } = await import("@/lib/load-balancer/event-log");
+
       for (const decision of decisions) {
         try {
           const upid =
@@ -209,11 +213,44 @@ async function tickSite(siteId: string, settings: LoadBalancerSettings): Promise
           console.log(
             `[load-balancer] Migration triggered: ${decision.type} ${decision.vmid} from ${decision.sourceNode} to ${decision.targetNode} (${decision.reason})`,
           );
+
+          recordLbEvent({
+            category: "migration-triggered",
+            level: "info",
+            siteId: config.siteId,
+            siteName: config.siteName,
+            node: decision.sourceNode,
+            vmid: decision.vmid,
+            message: `Migrated ${decision.type.toUpperCase()} ${decision.vmid} from ${decision.sourceNode} → ${decision.targetNode}`,
+            details: {
+              type: decision.type,
+              targetNode: decision.targetNode,
+              reason: decision.reason,
+              upid,
+            },
+          }).catch(() => {});
         } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
           console.error(
             `[load-balancer] Migration failed for ${decision.type} ${decision.vmid}:`,
-            error instanceof Error ? error.message : error,
+            message,
           );
+
+          recordLbEvent({
+            category: "migration-failed",
+            level: "destructive",
+            siteId: config.siteId,
+            siteName: config.siteName,
+            node: decision.sourceNode,
+            vmid: decision.vmid,
+            message: `Migration of ${decision.type.toUpperCase()} ${decision.vmid} (${decision.sourceNode} → ${decision.targetNode}) failed: ${message}`,
+            details: {
+              type: decision.type,
+              targetNode: decision.targetNode,
+              reason: decision.reason,
+              error: message,
+            },
+          }).catch(() => {});
         }
       }
     }
