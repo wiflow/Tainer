@@ -1,18 +1,21 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { getIdpProviderBySlug } from "@/lib/idp-providers";
-import { OIDC_FLOW_COOKIE, oidcFlowCookieHelpers, startOidcAuthorization } from "@/lib/oidc";
+import {
+  OIDC_FLOW_COOKIE,
+  getPublicOrigin,
+  oidcFlowCookieHelpers,
+  startOidcAuthorization,
+} from "@/lib/oidc";
 
 export const dynamic = "force-dynamic";
 
 function buildRedirectUri(request: NextRequest, providerSlug: string): string {
-  // Honour x-forwarded-* when sitting behind a reverse proxy. Falls back to
-  // the request's own protocol/host. Final URL must EXACTLY match the
-  // redirect URI registered in the IdP — typos here are the #1 OIDC failure.
-  const headers = request.headers;
-  const proto = headers.get("x-forwarded-proto") ?? request.nextUrl.protocol.replace(":", "");
-  const host = headers.get("x-forwarded-host") ?? headers.get("host") ?? request.nextUrl.host;
-  return `${proto}://${host}/auth/sso/callback/${providerSlug}`;
+  // Use the same origin resolution as the callback so the redirect_uri
+  // sent to the IdP matches exactly what the callback constructs (the IdP
+  // strict-compares these). APP_URL > x-forwarded-* > Host header.
+  const origin = getPublicOrigin(request.headers, request.url);
+  return `${origin}/auth/sso/callback/${providerSlug}`;
 }
 
 function sanitizeReturnTo(raw: string | null, fallback = "/"): string {

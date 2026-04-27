@@ -16,6 +16,44 @@ import {
  * scopes, where to redirect, how long the in-flight cookie lives).
  */
 
+/**
+ * Resolves the public origin Tainer is reachable at (e.g. https://tainer.example.com).
+ * Order of preference:
+ *   1. `APP_URL` env var — set explicitly by the deploy script and the most reliable
+ *      source when sitting behind a reverse proxy. Use this whenever it's set.
+ *   2. `x-forwarded-proto` + `x-forwarded-host` headers — what Caddy / nginx /
+ *      similar set when proxying. Honours the proxy without requiring config.
+ *   3. The request's own `Host` header + protocol — last-resort fallback that
+ *      can yield `http://0.0.0.0:3000` when the request hits the bind socket
+ *      directly inside Docker. Avoid using this unless 1 + 2 are unavailable.
+ *
+ * Always returns a string with no trailing slash, ready to concatenate paths.
+ */
+export function getPublicOrigin(headers: Headers, requestUrl?: string): string {
+  const envUrl = process.env.APP_URL?.trim();
+  if (envUrl) return envUrl.replace(/\/+$/, "");
+
+  const proto = headers.get("x-forwarded-proto");
+  const host = headers.get("x-forwarded-host");
+  if (proto && host) return `${proto}://${host}`;
+
+  if (requestUrl) {
+    try {
+      const u = new URL(requestUrl);
+      return `${u.protocol}//${u.host}`;
+    } catch {
+      // fall through
+    }
+  }
+
+  // Last resort. If we get here we'll likely build wrong URLs and the IdP
+  // will reject the redirect_uri. Better to surface the misconfiguration
+  // than silently use 0.0.0.0:3000.
+  throw new Error(
+    "Cannot determine public origin. Set APP_URL env var or configure x-forwarded-* headers on the reverse proxy.",
+  );
+}
+
 export const OIDC_FLOW_COOKIE = "tainer_oidc_flow";
 const OIDC_FLOW_COOKIE_NAMESPACE = "oidc-flow:v1";
 const OIDC_FLOW_TTL_MS = 5 * 60 * 1000; // 5 minutes — enough to complete the IdP redirect dance
