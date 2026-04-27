@@ -3,6 +3,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 
+import { computeNextRunAt } from "@/lib/scheduler-utils";
 import { resolveSiteDataFilePathFromContext } from "@/lib/site-data";
 import { createStoreMutator, writeJsonFileAtomically } from "@/lib/store-utils";
 
@@ -91,11 +92,6 @@ function normalizePolicy(raw: Partial<BackupPolicy>): BackupPolicy {
       : [],
     updatedAt: typeof raw.updatedAt === "string" ? raw.updatedAt : new Date().toISOString(),
   };
-}
-
-function computeNextRunAt(lastRunAt: string | null, intervalMinutes: number): string {
-  const baseMs = lastRunAt ? new Date(lastRunAt).getTime() : Date.now();
-  return new Date(baseMs + intervalMinutes * 60_000).toISOString();
 }
 
 async function readStore(): Promise<BackupPolicyStore> {

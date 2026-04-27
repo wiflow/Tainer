@@ -184,8 +184,8 @@ function prettyJson(value: unknown): string {
 import {
   listConfigSnapshotPolicies,
   markConfigSnapshotPolicyRun,
-  type ConfigSnapshotPolicy,
 } from "@/lib/config-snapshot-policies";
+import { runDuePolicies } from "@/lib/scheduler-utils";
 
 export type ConfigSnapshotTickResult = {
   errors: string[];
@@ -199,52 +199,39 @@ export type ConfigSnapshotTickResult = {
  * up site context (use `runConfigSnapshotTickAllSites()` for cluster-wide).
  */
 export async function runConfigSnapshotTick(): Promise<ConfigSnapshotTickResult> {
-  const errors: string[] = [];
-  let snapshotsTaken = 0;
-  let policies: ConfigSnapshotPolicy[] = [];
-
+  let policies;
   try {
     policies = await listConfigSnapshotPolicies();
   } catch (error) {
-    errors.push(
-      `Failed to load config snapshot policies: ${error instanceof Error ? error.message : String(error)}`,
-    );
-    return { errors, policiesEvaluated: 0, snapshotsTaken: 0 };
+    return {
+      errors: [
+        `Failed to load config snapshot policies: ${error instanceof Error ? error.message : String(error)}`,
+      ],
+      policiesEvaluated: 0,
+      snapshotsTaken: 0,
+    };
   }
 
-  const now = Date.now();
-  const due = policies.filter((p) => {
-    if (!p.enabled) return false;
-    if (!p.nodeName) return false;
-    if (!p.nextRunAt) return true;
-    return now >= new Date(p.nextRunAt).getTime();
-  });
-
-  for (const policy of due) {
-    const runAt = new Date().toISOString();
-    try {
-      const label = `${policy.name} — ${new Date(runAt).toLocaleString()}`;
+  const result = await runDuePolicies({
+    isReady: (p) => Boolean(p.nodeName),
+    markRun: markConfigSnapshotPolicyRun,
+    policies,
+    policyLabel: (p) => `Policy "${p.name}"`,
+    runOne: async (policy) => {
+      const label = `${policy.name} — ${new Date().toLocaleString()}`;
       await takeConfigSnapshot(policy.nodeName, `schedule:${policy.name}`, label, {
         policyId: policy.id,
         policyRetention: policy.retentionCount,
         trigger: "scheduled",
       });
-      await markConfigSnapshotPolicyRun(policy.id, runAt);
-      snapshotsTaken++;
-    } catch (error) {
-      errors.push(
-        `Policy "${policy.name}": ${error instanceof Error ? error.message : String(error)}`,
-      );
-      // Still mark the run so we don't immediately retry on every tick.
-      try {
-        await markConfigSnapshotPolicyRun(policy.id, runAt);
-      } catch {
-        /* ignore */
-      }
-    }
-  }
+    },
+  });
 
-  return { errors, policiesEvaluated: policies.length, snapshotsTaken };
+  return {
+    errors: result.errors,
+    policiesEvaluated: result.policiesEvaluated,
+    snapshotsTaken: result.ranCount,
+  };
 }
 
 // ---------------------------------------------------------------------------
