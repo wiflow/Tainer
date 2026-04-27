@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import {
   Camera,
+  Eye,
   FileJson2,
   GitCompare,
   History,
@@ -74,6 +75,13 @@ function SnapshotRow({
           {formatDate(snapshot.createdAt)} by {snapshot.createdBy}
         </p>
       </div>
+      <Link
+        className="rounded-md p-1.5 text-zinc-600 hover:bg-zinc-800 hover:text-sky-400 transition-colors"
+        href={`/sites/${siteSlug}/node-configs/view?id=${snapshot.id}`}
+        title="View snapshot contents"
+      >
+        <Eye className="h-3.5 w-3.5" />
+      </Link>
       <Link
         className="rounded-md p-1.5 text-zinc-600 hover:bg-zinc-800 hover:text-amber-400 transition-colors"
         href={`/sites/${siteSlug}/node-configs/restore?id=${snapshot.id}`}
