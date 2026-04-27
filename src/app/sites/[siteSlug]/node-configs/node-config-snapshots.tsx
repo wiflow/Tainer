@@ -5,8 +5,10 @@ import {
   Camera,
   FileJson2,
   GitCompare,
+  History,
   Trash2,
 } from "lucide-react";
+import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
 import { deleteConfigSnapshotAction, takeConfigSnapshotAction } from "@/app/node-config-actions";
@@ -72,6 +74,13 @@ function SnapshotRow({
           {formatDate(snapshot.createdAt)} by {snapshot.createdBy}
         </p>
       </div>
+      <Link
+        className="rounded-md p-1.5 text-zinc-600 hover:bg-zinc-800 hover:text-amber-400 transition-colors"
+        href={`/sites/${siteSlug}/node-configs/restore?id=${snapshot.id}`}
+        title="Restore this snapshot"
+      >
+        <History className="h-3.5 w-3.5" />
+      </Link>
       <Form
         action={deleteAction}
         onSubmit={(e) => {

@@ -4563,6 +4563,229 @@ export async function getClusterFirewallRules(): Promise<unknown[]> {
   return proxmoxRequest<unknown[]>("/cluster/firewall/rules") ?? [];
 }
 
+// ---------------------------------------------------------------------------
+// Node / cluster configuration setters (used by node-config snapshot restore)
+// ---------------------------------------------------------------------------
+
+/**
+ * Append URLSearchParams from a plain object, skipping null/undefined and
+ * coercing booleans to "0"/"1" (Proxmox API convention).
+ */
+function appendParams(
+  params: URLSearchParams,
+  source: Record<string, unknown>,
+  options: { skipKeys?: ReadonlySet<string> } = {},
+) {
+  const skip = options.skipKeys ?? new Set<string>();
+  for (const [key, value] of Object.entries(source)) {
+    if (skip.has(key)) continue;
+    if (value === null || value === undefined) continue;
+    if (typeof value === "boolean") {
+      params.set(key, value ? "1" : "0");
+      continue;
+    }
+    if (typeof value === "number") {
+      params.set(key, String(value));
+      continue;
+    }
+    if (typeof value === "string") {
+      params.set(key, value);
+      continue;
+    }
+    if (Array.isArray(value)) {
+      params.set(key, value.join(","));
+      continue;
+    }
+    // Skip nested objects — Proxmox endpoints we touch here don't take them
+    // and silently passing `[object Object]` would corrupt config.
+  }
+}
+
+/** Read-only / derived fields returned by Proxmox that must not be sent back. */
+const NETWORK_IFACE_READONLY_KEYS: ReadonlySet<string> = new Set([
+  "active",
+  "exists",
+  "families",
+  "iface",
+  "method6",
+  "priority",
+]);
+
+const STORAGE_READONLY_KEYS: ReadonlySet<string> = new Set([
+  "digest",
+  "storage",
+  "type", // type is immutable on PUT — only valid on POST
+]);
+
+export async function updateNodeDnsConfig(
+  node: string,
+  config: ProxmoxDnsConfig,
+): Promise<unknown> {
+  const safeNode = validateNodeName(node);
+  const params = new URLSearchParams();
+  appendParams(params, config as Record<string, unknown>);
+  return proxmoxRequest<unknown>(`/nodes/${safeNode}/dns`, {
+    method: "PUT",
+    params,
+  });
+}
+
+export async function updateNodeHostsConfig(
+  node: string,
+  data: string,
+  digest?: string,
+): Promise<unknown> {
+  const safeNode = validateNodeName(node);
+  const params = new URLSearchParams();
+  params.set("data", data);
+  if (digest) params.set("digest", digest);
+  return proxmoxRequest<unknown>(`/nodes/${safeNode}/hosts`, {
+    method: "POST",
+    params,
+  });
+}
+
+export async function updateNodeTimeConfig(
+  node: string,
+  timezone: string,
+): Promise<unknown> {
+  const safeNode = validateNodeName(node);
+  const params = new URLSearchParams();
+  params.set("timezone", timezone);
+  return proxmoxRequest<unknown>(`/nodes/${safeNode}/time`, {
+    method: "PUT",
+    params,
+  });
+}
+
+/**
+ * Update an existing network interface on a node. Caller is responsible for
+ * calling reloadNodeNetwork() afterwards to apply pending changes.
+ */
+export async function updateNodeNetworkInterface(
+  node: string,
+  iface: string,
+  config: Record<string, unknown>,
+): Promise<unknown> {
+  const safeNode = validateNodeName(node);
+  const safeIface = iface.trim();
+  if (!/^[a-zA-Z0-9_.:-]{1,40}$/.test(safeIface)) {
+    throw new Error("Invalid network interface name.");
+  }
+  const params = new URLSearchParams();
+  appendParams(params, config, { skipKeys: NETWORK_IFACE_READONLY_KEYS });
+  // `type` is required by the API but should not be changed; pass it through
+  // if present in the snapshot so PUT validates correctly.
+  if (typeof config.type === "string" && config.type) {
+    params.set("type", config.type);
+  }
+  return proxmoxRequest<unknown>(`/nodes/${safeNode}/network/${safeIface}`, {
+    method: "PUT",
+    params,
+  });
+}
+
+export async function createNodeNetworkInterface(
+  node: string,
+  config: Record<string, unknown>,
+): Promise<unknown> {
+  const safeNode = validateNodeName(node);
+  const iface = typeof config.iface === "string" ? config.iface.trim() : "";
+  const type = typeof config.type === "string" ? config.type : "";
+  if (!iface || !type) {
+    throw new Error("Network interface requires iface + type.");
+  }
+  const params = new URLSearchParams();
+  appendParams(params, config, { skipKeys: NETWORK_IFACE_READONLY_KEYS });
+  params.set("iface", iface);
+  params.set("type", type);
+  return proxmoxRequest<unknown>(`/nodes/${safeNode}/network`, {
+    method: "POST",
+    params,
+  });
+}
+
+/** Apply pending network changes (equivalent to `ifreload -a`). */
+export async function reloadNodeNetwork(node: string): Promise<string | null> {
+  const safeNode = validateNodeName(node);
+  return proxmoxRequest<string | null>(`/nodes/${safeNode}/network`, {
+    method: "PUT",
+  });
+}
+
+/** Discard pending (un-applied) network changes. */
+export async function revertNodeNetworkChanges(node: string): Promise<unknown> {
+  const safeNode = validateNodeName(node);
+  return proxmoxRequest<unknown>(`/nodes/${safeNode}/network`, {
+    method: "DELETE",
+  });
+}
+
+export async function createStorageConfig(
+  config: Record<string, unknown>,
+): Promise<unknown> {
+  const storage = typeof config.storage === "string" ? config.storage : "";
+  const type = typeof config.type === "string" ? config.type : "";
+  if (!storage || !type) {
+    throw new Error("Storage config requires storage + type.");
+  }
+  const safeStorage = validateStorageName(storage);
+  const params = new URLSearchParams();
+  appendParams(params, config, { skipKeys: STORAGE_READONLY_KEYS });
+  params.set("storage", safeStorage);
+  params.set("type", type);
+  return proxmoxRequest<unknown>(`/storage`, {
+    method: "POST",
+    params,
+  });
+}
+
+export async function updateStorageConfig(
+  storage: string,
+  config: Record<string, unknown>,
+): Promise<unknown> {
+  const safeStorage = validateStorageName(storage);
+  const params = new URLSearchParams();
+  appendParams(params, config, { skipKeys: STORAGE_READONLY_KEYS });
+  return proxmoxRequest<unknown>(`/storage/${safeStorage}`, {
+    method: "PUT",
+    params,
+  });
+}
+
+export async function deleteStorageConfig(storage: string): Promise<unknown> {
+  const safeStorage = validateStorageName(storage);
+  return proxmoxRequest<unknown>(`/storage/${safeStorage}`, {
+    method: "DELETE",
+  });
+}
+
+const FIREWALL_RULE_NON_PARAM_KEYS: ReadonlySet<string> = new Set([
+  "digest",
+  "ipversion",
+  "pos",
+]);
+
+export async function createClusterFirewallRule(
+  rule: Record<string, unknown>,
+): Promise<unknown> {
+  const params = new URLSearchParams();
+  appendParams(params, rule, { skipKeys: FIREWALL_RULE_NON_PARAM_KEYS });
+  return proxmoxRequest<unknown>(`/cluster/firewall/rules`, {
+    method: "POST",
+    params,
+  });
+}
+
+export async function deleteClusterFirewallRule(pos: number): Promise<unknown> {
+  if (!Number.isInteger(pos) || pos < 0) {
+    throw new Error("Invalid firewall rule position.");
+  }
+  return proxmoxRequest<unknown>(`/cluster/firewall/rules/${pos}`, {
+    method: "DELETE",
+  });
+}
+
 // --- Load Balancer helpers ---
 
 export type GuestPenaltyData = {
