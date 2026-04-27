@@ -20,9 +20,22 @@ function formatDate(iso: string) {
   }
 }
 
+function sortKeysDeep(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(sortKeysDeep);
+  if (value && typeof value === "object") {
+    const source = value as Record<string, unknown>;
+    const sorted: Record<string, unknown> = {};
+    for (const key of Object.keys(source).sort()) {
+      sorted[key] = sortKeysDeep(source[key]);
+    }
+    return sorted;
+  }
+  return value;
+}
+
 function prettyJson(value: unknown): string {
   try {
-    return JSON.stringify(value, null, 2);
+    return JSON.stringify(sortKeysDeep(value), null, 2);
   } catch {
     return String(value);
   }

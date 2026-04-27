@@ -30,3 +30,4 @@ Sections per release:
 ### Fixed
 
 - 500 on `/sites/[siteSlug]/node-configs` caused by exporting non-async values from a `"use server"` file. Restore action state moved to a companion `node-config-action-states.ts` file.
+- **False "Will change" diffs in node config restore preview.** Proxmox returned the same DNS object with keys in different orders on different reads, and the diff did string equality on `JSON.stringify`, so identical-but-reordered objects were flagged as changed. JSON formatting now recursively sorts object keys (arrays keep their order — firewall rule positions are meaningful) so semantically-equal sections show "No change".
