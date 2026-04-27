@@ -4,27 +4,42 @@ import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "@/lib/utils"
 
+// All variants are hardcoded against Tainer's dark palette. Do NOT switch
+// any of these to shadcn theme tokens (bg-secondary / bg-accent / bg-popover
+// / etc.) — those resolve to LIGHT defaults because Tainer doesn't apply
+// the `dark` class to <html>. Anything using a token here will render
+// white in production. Same trap that hit the Dialog component.
 const buttonVariants = cva(
-  "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer",
+  "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0a0a0c] disabled:pointer-events-none disabled:opacity-50 cursor-pointer",
   {
     variants: {
       variant: {
+        // Subtle elevated button — the most common "neutral action" look.
         default: "bg-white/10 text-white hover:bg-white/20 border border-white/5 shadow-sm",
         primary: "bg-white/10 text-white hover:bg-white/20 border border-white/5 shadow-sm",
-        accent: "bg-accent text-accent-foreground hover:bg-accent/90",
-        danger: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+        // Accent = primary call to action. Was white via `bg-accent`; now
+        // a teal CTA — same hue Tainer uses for accent labels in forms,
+        // distinct from the status-coloured variants (success/warning/etc).
+        accent: "bg-teal-500 text-zinc-950 hover:bg-teal-400 shadow-sm",
+        // Secondary = subdued action. Was light grey via `bg-secondary`;
+        // now a darker translucent tile that reads as a button without
+        // dominating.
+        secondary: "bg-white/[0.06] text-zinc-100 hover:bg-white/[0.10] border border-white/[0.06]",
+        // Outline = bordered, transparent fill. Was pure white via
+        // `bg-background`; now transparent with a subtle border that lights
+        // up on hover.
+        outline: "border border-white/15 bg-transparent text-zinc-200 hover:bg-white/[0.04] hover:border-white/25",
+        // Ghost = no background until hover. Was hovering to light tokens.
+        ghost: "bg-transparent text-zinc-300 hover:bg-white/[0.05] hover:text-white",
+        // Link = just text with hover underline.
+        link: "text-zinc-200 underline-offset-4 hover:underline hover:text-white",
+        // Status-coloured variants stay explicit (already were).
+        danger: "bg-rose-600 text-white hover:bg-rose-700",
+        destructive: "bg-rose-600 text-white hover:bg-rose-700",
         success: "bg-emerald-600 text-white hover:bg-emerald-700",
         warning: "bg-amber-500 text-white hover:bg-amber-600",
         review: "bg-blue-600 text-white hover:bg-blue-700",
-        neutral: "bg-zinc-600 text-white hover:bg-zinc-700",
-        destructive:
-          "bg-destructive text-destructive-foreground hover:bg-destructive/90",
-        outline:
-          "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
-        secondary:
-          "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-        ghost: "hover:bg-accent hover:text-accent-foreground",
-        link: "text-primary underline-offset-4 hover:underline",
+        neutral: "bg-zinc-700 text-white hover:bg-zinc-600",
       },
       size: {
         default: "h-10 px-4 py-2",
