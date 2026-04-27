@@ -898,6 +898,53 @@ const tlsOptionsCache = new Map<string, { result: { rejectUnauthorized: boolean;
 const tlsOptionsInflight = new Map<string, Promise<{ rejectUnauthorized: boolean; ca?: string[] }>>();
 const TLS_OPTIONS_CACHE_TTL_MS = 30 * 60_000; // 30 minutes
 
+// Keep-alive HTTPS / HTTP agents per site. Without these, every Proxmox call
+// opens a fresh TCP + TLS connection (~50-150ms of handshake on a LAN). The
+// deployments page can fire 90+ requests in parallel and was paying that cost
+// every time. With keep-alive, only the first request per socket pays the
+// handshake; subsequent requests reuse the connection.
+//
+// The agent is keyed by siteId. When TLS options refresh (every 30min), the
+// old agent's idle sockets are destroyed and a fresh agent is built — so cert
+// rotations propagate without restarting the server.
+const httpsAgentCache = new Map<string, { agent: https.Agent; expiresAt: number }>();
+const httpAgentCache = new Map<string, http.Agent>();
+const KEEP_ALIVE_AGENT_OPTS = {
+  keepAlive: true,
+  keepAliveMsecs: 5000,
+  maxSockets: 16,
+  scheduling: "lifo" as const,
+};
+
+function getHttpsAgent(
+  siteId: string,
+  tlsOpts: { rejectUnauthorized: boolean; ca?: string[] },
+): https.Agent {
+  const cached = httpsAgentCache.get(siteId);
+  if (cached && cached.expiresAt > Date.now()) return cached.agent;
+
+  // Replace expired agent — close any idle sockets to avoid leaks.
+  cached?.agent.destroy();
+
+  const agent = new https.Agent({
+    ...KEEP_ALIVE_AGENT_OPTS,
+    ...tlsOpts,
+  });
+  httpsAgentCache.set(siteId, {
+    agent,
+    expiresAt: Date.now() + TLS_OPTIONS_CACHE_TTL_MS,
+  });
+  return agent;
+}
+
+function getHttpAgent(siteId: string): http.Agent {
+  const existing = httpAgentCache.get(siteId);
+  if (existing) return existing;
+  const agent = new http.Agent(KEEP_ALIVE_AGENT_OPTS);
+  httpAgentCache.set(siteId, agent);
+  return agent;
+}
+
 async function buildTlsOptions(
   config: ResolvedSiteConfig,
 ): Promise<{ rejectUnauthorized: boolean; ca?: string[] }> {
@@ -990,11 +1037,16 @@ export async function getPveTicket(config: ResolvedSiteConfig): Promise<PveTicke
 
     const tlsOpts = loginUrl.protocol === "https:" ? await buildTlsOptions(config) : {};
     const requestModule = loginUrl.protocol === "https:" ? https : http;
+    const agent =
+      loginUrl.protocol === "https:"
+        ? getHttpsAgent(config.siteId, tlsOpts as { rejectUnauthorized: boolean; ca?: string[] })
+        : getHttpAgent(config.siteId);
 
     const data = await new Promise<{ ticket?: string; CSRFPreventionToken?: string }>((resolve, reject) => {
       const req = requestModule.request(
         loginUrl,
         {
+          agent,
           method: "POST",
           headers: {
             "Content-Length": Buffer.byteLength(loginBody),
@@ -1096,11 +1148,16 @@ async function proxmoxRequest<T>(endpoint: string, options: RequestOptions = {})
   const pveAuth = await getPveTicket(config);
   const tlsOpts = url.protocol === "https:" ? await buildTlsOptions(config) : {};
   const requestModule = url.protocol === "https:" ? https : http;
+  const agent =
+    url.protocol === "https:"
+      ? getHttpsAgent(config.siteId, tlsOpts as { rejectUnauthorized: boolean; ca?: string[] })
+      : getHttpAgent(config.siteId);
 
   const requestPromise = new Promise<T>((resolve, reject) => {
     const request = requestModule.request(
       url,
       {
+        agent,
         headers: {
           Cookie: `PVEAuthCookie=${pveAuth.ticket}`,
           ...(method !== "GET" ? { CSRFPreventionToken: pveAuth.csrfToken } : {}),
@@ -2137,15 +2194,26 @@ async function listDeploymentsInternal(nodes: LiveNode[]) {
     }
   }
 
+  // Fetch config first, then conditionally fetch runtime IP. The /interfaces
+  // endpoint is SLOW (Proxmox introspects the live container) — easily 1-2s
+  // each. For containers with a static IP already in net0, we don't need it
+  // at all. Only DHCP / "manual" / missing-config containers actually need
+  // the runtime lookup.
   const configResults = await Promise.all(
     containers.map(async ({ node, container }) => {
+      const config = await safeRequest<ProxmoxLxcConfigResponse>(
+        `/nodes/${node.name}/lxc/${container.vmid}/config`,
+      );
+
       const isRunning = container.status === "running";
-      const [config, runtimeIp] = await Promise.all([
-        safeRequest<ProxmoxLxcConfigResponse>(
-          `/nodes/${node.name}/lxc/${container.vmid}/config`,
-        ),
-        isRunning ? getRuntimeIp(node.name, container.vmid) : null,
-      ]);
+      const staticIp = config.data ? parseIpFromNet(config.data.net0) : "Unavailable";
+      const isDynamic =
+        staticIp === "Unavailable" || staticIp === "DHCP" || staticIp === "MANUAL";
+
+      const runtimeIp = isRunning && isDynamic
+        ? await getRuntimeIp(node.name, container.vmid)
+        : null;
+
       return { node, container, config, runtimeIp };
     }),
   );

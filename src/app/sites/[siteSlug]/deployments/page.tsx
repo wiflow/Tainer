@@ -12,8 +12,7 @@ import { listContainerTags } from "@/lib/container-groups";
 import { listDeploymentTemplates } from "@/lib/deployment-templates";
 import { getDeploymentIndex, withSiteConfig } from "@/lib/proxmox";
 
-export const dynamic = "force-dynamic";
-
+// Avoid `force-dynamic` here — it silently disables the unstable_cache below.
 const getDeploymentsPageData = unstable_cache(
   async (siteSlug: string) => {
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
