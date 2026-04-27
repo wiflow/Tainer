@@ -16,6 +16,14 @@ import { updateUserGroupsAction } from "@/app/group-management-actions";
 import { useActionFlashFeedback } from "@/components/task-toast-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { SectionPanel } from "@/components/ui/section-panel";
 import { Form } from "@/components/ui/form";
 import { initialBasicActionState } from "@/lib/action-states";
@@ -116,7 +124,7 @@ function useRefreshOnSuccess(status: string) {
   }, [router, status]);
 }
 
-function UserResetPasswordForm({ userId }: { userId: string }) {
+function UserResetPasswordButton({ user }: { user: ManagedUserSummary }) {
   const [open, setOpen] = useState(false);
   const [state, formAction, isPending] = useActionState(
     adminResetPasswordAction,
@@ -128,49 +136,76 @@ function UserResetPasswordForm({ userId }: { userId: string }) {
     successTitle: "Password reset",
   });
 
+  // Auto-close on success.
   useEffect(() => {
-    if (state.status === "success") {
-      setOpen(false);
-    }
+    if (state.status === "success") setOpen(false);
   }, [state.status, state.requestId]);
 
-  if (!open) {
-    return (
+  return (
+    <>
       <button
-        className="flex items-center gap-1 text-[11px] text-zinc-500 transition-colors hover:text-zinc-300"
+        className="rounded-md p-1.5 text-zinc-500 transition-colors hover:bg-white/5 hover:text-zinc-200"
         onClick={() => setOpen(true)}
+        title="Reset password"
         type="button"
       >
-        <KeyRound className="h-3 w-3" />
-        Reset password
+        <KeyRound className="h-3.5 w-3.5" />
       </button>
-    );
-  }
 
-  return (
-    <Form action={formAction} className="mt-3 flex w-full flex-col gap-3 rounded-lg border border-white/5 bg-black/20 p-3 text-left">
-      <input name="userId" type="hidden" value={userId} />
-      <label className="block w-full">
-        <span className="text-[11px] text-zinc-500">New password</span>
-        <input className={inputClassName} name="password" type="password" />
-      </label>
-      <label className="block w-full">
-        <span className="text-[11px] text-zinc-500">Confirm</span>
-        <input className={inputClassName} name="confirmPassword" type="password" />
-      </label>
-      <div className="flex w-full justify-end gap-1">
-        <Button onClick={() => setOpen(false)} size="sm" type="button" variant="ghost">
-          Cancel
-        </Button>
-        <Button disabled={isPending} size="sm" type="submit" variant="danger">
-          {isPending ? "Reset..." : "Reset"}
-        </Button>
-      </div>
-    </Form>
+      <Dialog onOpenChange={setOpen} open={open}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <KeyRound className="h-4 w-4 text-amber-400" />
+              Reset password
+            </DialogTitle>
+            <DialogDescription>
+              Set a new password for{" "}
+              <span className="text-zinc-200">{user.name || user.email}</span>. The user&apos;s
+              other active sessions will be revoked — they&apos;ll need to sign in again.
+            </DialogDescription>
+          </DialogHeader>
+          <Form action={formAction} className="space-y-3">
+            <input name="userId" type="hidden" value={user.id} />
+            <label className="block">
+              <span className="text-[12px] font-medium text-zinc-400">New password</span>
+              <input
+                autoComplete="new-password"
+                className={inputClassName}
+                name="password"
+                type="password"
+              />
+            </label>
+            <label className="block">
+              <span className="text-[12px] font-medium text-zinc-400">Confirm password</span>
+              <input
+                autoComplete="new-password"
+                className={inputClassName}
+                name="confirmPassword"
+                type="password"
+              />
+            </label>
+            <DialogFooter>
+              <Button
+                disabled={isPending}
+                onClick={() => setOpen(false)}
+                type="button"
+                variant="ghost"
+              >
+                Cancel
+              </Button>
+              <Button disabled={isPending} type="submit" variant="warning">
+                {isPending ? "Resetting…" : "Reset password"}
+              </Button>
+            </DialogFooter>
+          </Form>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
-function UserGroupsEditor({
+function UserGroupsCell({
   user,
   allGroups,
 }: {
@@ -190,50 +225,17 @@ function UserGroupsEditor({
   });
   useRefreshOnSuccess(state.status);
 
+  // Reset checkbox state to the current truth whenever the dialog opens.
+  // Otherwise after Save the checkboxes drift and a subsequent open shows stale.
   useEffect(() => {
-    if (state.status === "success") {
-      setOpen(false);
-    }
+    if (open) setSelected(new Set(user.groupIds));
+  }, [open, user.groupIds]);
+
+  useEffect(() => {
+    if (state.status === "success") setOpen(false);
   }, [state.status, state.requestId]);
 
   const userGroups = allGroups.filter((g) => user.groupIds.includes(g.id));
-
-  if (!open) {
-    return (
-      <div className="mt-2">
-        <div className="flex flex-wrap items-center gap-1.5">
-          {userGroups.length > 0 ? (
-            userGroups.map((g) => (
-              <Badge
-                key={g.id}
-                className={
-                  g.isAdmin
-                    ? "border-teal-500/20 bg-teal-500/10 text-teal-300"
-                    : "border-white/10 bg-zinc-800 text-zinc-400"
-                }
-                variant="neutral"
-              >
-                {g.name}
-              </Badge>
-            ))
-          ) : (
-            <span className="text-[11px] text-zinc-500">No groups assigned</span>
-          )}
-          <button
-            className="flex items-center gap-1 text-[11px] text-zinc-500 transition-colors hover:text-zinc-300"
-            onClick={() => {
-              setSelected(new Set(user.groupIds));
-              setOpen(true);
-            }}
-            type="button"
-          >
-            <Shield className="h-3 w-3" />
-            Edit groups
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   function toggle(groupId: string) {
     setSelected((prev) => {
@@ -245,42 +247,107 @@ function UserGroupsEditor({
   }
 
   return (
-    <div className="mt-3 rounded-lg border border-white/5 bg-black/20 p-3">
-      <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.16em] text-zinc-500">
-        Groups
-      </p>
-      <Form action={formAction}>
-        <input type="hidden" name="userId" value={user.id} />
-        <input type="hidden" name="groupIds" value={Array.from(selected).join(",")} />
-        <div className="flex flex-col gap-1.5">
-          {allGroups.map((g) => (
-            <label
+    <>
+      {/* Inline display: chips for current groups, plus an icon button to open
+          the editor. Click the chips area or the icon to open the dialog. */}
+      <button
+        className="flex w-full flex-wrap items-center gap-1.5 rounded-md px-1 py-0.5 text-left transition-colors hover:bg-white/[0.03]"
+        onClick={() => setOpen(true)}
+        title="Edit groups"
+        type="button"
+      >
+        {userGroups.length > 0 ? (
+          userGroups.map((g) => (
+            <Badge
+              className={
+                g.isAdmin
+                  ? "border-teal-500/20 bg-teal-500/10 text-teal-300"
+                  : "border-white/10 bg-zinc-800 text-zinc-400"
+              }
               key={g.id}
-              className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-[12px] text-zinc-400 transition-colors hover:bg-white/5"
+              variant="neutral"
             >
-              <input
-                type="checkbox"
-                checked={selected.has(g.id)}
-                onChange={() => toggle(g.id)}
-                className="h-3.5 w-3.5 rounded border-white/10 bg-zinc-900 text-white accent-white"
-              />
               {g.name}
-              {g.isAdmin && (
-                <span className="text-[10px] text-teal-400">(admin)</span>
+            </Badge>
+          ))
+        ) : (
+          <span className="text-[11px] text-zinc-500">No groups</span>
+        )}
+        <Shield className="h-3 w-3 text-zinc-600 ml-auto md:ml-1" />
+      </button>
+
+      <Dialog onOpenChange={setOpen} open={open}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Shield className="h-4 w-4 text-teal-400" />
+              Edit groups
+            </DialogTitle>
+            <DialogDescription>
+              Choose which groups{" "}
+              <span className="text-zinc-200">{user.name || user.email}</span> belongs to.
+              Group permissions are additive — a user with both `admin` and `operator` groups
+              gets every permission either grants.
+            </DialogDescription>
+          </DialogHeader>
+          <Form action={formAction}>
+            <input name="userId" type="hidden" value={user.id} />
+            <input name="groupIds" type="hidden" value={Array.from(selected).join(",")} />
+            <div className="space-y-1">
+              {allGroups.length === 0 ? (
+                <p className="rounded-md border border-white/5 bg-black/20 px-3 py-3 text-[12px] text-zinc-500">
+                  No groups exist yet. Create groups first under <em>Groups</em> in the sidebar.
+                </p>
+              ) : (
+                allGroups.map((g) => {
+                  const isSelected = selected.has(g.id);
+                  return (
+                    <label
+                      className={cn(
+                        "flex cursor-pointer items-center gap-3 rounded-md border border-transparent px-3 py-2 transition-colors",
+                        isSelected
+                          ? "border-teal-500/20 bg-teal-500/10"
+                          : "hover:border-white/[0.08] hover:bg-white/[0.025]",
+                      )}
+                      key={g.id}
+                    >
+                      <input
+                        checked={isSelected}
+                        className="h-4 w-4 rounded border-white/10 bg-zinc-900 text-teal-400 accent-teal-400"
+                        onChange={() => toggle(g.id)}
+                        type="checkbox"
+                      />
+                      <span className="flex-1 text-[13px] text-zinc-200">{g.name}</span>
+                      {g.isAdmin && (
+                        <Badge
+                          className="border-teal-500/20 bg-teal-500/10 text-teal-300"
+                          variant="neutral"
+                        >
+                          admin
+                        </Badge>
+                      )}
+                    </label>
+                  );
+                })
               )}
-            </label>
-          ))}
-        </div>
-        <div className="mt-3 flex gap-1">
-          <Button disabled={isPending} size="sm" type="submit">
-            {isPending ? "Saving..." : "Save"}
-          </Button>
-          <Button onClick={() => setOpen(false)} size="sm" type="button" variant="ghost">
-            Cancel
-          </Button>
-        </div>
-      </Form>
-    </div>
+            </div>
+            <DialogFooter>
+              <Button
+                disabled={isPending}
+                onClick={() => setOpen(false)}
+                type="button"
+                variant="ghost"
+              >
+                Cancel
+              </Button>
+              <Button disabled={isPending} type="submit">
+                {isPending ? "Saving…" : "Save groups"}
+              </Button>
+            </DialogFooter>
+          </Form>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -502,12 +569,12 @@ export function UserManagementPanel({
 
                   {/* Groups */}
                   <div className="mt-2 md:mt-0 min-w-0">
-                    <UserGroupsEditor user={user} allGroups={groups} />
+                    <UserGroupsCell allGroups={groups} user={user} />
                   </div>
 
                   {/* Actions */}
-                  <div className="mt-2 md:mt-0 md:text-right">
-                    <UserResetPasswordForm userId={user.id} />
+                  <div className="mt-2 md:mt-0 flex md:justify-end">
+                    <UserResetPasswordButton user={user} />
                   </div>
                 </li>
               ))}
