@@ -66,6 +66,7 @@ type StoredUser = {
   groupIds?: string[];
   id: string;
   name: string;
+  /** Empty string for users provisioned through SSO who have no local password. */
   passwordHash: string;
   passwordUpdatedAt: string;
   pendingTwoFactorSecret: string | null;
@@ -76,6 +77,12 @@ type StoredUser = {
   twoFactorSecret: string | null;
   twoFactorUpdatedAt: string | null;
   updatedAt: string;
+  /** When set, the user was created via or last logged in via this OIDC provider. */
+  ssoProviderId?: string | null;
+  /** Stable identifier from the IdP (the `sub` claim). Used to match a user
+   * across email changes — emails get re-used and re-assigned at IdPs, this
+   * doesn't. Set on first SSO login alongside ssoProviderId. */
+  ssoSubject?: string | null;
 };
 
 type StoredSession = {
@@ -480,6 +487,11 @@ async function hashPassword(password: string) {
 }
 
 async function verifyPassword(password: string, storedHash: string) {
+  // SSO-provisioned users have an empty `passwordHash` — they cannot authenticate
+  // via the password flow at all. Reject before parsing so the caller's "wrong
+  // credentials" message is consistent with a non-SSO unknown user.
+  if (!storedHash) return false;
+
   const [algorithm, saltRaw, keyRaw] = storedHash.split(":");
 
   if (algorithm !== "scrypt" || !saltRaw || !keyRaw) {
@@ -1531,6 +1543,96 @@ export async function createSession(userId: string) {
   });
 
   await setSessionCookie(sessionId, expiresAt);
+}
+
+export type SsoSignInInput = {
+  providerId: string;
+  /** Stable identifier from the IdP (`sub` claim). */
+  subject: string;
+  email: string;
+  name: string;
+  /** Whether to auto-create a Tainer user if no match is found. */
+  autoProvision: boolean;
+  /** Role assigned to a newly-provisioned user. Ignored if user already exists. */
+  defaultRole: AuthRole;
+};
+
+export type SsoSignInResult = {
+  /** True if a brand-new Tainer user was just created. */
+  provisioned: boolean;
+  user: StoredUser;
+};
+
+/**
+ * Sign a user in using credentials already validated by an OIDC provider.
+ * Looks up by (providerId, subject) first, then by email, then optionally
+ * provisions a new user. Sets the same `tainer_session` cookie that the
+ * password login flow uses, so downstream auth is identical.
+ *
+ * 2FA is NOT enforced for SSO users — the IdP is responsible for that.
+ */
+export async function signInWithSso(
+  input: SsoSignInInput,
+): Promise<SsoSignInResult> {
+  const email = normalizeEmail(input.email);
+  if (!email) throw new Error("Identity provider did not return a valid email.");
+  const name = input.name.trim() || email;
+
+  let provisioned = false;
+  const user = await mutateAuthStore((store) => {
+    // 1. Try to match by stable IdP subject — survives email changes.
+    let existing = store.users.find(
+      (u) => u.ssoProviderId === input.providerId && u.ssoSubject === input.subject,
+    );
+
+    // 2. Fall back to matching by email. If found, attach the SSO subject
+    //    so subsequent logins use the stable lookup path.
+    if (!existing) {
+      existing = store.users.find((u) => u.email === email);
+    }
+
+    if (existing) {
+      const timestamp = nowIso();
+      existing.ssoProviderId = input.providerId;
+      existing.ssoSubject = input.subject;
+      // Refresh display name — IdPs are usually the source of truth here.
+      if (name && name !== existing.name) existing.name = name;
+      existing.updatedAt = timestamp;
+      return existing;
+    }
+
+    if (!input.autoProvision) {
+      throw new Error(
+        "Your account isn't set up in Tainer yet. Ask an administrator to add you, then try signing in again.",
+      );
+    }
+
+    const timestamp = nowIso();
+    const newUser: StoredUser = {
+      createdAt: timestamp,
+      email,
+      groupIds: [],
+      id: randomUUID(),
+      name,
+      passwordHash: "", // SSO-provisioned, no local password
+      passwordUpdatedAt: timestamp,
+      pendingTwoFactorSecret: null,
+      pendingTwoFactorExpiresAt: null,
+      role: input.defaultRole,
+      twoFactorRecoveryCodeHashes: [],
+      twoFactorSecret: null,
+      twoFactorUpdatedAt: null,
+      updatedAt: timestamp,
+      ssoProviderId: input.providerId,
+      ssoSubject: input.subject,
+    };
+    store.users.push(newUser);
+    provisioned = true;
+    return newUser;
+  });
+
+  await createSession(user.id);
+  return { provisioned, user };
 }
 
 // No cookie is set; caller wraps the returned session ID in a JWT via generateMobileToken().

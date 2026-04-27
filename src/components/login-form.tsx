@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useActionState } from "react";
-import { ArrowRight, LockKeyhole, Shield, UserRound } from "lucide-react";
+import { ArrowRight, KeyRound, LockKeyhole, Shield, UserRound } from "lucide-react";
 
 import { loginAction } from "@/app/auth-actions";
 import { Button } from "@/components/ui/button";
@@ -15,8 +15,12 @@ const inputClassName =
 
 export function LoginForm({
   resetConfirmed = false,
+  ssoError,
+  ssoProviders = [],
 }: {
   resetConfirmed?: boolean;
+  ssoError?: string;
+  ssoProviders?: { slug: string; name: string }[];
 }) {
   const [state, formAction, isPending] = useActionState(
     loginAction,
@@ -37,6 +41,37 @@ export function LoginForm({
       {resetConfirmed ? (
         <div className="animate-slide-down rounded-xl border border-emerald-500/20 bg-emerald-500/[0.06] px-4 py-3 text-[13px] text-emerald-300">
           Your password has been reset. Sign in with the new one.
+        </div>
+      ) : null}
+
+      {ssoError ? (
+        <div
+          className="animate-slide-down rounded-xl border border-rose-500/20 bg-rose-500/[0.06] px-4 py-3 text-[13px] text-rose-300"
+          role="alert"
+        >
+          Sign-in failed: {ssoError}
+        </div>
+      ) : null}
+
+      {ssoProviders.length > 0 && !state.requiresTwoFactor ? (
+        <div className="animate-slide-up space-y-2">
+          {ssoProviders.map((p) => (
+            <a
+              className="group flex w-full items-center justify-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.02] px-4 py-3 text-[13px] font-medium text-zinc-200 transition-all hover:border-white/[0.18] hover:bg-white/[0.06]"
+              href={`/auth/sso/initiate/${p.slug}`}
+              key={p.slug}
+            >
+              <KeyRound className="h-4 w-4 text-sky-400" />
+              Sign in with {p.name}
+            </a>
+          ))}
+          <div className="flex items-center gap-3 py-1">
+            <span className="h-px flex-1 bg-white/[0.06]" />
+            <span className="text-[11px] uppercase tracking-[0.2em] text-zinc-600">
+              or
+            </span>
+            <span className="h-px flex-1 bg-white/[0.06]" />
+          </div>
         </div>
       ) : null}
 

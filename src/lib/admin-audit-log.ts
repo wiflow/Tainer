@@ -29,7 +29,12 @@ export type AdminAuditAction =
   | "group-created"
   | "group-updated"
   | "group-deleted"
-  | "user-groups-updated";
+  | "user-groups-updated"
+  | "sso-login"
+  | "sso-user-provisioned"
+  | "sso-provider-created"
+  | "sso-provider-updated"
+  | "sso-provider-deleted";
 
 export type AdminAuditEntry = {
   action: AdminAuditAction;
