@@ -170,13 +170,48 @@ export async function takeConfigSnapshot(
 }
 
 /**
- * Recursively sort object keys so semantically-equal objects stringify to
- * identical text. Array order is preserved (firewall rule positions etc. are
- * meaningful and must not be reordered).
+ * Identity keys we'll try in priority order when canonicalising arrays of
+ * objects. Proxmox returns interface lists, storage lists, firewall rule lists
+ * etc. in different orders on different reads — sorting by a stable identity
+ * field makes semantically-equal arrays stringify identically.
+ *
+ * `pos` first because firewall rules use it and it's numeric (cheap), then
+ * the named identifiers we know appear in the snapshot sections.
+ */
+const ARRAY_IDENTITY_KEYS = ["pos", "iface", "storage", "id", "name"] as const;
+
+function findArrayIdentityKey(arr: unknown[]): string | null {
+  if (arr.length === 0) return null;
+  if (!arr.every((e) => e !== null && typeof e === "object" && !Array.isArray(e))) {
+    return null;
+  }
+  for (const key of ARRAY_IDENTITY_KEYS) {
+    if (arr.every((e) => key in (e as Record<string, unknown>))) {
+      return key;
+    }
+  }
+  return null;
+}
+
+/**
+ * Recursively canonicalise: sort object keys, and sort arrays of objects by
+ * a stable identity field (`pos`, `iface`, `storage`, `id`, `name`) when one
+ * exists across every element. Arrays without a recognised identity key keep
+ * their order — meaningful for ordered scalars or heterogeneous lists.
  */
 function sortKeysDeep(value: unknown): unknown {
   if (Array.isArray(value)) {
-    return value.map(sortKeysDeep);
+    const items = value.map(sortKeysDeep);
+    const idKey = findArrayIdentityKey(value);
+    if (idKey) {
+      return [...items].sort((a, b) => {
+        const av = (a as Record<string, unknown>)[idKey];
+        const bv = (b as Record<string, unknown>)[idKey];
+        if (typeof av === "number" && typeof bv === "number") return av - bv;
+        return String(av).localeCompare(String(bv));
+      });
+    }
+    return items;
   }
   if (value && typeof value === "object") {
     const source = value as Record<string, unknown>;

@@ -20,8 +20,33 @@ function formatDate(iso: string) {
   }
 }
 
+const ARRAY_IDENTITY_KEYS = ["pos", "iface", "storage", "id", "name"] as const;
+
+function findArrayIdentityKey(arr: unknown[]): string | null {
+  if (arr.length === 0) return null;
+  if (!arr.every((e) => e !== null && typeof e === "object" && !Array.isArray(e))) {
+    return null;
+  }
+  for (const key of ARRAY_IDENTITY_KEYS) {
+    if (arr.every((e) => key in (e as Record<string, unknown>))) return key;
+  }
+  return null;
+}
+
 function sortKeysDeep(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(sortKeysDeep);
+  if (Array.isArray(value)) {
+    const items = value.map(sortKeysDeep);
+    const idKey = findArrayIdentityKey(value);
+    if (idKey) {
+      return [...items].sort((a, b) => {
+        const av = (a as Record<string, unknown>)[idKey];
+        const bv = (b as Record<string, unknown>)[idKey];
+        if (typeof av === "number" && typeof bv === "number") return av - bv;
+        return String(av).localeCompare(String(bv));
+      });
+    }
+    return items;
+  }
   if (value && typeof value === "object") {
     const source = value as Record<string, unknown>;
     const sorted: Record<string, unknown> = {};
