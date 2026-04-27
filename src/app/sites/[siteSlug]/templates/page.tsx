@@ -13,8 +13,7 @@ import { ensureSiteConfig } from "@/lib/site-context";
 import { resolveSiteConfigBySlug } from "@/lib/site-resolver";
 import { listVmTemplates } from "@/lib/vm-templates";
 
-export const dynamic = "force-dynamic";
-
+// Avoid `force-dynamic` here — it silently disables the unstable_cache below.
 const getTemplatesPageData = unstable_cache(
   async (siteSlug: string) => {
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);

@@ -10,8 +10,7 @@ import { getIsoStorageTargets, getNodes, listIsoImages, withSiteConfig } from "@
 import { ensureSiteConfig } from "@/lib/site-context";
 import { resolveSiteConfigBySlug } from "@/lib/site-resolver";
 
-export const dynamic = "force-dynamic";
-
+// Avoid `force-dynamic` here — it silently disables the unstable_cache below.
 const getIsoImagesPageData = unstable_cache(
   async (siteSlug: string) => {
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);

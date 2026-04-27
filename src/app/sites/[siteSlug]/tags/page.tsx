@@ -13,8 +13,7 @@ import { getDeploymentIndex, withSiteConfig } from "@/lib/proxmox";
 import { extractManagedTagSlugs } from "@/lib/tag-utils";
 import { cn } from "@/lib/utils";
 
-export const dynamic = "force-dynamic";
-
+// Avoid `force-dynamic` here — it silently disables the unstable_cache below.
 const getTagsPageData = unstable_cache(
   async (siteSlug: string) => {
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);

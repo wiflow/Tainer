@@ -20,8 +20,7 @@ import { getDeploymentIndex, withSiteConfig } from "@/lib/proxmox";
 import { getTagBadgeClass, hasManagedTag } from "@/lib/tag-utils";
 import { cn } from "@/lib/utils";
 
-export const dynamic = "force-dynamic";
-
+// Avoid `force-dynamic` here — it silently disables the unstable_cache below.
 const getTagDetailData = unstable_cache(
   async (siteSlug: string, slug: string) => {
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);

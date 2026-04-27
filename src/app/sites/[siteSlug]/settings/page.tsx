@@ -17,8 +17,7 @@ import { ensureSiteConfig } from "@/lib/site-context";
 import { resolveSiteConfigBySlug } from "@/lib/site-resolver";
 import { getSshKeyInfo } from "@/lib/ssh-keys";
 
-export const dynamic = "force-dynamic";
-
+// Avoid `force-dynamic` here — it silently disables the unstable_cache below.
 const getSettingsPageData = unstable_cache(
   async (siteSlug: string) => {
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);

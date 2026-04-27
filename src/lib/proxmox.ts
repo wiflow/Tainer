@@ -502,7 +502,12 @@ type SafeResult<T> = {
 
 const PROXMOX_NODE_NAME_REGEX = /^[a-zA-Z0-9]([a-zA-Z0-9._-]{0,61}[a-zA-Z0-9])?$/;
 const PROXMOX_STORAGE_NAME_REGEX = /^[a-zA-Z0-9._-]{1,63}$/;
-const PROXMOX_GET_CACHE_TTL_MS = 1_500;
+// Bumped from 1.5s -> 10s. The previous TTL meant even concurrent renders within
+// a single page load couldn't share cached Proxmox GET responses. 10s is a safe
+// staleness for operational dashboards (longer than any single render hierarchy,
+// shorter than the 30s scheduler tick that updates background state). Mutations
+// still call `invalidateProxmoxGetCache` explicitly where needed.
+const PROXMOX_GET_CACHE_TTL_MS = 10_000;
 const TEMPLATE_CONTENT_INDEX_TTL_MS = 10_000;
 const TASK_UPID_DETAILS_REGEX = /^UPID:([^:]+):[0-9A-Fa-f]+:[0-9A-Fa-f]+:([0-9A-Fa-f]+):([^:]+):([^:]*):([^:]+):$/;
 const IGNORED_DEPLOYMENT_TASK_TYPES = new Set([
@@ -2706,14 +2711,23 @@ export async function getTemplateIndex() {
   issues.push(...nodeIssues);
   if (nextIdResult.issue) issues.push(nextIdResult.issue);
 
-  const [templateResult, targetResult, rootfsResult] = await Promise.all([
-    listTemplatesInternal(nodes),
-    listTemplateTargetsInternal(nodes),
-    listRootfsTargetsInternal(nodes),
-  ]);
-  const availableTemplateResult = await listAvailableTemplatesInternal(
-    targetResult.targets[0] ?? null,
+  // The available-templates fetch needs the first target — but we don't have
+  // to wait for the WHOLE first batch before starting it. Chain it off the
+  // targets promise via .then() so it runs in parallel with templates and
+  // rootfs targets. Net: the slowest fetch dominates instead of (slowest first
+  // batch) + available-templates serially.
+  const targetsPromise = listTemplateTargetsInternal(nodes);
+  const availablePromise = targetsPromise.then((tr) =>
+    listAvailableTemplatesInternal(tr.targets[0] ?? null),
   );
+
+  const [templateResult, targetResult, rootfsResult, availableTemplateResult] =
+    await Promise.all([
+      listTemplatesInternal(nodes),
+      targetsPromise,
+      listRootfsTargetsInternal(nodes),
+      availablePromise,
+    ]);
 
   issues.push(
     ...templateResult.issues,

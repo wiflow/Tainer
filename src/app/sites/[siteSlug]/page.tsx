@@ -10,8 +10,9 @@ import { DashboardTabs } from "@/components/dashboard-tabs";
 import { ArrowUpRight, ArrowDownRight, Cpu, MemoryStick, HardDrive, RefreshCw } from "lucide-react";
 import { MetricCard } from "@/components/ui/metric-card";
 
-export const dynamic = "force-dynamic";
-
+// Note: do NOT add `export const dynamic = "force-dynamic"` here. It silently
+// disables `unstable_cache` and the `revalidate` value below becomes a no-op,
+// turning every request into a full Proxmox refetch.
 const getHomePageData = unstable_cache(
   async (siteSlug: string) => {
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);

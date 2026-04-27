@@ -46,77 +46,76 @@ async function tick() {
   const state = getState();
   state.tickCount++;
 
-  try {
-    const settings = await getAlertSettings();
+  // The four checks (alerts, backups, config snapshots, heartbeat) are
+  // independent — none reads what the others wrote. Run them in parallel so
+  // the worst-case tick is the slowest single check, not the sum of all four.
+  // Each block has its own try/catch, so a failure in one does not affect the
+  // others. We collect errors and apply them to `state` after all settle, in
+  // a deterministic order, so the displayed `lastError` is stable.
 
-    if (!settings.enabled) {
-      return;
-    }
+  const collectedErrors: string[] = [];
 
-    const result = await runAlertCheck();
-    const now = new Date().toISOString();
-    state.lastCheckAt = now;
+  const runAlerts = async () => {
+    try {
+      const settings = await getAlertSettings();
+      if (!settings.enabled) return;
 
-    if (result.policiesEvaluated > 0) {
-      state.lastResult = `${result.policiesEvaluated} policies, ${result.alertsFired} fired, ${result.resolvedAlerts} resolved`;
-    } else {
-      state.lastResult = "No policies due";
+      const result = await runAlertCheck();
+      state.lastCheckAt = new Date().toISOString();
+      state.lastResult =
+        result.policiesEvaluated > 0
+          ? `${result.policiesEvaluated} policies, ${result.alertsFired} fired, ${result.resolvedAlerts} resolved`
+          : "No policies due";
+      if (result.errors.length > 0) collectedErrors.push(result.errors[0]);
+    } catch (error) {
+      state.lastResult = null;
+      collectedErrors.push(error instanceof Error ? error.message : "Scheduler tick failed");
     }
-    state.lastError = null;
+  };
 
-    if (result.errors.length > 0) {
-      state.lastError = result.errors[0];
+  const runBackups = async () => {
+    try {
+      const backupResult = await runBackupTick();
+      if (backupResult.runsActive > 0 || backupResult.policiesStarted > 0) {
+        state.backupLastResult = `${backupResult.runsActive} active, ${backupResult.policiesStarted} started`;
+      }
+      if (backupResult.errors.length > 0) collectedErrors.push(backupResult.errors[0]);
+    } catch (error) {
+      collectedErrors.push(error instanceof Error ? error.message : "Backup tick failed");
     }
-  } catch (error) {
-    state.lastError = error instanceof Error ? error.message : "Scheduler tick failed";
-    state.lastResult = null;
-  }
+  };
 
-  // Backup tick runs regardless of alert settings
-  try {
-    const backupResult = await runBackupTick();
-    if (backupResult.runsActive > 0 || backupResult.policiesStarted > 0) {
-      state.backupLastResult = `${backupResult.runsActive} active, ${backupResult.policiesStarted} started`;
+  const runConfigSnapshots = async () => {
+    try {
+      const csResult = await runConfigSnapshotTickAllSites();
+      if (csResult.snapshotsTaken > 0 || csResult.policiesEvaluated > 0) {
+        state.configSnapshotLastResult = `${csResult.sitesProcessed} site(s), ${csResult.policiesEvaluated} policies, ${csResult.snapshotsTaken} snapshot(s) taken`;
+      }
+      if (csResult.errors.length > 0) collectedErrors.push(csResult.errors[0]);
+    } catch (error) {
+      collectedErrors.push(
+        error instanceof Error ? error.message : "Config snapshot tick failed",
+      );
     }
-    if (backupResult.errors.length > 0) {
-      state.lastError = (state.lastError ? `${state.lastError}; ` : "") + backupResult.errors[0];
-    }
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : "Backup tick failed";
-    state.lastError = (state.lastError ? `${state.lastError}; ` : "") + msg;
-  }
+  };
 
-  // Config snapshot scheduling: iterate enabled sites and capture due policies.
-  try {
-    const csResult = await runConfigSnapshotTickAllSites();
-    if (csResult.snapshotsTaken > 0 || csResult.policiesEvaluated > 0) {
-      state.configSnapshotLastResult = `${csResult.sitesProcessed} site(s), ${csResult.policiesEvaluated} policies, ${csResult.snapshotsTaken} snapshot(s) taken`;
-    }
-    if (csResult.errors.length > 0) {
-      state.lastError = (state.lastError ? `${state.lastError}; ` : "") + csResult.errors[0];
-    }
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : "Config snapshot tick failed";
-    state.lastError = (state.lastError ? `${state.lastError}; ` : "") + msg;
-  }
-
-  // Heartbeat runs on its own interval, independent of alert settings
-  try {
-    const hbSettings = await getHeartbeatSettings();
-    if (shouldRunHeartbeat(hbSettings)) {
+  const runHeartbeat = async () => {
+    try {
+      const hbSettings = await getHeartbeatSettings();
+      if (!shouldRunHeartbeat(hbSettings)) return;
       const hbResult = await runHeartbeatCheck();
       if (hbResult.sitesChecked > 0) {
         state.heartbeatLastResult = `${hbResult.sitesChecked} sites, ${hbResult.alertsFired} fired, ${hbResult.resolvedAlerts} resolved`;
       }
-      if (hbResult.errors.length > 0) {
-        state.lastError = (state.lastError ? `${state.lastError}; ` : "") + hbResult.errors[0];
-      }
+      if (hbResult.errors.length > 0) collectedErrors.push(hbResult.errors[0]);
+    } catch (error) {
+      collectedErrors.push(error instanceof Error ? error.message : "Heartbeat tick failed");
     }
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : "Heartbeat tick failed";
-    state.lastError = (state.lastError ? `${state.lastError}; ` : "") + msg;
-  }
+  };
 
+  await Promise.all([runAlerts(), runBackups(), runConfigSnapshots(), runHeartbeat()]);
+
+  state.lastError = collectedErrors.length > 0 ? collectedErrors.join("; ") : null;
 }
 
 export function startScheduler() {

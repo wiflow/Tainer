@@ -37,22 +37,37 @@ export async function runConfigSnapshotTickAllSites(): Promise<ConfigSnapshotMul
     };
   }
 
-  for (const site of sites) {
-    try {
-      const config = await resolveSiteConfig(site);
-      const result = await withSiteConfig(config, () => runConfigSnapshotTick());
-      policiesEvaluated += result.policiesEvaluated;
-      snapshotsTaken += result.snapshotsTaken;
-      sitesProcessed++;
-      for (const err of result.errors) {
-        errors.push(`[${site.name}] ${err}`);
+  // Process sites in parallel with a bounded concurrency. Sites are independent
+  // (each has its own Proxmox cluster + its own policy store), so we get linear
+  // speedup until the bound. Capped at 3 to avoid hammering Proxmox tickets and
+  // disk I/O when there are many sites — backups can run hot already.
+  const CONCURRENCY = 3;
+  const queue = [...sites];
+
+  async function worker() {
+    while (queue.length > 0) {
+      const site = queue.shift();
+      if (!site) return;
+      try {
+        const config = await resolveSiteConfig(site);
+        const result = await withSiteConfig(config, () => runConfigSnapshotTick());
+        policiesEvaluated += result.policiesEvaluated;
+        snapshotsTaken += result.snapshotsTaken;
+        sitesProcessed++;
+        for (const err of result.errors) {
+          errors.push(`[${site.name}] ${err}`);
+        }
+      } catch (error) {
+        errors.push(
+          `[${site.name}] Tick failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
-    } catch (error) {
-      errors.push(
-        `[${site.name}] Tick failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
     }
   }
+
+  await Promise.all(
+    Array.from({ length: Math.min(CONCURRENCY, sites.length) }, () => worker()),
+  );
 
   return { errors, policiesEvaluated, sitesProcessed, snapshotsTaken };
 }

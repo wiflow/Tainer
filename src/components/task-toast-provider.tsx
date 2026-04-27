@@ -554,14 +554,28 @@ export function TaskToastProvider({
     };
   }, [router, toasts]);
 
+  // Stabilize the Set reference: a new toast progress update arrives every
+  // 2-5s, but the SET of running UPIDs only changes when a task starts or
+  // finishes. Returning the same Set reference when content is unchanged means
+  // the context value is stable and consumers don't re-render on progress.
+  const prevUpidsRef = useRef<Set<string>>(new Set());
   const activeTaskUpids = useMemo(() => {
-    const upids = new Set<string>();
+    const next = new Set<string>();
     for (const toast of toasts) {
       if (toast.type === "task" && toast.status === "running") {
-        upids.add(toast.upid);
+        next.add(toast.upid);
       }
     }
-    return upids;
+    const prev = prevUpidsRef.current;
+    if (next.size === prev.size) {
+      let same = true;
+      for (const upid of next) {
+        if (!prev.has(upid)) { same = false; break; }
+      }
+      if (same) return prev;
+    }
+    prevUpidsRef.current = next;
+    return next;
   }, [toasts]);
 
   const value = useMemo<TaskToastContextValue>(
