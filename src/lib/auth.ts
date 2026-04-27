@@ -2131,12 +2131,54 @@ export async function getAccountSettings() {
   return {
     createdAt: user.createdAt,
     email: user.email,
+    hasLocalPassword: Boolean(user.passwordHash),
     hasTwoFactor: Boolean(user.twoFactorSecret),
     id: user.id,
     name: user.name,
     role: user.role,
+    ssoProviderId: user.ssoProviderId ?? null,
+    ssoSubject: user.ssoSubject ?? null,
     twoFactorUpdatedAt: user.twoFactorUpdatedAt,
   };
+}
+
+/**
+ * Clear the current user's local password (set passwordHash = ""). Refuses
+ * if no SSO link is set, otherwise the user would be locked out. Revokes
+ * all OTHER active sessions for safety — anyone who learned the password
+ * before now no longer has access; the current device stays signed in.
+ */
+export async function disableLocalPassword(): Promise<void> {
+  const session = await requireSession();
+  const timestamp = nowIso();
+
+  await mutateAuthStore((store) => {
+    const user = store.users.find((entry) => entry.id === session.user.id);
+    if (!user) {
+      throw new Error("User account could not be found.");
+    }
+    if (!user.passwordHash) {
+      // Already disabled — nothing to do.
+      return;
+    }
+    if (!user.ssoProviderId || !user.ssoSubject) {
+      throw new Error(
+        "Link an SSO provider before disabling your local password — without one, you would be locked out.",
+      );
+    }
+    user.passwordHash = "";
+    user.passwordUpdatedAt = timestamp;
+    user.updatedAt = timestamp;
+    // Revoke every session for this user EXCEPT the active one, so anyone who
+    // had the password (including the user themselves on other devices) needs
+    // to re-auth via SSO.
+    for (const s of store.sessions) {
+      if (s.userId !== user.id) continue;
+      if (s.id === session.id) continue;
+      if (s.revokedAt) continue;
+      s.revokedAt = timestamp;
+    }
+  });
 }
 
 export async function verifyGuestShellStepUp(code: string) {

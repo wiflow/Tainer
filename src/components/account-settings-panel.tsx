@@ -18,6 +18,7 @@ import type { ManagedUserSummary } from "@/lib/auth";
 import {
   changePasswordAction,
   confirmTwoFactorSetupAction,
+  disableLocalPasswordAction,
   disableTwoFactorAction,
   requestPasswordResetFromAccountAction,
   startTwoFactorSetupAction,
@@ -72,17 +73,21 @@ export function AccountSettingsPanel({
   account,
   passwordResetDebugPath,
   smtpConfigured,
+  ssoProviderName,
 }: {
   account: {
     createdAt: string;
     email: string;
+    hasLocalPassword?: boolean;
     hasTwoFactor: boolean;
     name: string;
     role: string;
+    ssoProviderId?: string | null;
     twoFactorUpdatedAt: string | null;
   };
   passwordResetDebugPath?: string;
   smtpConfigured: boolean;
+  ssoProviderName?: string | null;
   users?: ManagedUserSummary[];
 }) {
   const [profileState, profileAction, profilePending] = useActionState(
@@ -105,6 +110,8 @@ export function AccountSettingsPanel({
     requestPasswordResetFromAccountAction,
     initialBasicActionState,
   );
+  const [disablePasswordState, disablePasswordAction, disablePasswordPending] =
+    useActionState(disableLocalPasswordAction, initialBasicActionState);
 
   useActionFlashFeedback(profileState, {
     errorTitle: "Profile update failed",
@@ -130,9 +137,14 @@ export function AccountSettingsPanel({
     errorTitle: "Password reset failed",
     successTitle: "Password reset requested",
   });
+  useActionFlashFeedback(disablePasswordState, {
+    errorTitle: "Disable failed",
+    successTitle: "Local password disabled",
+  });
 
   useRefreshOnSuccess(profileState.status);
   useRefreshOnSuccess(disableTwoFactorState.status);
+  useRefreshOnSuccess(disablePasswordState.status);
 
   const effectiveHasTwoFactor = account.hasTwoFactor || confirmTwoFactorState.recoveryCodes.length > 0;
   const activeTwoFactorSetup =
@@ -219,6 +231,106 @@ export function AccountSettingsPanel({
             </Form>
         </SectionPanel>
       </div>
+
+      {/* ── Sign-in methods (SSO) ── */}
+      <SectionPanel
+        title="Sign-in methods"
+        description="What you can use to sign in. Local password and SSO can co-exist; disabling the local password commits the account to SSO-only."
+      >
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/5 bg-[#111113] px-4 py-3">
+            <div className="flex items-center gap-3">
+              <KeyRound className="h-4 w-4 text-zinc-400" />
+              <div>
+                <p className="text-[13px] font-medium text-zinc-200">Local password</p>
+                <p className="text-[11px] text-zinc-500">
+                  {account.hasLocalPassword
+                    ? "Active — you can sign in with email + password."
+                    : "Disabled — sign in via SSO only. Password reset email still works as a recovery path."}
+                </p>
+              </div>
+            </div>
+            {account.hasLocalPassword ? (
+              <span className="rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[11px] font-medium text-emerald-300">
+                Active
+              </span>
+            ) : (
+              <span className="rounded-full bg-zinc-800 px-2.5 py-0.5 text-[11px] font-medium text-zinc-400">
+                Disabled
+              </span>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/5 bg-[#111113] px-4 py-3">
+            <div className="flex items-center gap-3">
+              <ShieldCheck className="h-4 w-4 text-zinc-400" />
+              <div>
+                <p className="text-[13px] font-medium text-zinc-200">
+                  Single sign-on (OIDC)
+                </p>
+                <p className="text-[11px] text-zinc-500">
+                  {ssoProviderName
+                    ? `Linked to ${ssoProviderName}. Future sign-ins via SSO use this provider.`
+                    : "Not linked. Sign in once via the SSO button on the login page to link this account."}
+                </p>
+              </div>
+            </div>
+            {ssoProviderName ? (
+              <span className="rounded-full bg-sky-500/10 px-2.5 py-0.5 text-[11px] font-medium text-sky-300">
+                Linked
+              </span>
+            ) : (
+              <span className="rounded-full bg-zinc-800 px-2.5 py-0.5 text-[11px] font-medium text-zinc-400">
+                Not linked
+              </span>
+            )}
+          </div>
+
+          {/* Disable-local-password block — only meaningful when both:
+              the user HAS a local password, AND SSO is linked. */}
+          {account.hasLocalPassword && ssoProviderName ? (
+            <div className="rounded-xl border border-amber-500/20 bg-amber-500/[0.06] px-4 py-3 space-y-3">
+              <div className="flex items-start gap-3">
+                <ShieldOff className="h-4 w-4 text-amber-400 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-[13px] font-medium text-zinc-200">
+                    Disable local password
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-zinc-500">
+                    Removes your scrypt password hash. After this, only SSO via{" "}
+                    <span className="text-zinc-300">{ssoProviderName}</span> can sign you in.
+                    All your other active sessions are revoked. Password reset email still
+                    works as a fallback if SSO ever breaks.
+                  </p>
+                </div>
+              </div>
+              <Form action={disablePasswordAction} className="flex flex-wrap items-end gap-3">
+                <label className="flex-1 min-w-[200px]">
+                  <span className="text-[12px] font-medium text-zinc-400">
+                    Type <span className="font-mono text-zinc-200">DISABLE</span> to confirm
+                  </span>
+                  <input
+                    autoComplete="off"
+                    className={inputClassName}
+                    name="confirmation"
+                    placeholder="DISABLE"
+                  />
+                </label>
+                <Button disabled={disablePasswordPending} type="submit" variant="warning">
+                  {disablePasswordPending ? "Disabling..." : "Disable password"}
+                </Button>
+              </Form>
+            </div>
+          ) : null}
+
+          {account.hasLocalPassword && !ssoProviderName ? (
+            <p className="text-[11px] text-zinc-500 italic">
+              Sign in once via SSO to link this account; the option to disable your local
+              password will appear here afterwards.
+            </p>
+          ) : null}
+        </div>
+      </SectionPanel>
 
       {/* ── Two-factor authentication ── */}
       <div className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">

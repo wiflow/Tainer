@@ -23,6 +23,7 @@ import {
   createInitialAdministrator,
   createPasswordReset,
   createUserAsAdmin,
+  disableLocalPassword,
   disableTwoFactor,
   getCurrentSession,
   requirePermission,
@@ -485,6 +486,43 @@ export async function disableTwoFactorAction(
     return errorState(
       _previousState,
       error instanceof Error ? error.message : "Failed to disable 2FA.",
+    );
+  }
+}
+
+export async function disableLocalPasswordAction(
+  _previousState: BasicActionState,
+  formData: FormData,
+): Promise<BasicActionState> {
+  try {
+    const confirmation = String(formData.get("confirmation") ?? "").trim();
+    if (confirmation !== "DISABLE") {
+      return errorState(_previousState, 'Type "DISABLE" to confirm.');
+    }
+
+    await disableLocalPassword();
+    const session = await getCurrentSession();
+
+    if (session) {
+      recordAdminAudit({
+        action: "password-changed",
+        actorEmail: session.user.email,
+        actorName: session.user.name,
+        message: "Disabled local password (SSO-only)",
+      }).catch(() => {});
+    }
+
+    revalidatePath("/account");
+    return {
+      message:
+        "Local password disabled. Future sign-ins must use SSO. Your password reset email still works as a recovery path.",
+      requestId: randomUUID(),
+      status: "success",
+    };
+  } catch (error) {
+    return errorState(
+      _previousState,
+      error instanceof Error ? error.message : "Failed to disable password.",
     );
   }
 }
