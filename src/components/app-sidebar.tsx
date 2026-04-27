@@ -204,23 +204,23 @@ export function AppSidebar({
       <div className="flex flex-1 flex-col overflow-y-auto px-3 py-4">
 
         {/* ── Brand header ──
-            Uses the Tainer wordmark logo (crane + "TAINER" text in one image).
-            Drop the file at public/tainer-wordmark.png — already-white-on-
-            transparent, ~5:1 aspect ratio. Sized to ~36px tall so the wordmark
-            is legible without dominating the sidebar. */}
-        <div className="mb-3 flex items-center gap-2 px-1">
+            Uses the Tainer wordmark logo. The source image has a lot of
+            transparent padding around the actual artwork, so we render it
+            tall (h-16) and let the natural aspect ratio fill the sidebar
+            width. Negative top margin pulls it tight against the top. */}
+        <div className="mb-2 flex items-start px-1 -mt-2">
           <Image
             alt="Tainer"
-            className="h-9 w-auto"
-            height={36}
+            className="h-16 w-auto"
+            height={64}
             priority
             src="/tainer-wordmark.png"
-            width={170}
+            width={300}
           />
           <div className="flex-1" />
           <button
             aria-label="Close navigation menu"
-            className="shrink-0 flex items-center justify-center w-8 h-8 rounded-md text-zinc-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer lg:hidden"
+            className="shrink-0 flex items-center justify-center w-8 h-8 mt-2 rounded-md text-zinc-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer lg:hidden"
             onClick={() => setMobileOpen(false)}
             type="button"
           >
