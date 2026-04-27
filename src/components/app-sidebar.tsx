@@ -248,46 +248,76 @@ export function AppSidebar({
     <>
       <div className="flex flex-1 flex-col overflow-y-auto px-3 py-4">
 
-        {/* ── Brand header ── */}
-        <div className="mb-3 flex items-center gap-2 px-1">
-          <Image
-            alt="Tainer"
-            className="rounded-md"
-            height={28}
-            priority
-            src="/logo.png"
-            width={28}
-          />
-          {!collapsed && (
+        {/* ── Brand header ──
+            Expanded: [logo] Tainer  ........ [<]   (collapse toggle on right)
+            Collapsed: [>]           (toggle centered + prominent)
+                       [logo]
+            In collapsed mode the toggle is the FIRST visible thing so it
+            doesn't get lost in the narrow 64px column. The logo also acts
+            as a fallback expand trigger (click anywhere on it). */}
+        {!collapsed ? (
+          <div className="mb-3 flex items-center gap-2 px-1">
+            <Image
+              alt="Tainer"
+              className="rounded-md"
+              height={28}
+              priority
+              src="/logo.png"
+              width={28}
+            />
             <span className="font-display text-[15px] font-semibold tracking-wide text-zinc-100">
               Tainer
             </span>
-          )}
-          <div className="flex-1" />
-          {/* Mobile close button (collapse toggle replaces it on desktop) */}
-          <button
-            aria-label="Close navigation menu"
-            className="shrink-0 flex items-center justify-center w-8 h-8 rounded-md text-zinc-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer lg:hidden"
-            onClick={() => setMobileOpen(false)}
-            type="button"
-          >
-            <X className="w-4 h-4" />
-          </button>
-          {/* Desktop collapse toggle */}
-          <button
-            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            className="hidden shrink-0 lg:flex items-center justify-center w-7 h-7 rounded-md text-zinc-500 hover:text-zinc-200 hover:bg-white/5 transition-colors cursor-pointer"
-            onClick={toggleCollapsed}
-            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            type="button"
-          >
-            {collapsed ? (
-              <ChevronRight className="w-3.5 h-3.5" />
-            ) : (
+            <div className="flex-1" />
+            <button
+              aria-label="Close navigation menu"
+              className="shrink-0 flex items-center justify-center w-8 h-8 rounded-md text-zinc-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer lg:hidden"
+              onClick={() => setMobileOpen(false)}
+              type="button"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <button
+              aria-label="Collapse sidebar"
+              className="hidden shrink-0 lg:flex items-center justify-center w-7 h-7 rounded-md text-zinc-500 hover:text-zinc-200 hover:bg-white/5 transition-colors cursor-pointer"
+              onClick={toggleCollapsed}
+              title="Collapse sidebar"
+              type="button"
+            >
               <ChevronLeft className="w-3.5 h-3.5" />
-            )}
-          </button>
-        </div>
+            </button>
+          </div>
+        ) : (
+          <div className="mb-3 flex flex-col items-center gap-2">
+            {/* Big, obvious expand button */}
+            <button
+              aria-label="Expand sidebar"
+              className="hidden lg:flex items-center justify-center w-9 h-9 rounded-md border border-white/10 bg-white/5 text-zinc-200 hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
+              onClick={toggleCollapsed}
+              title="Expand sidebar"
+              type="button"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+            {/* Logo below — also clickable as a fallback expand affordance */}
+            <button
+              aria-label="Expand sidebar"
+              className="hidden lg:flex items-center justify-center cursor-pointer"
+              onClick={toggleCollapsed}
+              title="Expand sidebar"
+              type="button"
+            >
+              <Image
+                alt="Tainer"
+                className="rounded-md"
+                height={32}
+                priority
+                src="/logo.png"
+                width={32}
+              />
+            </button>
+          </div>
+        )}
 
         {/* ── Overview (top-level, separate from sectioned nav) ── */}
         <nav className="mb-4">
