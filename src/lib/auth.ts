@@ -645,7 +645,13 @@ async function setSessionCookie(sessionId: string, expiresAt: string) {
     expires: new Date(expiresAt),
     httpOnly: true,
     path: "/",
-    sameSite: "strict",
+    // `lax` (not `strict`) is required for federated sign-in flows: when the
+    // user comes back from an OIDC IdP via a cross-site redirect, Chrome
+    // refuses to send `strict` cookies on the first navigation, so the user
+    // lands on /login until they reload (the bug we just hit). `lax` still
+    // blocks CSRF on cross-site form POSTs (the threat model `strict`
+    // protects against) — it only relaxes top-level navigations.
+    sameSite: "lax",
     secure,
   });
 }
@@ -657,7 +663,9 @@ async function clearSessionCookie() {
     expires: new Date(0),
     httpOnly: true,
     path: "/",
-    sameSite: "strict",
+    // Match setSessionCookie so the browser's cookie-jar lookup paired with
+    // the same SameSite is what removes the entry.
+    sameSite: "lax",
     secure,
   });
 }
