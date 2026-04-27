@@ -255,10 +255,27 @@ export async function completeOidcAuthorization(
   const sub = typeof claims.sub === "string" ? claims.sub : "";
   if (!sub) throw new Error("ID token has no subject claim.");
 
-  const email = typeof claims.email === "string" ? claims.email.toLowerCase() : "";
+  // Entra/Azure AD often omits the standard `email` claim and puts the
+  // email-like value in `preferred_username` or `upn` instead. Other IdPs
+  // (Google, Okta) reliably use `email`. Try them in order and use whatever
+  // looks like an email address. We require an "@" so we don't accidentally
+  // accept a non-email username as the canonical identifier.
+  const emailCandidates = [
+    claims.email,
+    (claims as Record<string, unknown>).preferred_username,
+    (claims as Record<string, unknown>).upn,
+  ];
+  let email = "";
+  for (const candidate of emailCandidates) {
+    if (typeof candidate === "string" && candidate.includes("@")) {
+      email = candidate.toLowerCase();
+      break;
+    }
+  }
   if (!email) {
     throw new Error(
-      "Identity provider did not return an email claim. Make sure the 'email' scope is granted.",
+      "Identity provider did not return an email-like claim (checked email, preferred_username, upn). " +
+        "For Entra, ensure the app has User.Read permission and that the user has a UPN.",
     );
   }
 
