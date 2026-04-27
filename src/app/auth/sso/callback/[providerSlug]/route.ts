@@ -1,4 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
+import {
+  AuthorizationResponseError,
+  ResponseBodyError,
+} from "openid-client";
 
 import { recordAdminAudit } from "@/lib/admin-audit-log";
 import { signInWithSso } from "@/lib/auth";
@@ -83,14 +87,40 @@ export async function GET(
   try {
     claims = await completeOidcAuthorization(provider, flowState, callbackUrl);
   } catch (error) {
-    console.error(
-      `[oidc] Token exchange failed for ${provider.slug}:`,
-      error instanceof Error ? error.message : error,
-    );
-    return loginRedirect(
-      request,
-      error instanceof Error ? error.message : "Failed to complete sign-in.",
-    );
+    // openid-client v6 raises ResponseBodyError when the IdP returns an
+    // OAuth error response from the token endpoint (e.g. invalid_grant,
+    // redirect_uri_mismatch, invalid_client) and AuthorizationResponseError
+    // when the authorization response itself is malformed. Both carry
+    // structured fields that are FAR more useful to display than the
+    // generic "server responded with an error in the response body".
+    let detail: string;
+    let logBody: unknown = error;
+
+    if (error instanceof ResponseBodyError) {
+      const parts = [error.error];
+      if (error.error_description) parts.push(error.error_description);
+      detail = parts.filter(Boolean).join(" — ") || "OIDC token endpoint returned an error.";
+      logBody = {
+        error: error.error,
+        error_description: error.error_description,
+        status: error.status,
+        cause: error.cause,
+      };
+    } else if (error instanceof AuthorizationResponseError) {
+      const parts = [error.error];
+      if (error.error_description) parts.push(error.error_description);
+      detail = parts.filter(Boolean).join(" — ") || "OIDC authorization response was invalid.";
+      logBody = {
+        error: error.error,
+        error_description: error.error_description,
+        cause: error.cause,
+      };
+    } else {
+      detail = error instanceof Error ? error.message : "Failed to complete sign-in.";
+    }
+
+    console.error(`[oidc] Token exchange failed for ${provider.slug}:`, logBody);
+    return loginRedirect(request, detail);
   }
 
   if (!isEmailAllowed(claims.email, provider.allowedEmailDomains)) {
