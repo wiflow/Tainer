@@ -17,6 +17,7 @@ import {
   Home,
   KeyRound,
   LogOut,
+  ScrollText,
   Mail,
   Menu,
   MoreHorizontal,
@@ -308,6 +309,7 @@ export function AppSidebar({
             <>
               <NavLink icon={Users} label="Users" active={pathname.startsWith("/users")} href="/users" />
               <NavLink icon={KeyRound} label="Identity Providers" active={pathname.startsWith("/identity-providers")} href="/identity-providers" />
+              <NavLink icon={ScrollText} label="Audit Log" active={pathname.startsWith("/audit-log")} href="/audit-log" />
               <NavLink icon={Globe} label="Site Manager" active={pathname === "/sites"} href="/sites" />
             </>
           )}
