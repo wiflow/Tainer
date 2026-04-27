@@ -21,6 +21,16 @@ function formatDate(iso: string) {
 }
 
 const ARRAY_IDENTITY_KEYS = ["pos", "iface", "storage", "id", "name"] as const;
+const COMMA_SET_FIELDS = new Set(["content", "nodes", "tags"]);
+
+function canonicaliseCsvSet(raw: string): string {
+  return raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0)
+    .sort()
+    .join(",");
+}
 
 function findArrayIdentityKey(arr: unknown[]): string | null {
   if (arr.length === 0) return null;
@@ -51,7 +61,12 @@ function sortKeysDeep(value: unknown): unknown {
     const source = value as Record<string, unknown>;
     const sorted: Record<string, unknown> = {};
     for (const key of Object.keys(source).sort()) {
-      sorted[key] = sortKeysDeep(source[key]);
+      const raw = source[key];
+      if (COMMA_SET_FIELDS.has(key) && typeof raw === "string" && raw.includes(",")) {
+        sorted[key] = canonicaliseCsvSet(raw);
+      } else {
+        sorted[key] = sortKeysDeep(raw);
+      }
     }
     return sorted;
   }

@@ -180,6 +180,27 @@ export async function takeConfigSnapshot(
  */
 const ARRAY_IDENTITY_KEYS = ["pos", "iface", "storage", "id", "name"] as const;
 
+/**
+ * Proxmox stores set-valued config fields as comma-separated strings ("vztmpl,
+ * backup,iso") but treats them as unordered. Different reads can return the
+ * same set with the elements in different orders, so we canonicalise these
+ * specific fields by splitting, sorting, and rejoining.
+ */
+const COMMA_SET_FIELDS = new Set([
+  "content",
+  "nodes",
+  "tags",
+]);
+
+function canonicaliseCsvSet(raw: string): string {
+  return raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0)
+    .sort()
+    .join(",");
+}
+
 function findArrayIdentityKey(arr: unknown[]): string | null {
   if (arr.length === 0) return null;
   if (!arr.every((e) => e !== null && typeof e === "object" && !Array.isArray(e))) {
@@ -217,7 +238,16 @@ function sortKeysDeep(value: unknown): unknown {
     const source = value as Record<string, unknown>;
     const sorted: Record<string, unknown> = {};
     for (const key of Object.keys(source).sort()) {
-      sorted[key] = sortKeysDeep(source[key]);
+      const raw = source[key];
+      if (
+        COMMA_SET_FIELDS.has(key) &&
+        typeof raw === "string" &&
+        raw.includes(",")
+      ) {
+        sorted[key] = canonicaliseCsvSet(raw);
+      } else {
+        sorted[key] = sortKeysDeep(raw);
+      }
     }
     return sorted;
   }
