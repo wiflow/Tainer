@@ -16,6 +16,14 @@ Sections per release:
 
 ### Added
 
+### Changed
+
+### Fixed
+
+## [1.4.0] - 2026-05-01
+
+### Added
+
 - **Tainer wordmark logo in the sidebar header.** Above the Overview link, the Tainer wordmark logo (crane + "TAINER" text) renders at the top of the sidebar. Loaded from `public/tainer-wordmark.png`.
 - **Load-balancer activity log persists across restarts.** Migrations triggered + failed (and future categories: circuit-breaker open/close, tick errors, settings changes) now write to a per-site `load-balancer-events.json` capped at 10,000 entries — high enough that it effectively "never gets cleared" without unbounded file growth. The Load Balancer page gets a new Activity Log section using the same searchable / filterable / expandable viewer pattern as the Audit Log: filter by severity (info/warning/destructive), category, or specific node; click a row to see full structured details (target node, migration UPID, error message, etc.).
 - **Sidebar nav grouped into collapsible sections.** Items used to be in three flat lists separated by dividers, which got long once Identity Providers + Audit Log + Heartbeat were added. Now grouped into four sections — **Workloads** (Dashboard, Deployments, Backups, Tags), **Reliability** (Alerts, Heartbeat, Node Configs, CVE Scanner, Load Balancer), **Library** (Templates, Images, ISOs), **Access** (admin: Users, Groups, Identity Providers, Audit Log, Site Manager) — each with a clickable header that animates open/closed via framer-motion. The section containing the active route auto-expands; collapse state otherwise persists in localStorage so refresh remembers what you had open.
