@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { getCurrentSession } from "@/lib/auth";
+import { getCurrentSession, hasSiteAccess } from "@/lib/auth";
 import { getClusterRRDData, withSiteConfig } from "@/lib/proxmox";
 import { resolveSiteConfigBySlug } from "@/lib/site-resolver";
 
@@ -29,9 +29,10 @@ export async function GET(request: NextRequest) {
   try {
     const tf = timeframe as "hour" | "day" | "week" | "month" | "year";
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
-    console.log(`[rrd] Fetching RRD for site="${siteSlug}" tf="${tf}" apiUrl="${siteConfig.apiUrl}" user="${siteConfig.username}"`);
+    if (!hasSiteAccess(session, siteConfig.siteId)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
     const data = await withSiteConfig(siteConfig, () => getClusterRRDData(tf));
-    console.log(`[rrd] Result: categories=${data.categories.length} cpu=${data.cpu.length}`);
     return NextResponse.json(data, {
       headers: { "Cache-Control": "private, max-age=60" },
     });

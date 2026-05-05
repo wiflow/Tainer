@@ -18,6 +18,21 @@ async function loadOrCreateSecret(): Promise<Buffer> {
     return createHash("sha256").update(process.env.AUTH_SECRET.trim()).digest();
   }
 
+  // The auth secret is the crypto root for session cookies, mobile JWTs,
+  // 2FA secrets, and Proxmox credential encryption. In production we refuse
+  // to auto-generate it: silently writing the secret to the data volume
+  // means anyone who can read the volume (operator backup, snapshot leak,
+  // post-RCE) can mint admin sessions and decrypt every Proxmox password.
+  // Force operators to inject AUTH_SECRET as an env var instead — typically
+  // out-of-band, e.g. `openssl rand -base64 32` piped into a secrets store.
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "AUTH_SECRET is required in production. Generate one with " +
+        "`openssl rand -base64 32` and set it as an environment variable; " +
+        "do not rely on the on-disk fallback.",
+    );
+  }
+
   try {
     const raw = await readFile(await resolveDataFilePath("auth-secret.txt"), "utf8");
     return Buffer.from(raw.trim(), "base64");

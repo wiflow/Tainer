@@ -22,7 +22,6 @@ import { SectionPanel } from "@/components/ui/section-panel";
 import { getAppSettings, resolveDefaultRootfsStorage } from "@/lib/app-settings";
 import { getCurrentSession } from "@/lib/auth";
 import { listBackupPolicies } from "@/lib/backup-policies";
-import { isCloudBackupEnabled } from "@/lib/cloud-backup";
 import { listBackupRuns } from "@/lib/backup-run-log";
 import { listContainerTags } from "@/lib/container-groups";
 import { getBackupOverview, getProxmoxDefaults, getRootfsTargets, withSiteConfig } from "@/lib/proxmox";
@@ -75,9 +74,7 @@ export default async function BackupsPage({
   const healthyPools = overview.backupStoragePools.filter((p) => p.issues.length === 0);
   const unhealthyPools = overview.backupStoragePools.filter((p) => p.issues.length > 0);
 
-  const cloudEnabled = isCloudBackupEnabled();
-
-  if (overview.backupStoragePools.length === 0 && !cloudEnabled) {
+  if (overview.backupStoragePools.length === 0) {
     return (
       <div className="space-y-4">
         <Card>
@@ -169,7 +166,6 @@ export default async function BackupsPage({
       {isAdmin && (
         <BackupPoliciesList
           availableTags={availableTags}
-          cloudBackupEnabled={cloudEnabled}
           healthyPools={healthyPools}
           policies={backupPolicies}
         />

@@ -203,11 +203,6 @@ export async function scanPorts(
     if (results !== null) return results;
   }
 
-  if (vmid) {
-    const results = await scanViaTunnel(normalizedIp, vmid);
-    if (results !== null) return results;
-  }
-
   return scanViaTcp(normalizedIp);
 }
 
@@ -292,32 +287,6 @@ function parseNetstatOutput(output: string, ip: string): PortResult[] {
   }
 
   return results.sort((a, b) => a.port - b.port);
-}
-
-async function scanViaTunnel(
-  ip: string,
-  vmid: number,
-): Promise<PortResult[] | null> {
-  const tunnelProxy = process.env.TAINER_TUNNEL_PROXY;
-  if (!tunnelProxy) return null;
-
-  try {
-    const res = await fetch(`${tunnelProxy}/__tainer__/port-scan`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ vmid }),
-      signal: AbortSignal.timeout(15_000),
-    });
-
-    if (!res.ok) return null;
-
-    const data = await res.json() as { output?: string };
-    if (!data.output) return null;
-
-    return parseNetstatOutput(data.output, ip);
-  } catch {
-    return null;
-  }
 }
 
 async function scanViaTcp(ip: string): Promise<PortResult[]> {

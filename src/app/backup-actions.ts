@@ -12,7 +12,6 @@ import { createRateLimiterOrThrow } from "@/lib/rate-limit";
 
 const enforceRateLimit = createRateLimiterOrThrow("backup-actions", 10, 5 * 60_000);
 import { reapplySkippedCustomLxcConfig } from "@/lib/proxmox-host";
-import { isCloudBackupEnabled, requestCloudUpload } from "@/lib/cloud-backup";
 import {
   decodeDeploymentId,
   deleteBackup,
@@ -20,13 +19,12 @@ import {
   getSkippedCustomLxcConfigLines,
   getNextId,
   listBackupStoragePools,
-  listBackupsForVm,
   restoreBackup,
   runContainerLifecycleAction,
   runVmLifecycleAction,
   triggerBackup,
-  waitForTask,
   validateUpid,
+  waitForTask,
   withSiteConfig,
 } from "@/lib/proxmox";
 import { resolveSiteConfigBySlug } from "@/lib/site-resolver";
@@ -86,42 +84,10 @@ export async function triggerBackupAction(
     const upid = await triggerBackup(node, vmid, storage);
     const validUpid = validateUpid(upid);
 
-    // Cloud backup: after vzdump completes, agent uploads directly to SaaS via HTTPS
-    if (isCloudBackupEnabled()) {
-      waitForTask(node, validUpid).then(async () => {
-        try {
-          const { archives } = await listBackupsForVm(node, vmid);
-          const latest = archives
-            .filter((a) => a.storage === storage)
-            .sort((a, b) => b.ctime - a.ctime)[0];
-
-          if (latest) {
-            const filename = latest.volid.includes("/")
-              ? latest.volid.split("/").pop()!
-              : latest.volid;
-
-            console.log(`[cloud-backup] Uploading ${filename} for VMID ${vmid}...`);
-            const result = await requestCloudUpload(node, storage, filename);
-
-            if (result.success) {
-              console.log(`[cloud-backup] Upload OK (${result.sizeBytes} bytes), deleting local copy`);
-              await deleteBackup(node, storage, latest.volid);
-            } else {
-              console.error(`[cloud-backup] Upload failed: ${result.error}`);
-            }
-          }
-        } catch (err) {
-          console.error("[cloud-backup] Post-backup upload failed:", err);
-        }
-      }).catch((err) => {
-        console.error("[cloud-backup] Wait for vzdump task failed:", err);
-      });
-    }
-
     recordDeploymentActivity({
       action: "backup-created",
       deploymentId,
-      message: `Backup started for VMID ${vmid} on ${storage}${isCloudBackupEnabled() ? " (cloud)" : ""}`,
+      message: `Backup started for VMID ${vmid} on ${storage}`,
       userEmail: session.user.email,
       userName: session.user.name,
       vmid,
@@ -131,9 +97,7 @@ export async function triggerBackupAction(
     revalidatePath(`/sites/${siteSlug}/deployments/${deploymentId}`);
 
     return {
-      message: isCloudBackupEnabled()
-        ? `Backup started for VMID ${vmid}. Will upload to cloud after completion.`
-        : `Backup started for VMID ${vmid} on ${storage}.`,
+      message: `Backup started for VMID ${vmid} on ${storage}.`,
       requestId: randomUUID(),
       status: "success",
       task: {
@@ -141,9 +105,7 @@ export async function triggerBackupAction(
         siteSlug,
         submittedMessage: `Backup of VMID ${vmid} submitted to ${storage}.`,
         successHref: `/sites/${siteSlug}/deployments/${deploymentId}`,
-        successMessage: isCloudBackupEnabled()
-          ? `Backup of VMID ${vmid} completed. Cloud upload in progress...`
-          : `Backup of VMID ${vmid} completed successfully.`,
+        successMessage: `Backup of VMID ${vmid} completed successfully.`,
         title: `Backing up VMID ${vmid}`,
         upid: validUpid,
       },

@@ -16,6 +16,7 @@ IMAGE="tainersh/tainer"
 TAG="${TAG:-latest}"
 BUILDER="tainer-multiarch"
 PLATFORMS="linux/amd64,linux/arm64"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Ensure a buildx builder with multi-arch support exists.
 if ! docker buildx inspect "${BUILDER}" &>/dev/null; then
@@ -30,6 +31,25 @@ if [[ "${TAG}" != "latest" ]]; then
   TAGS+=("-t" "${IMAGE}:latest")
 fi
 
+# ── Pre-push gate: build linux/amd64 locally and inspect its layers ──
+# `docker buildx build --push` for a multi-arch manifest goes straight to
+# the registry without leaving anything in the local daemon. We can't
+# inspect what we just built that way. So we do a single-arch local load
+# first, fail the script if the image leaks source artifacts, and only
+# then run the real multi-arch build + push.
+GATE_TAG="${IMAGE}:gate-${TAG}"
+echo "=== Pre-push gate: building linux/amd64 locally ==="
+docker buildx build \
+  --platform linux/amd64 \
+  --load \
+  -t "${GATE_TAG}" \
+  .
+
+echo ""
+"${SCRIPT_DIR}/check-image-layers.sh" "${GATE_TAG}"
+docker image rm "${GATE_TAG}" >/dev/null 2>&1 || true
+
+echo ""
 echo "=== Building ${IMAGE}:${TAG} for ${PLATFORMS} ==="
 docker buildx build \
   --platform "${PLATFORMS}" \

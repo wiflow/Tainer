@@ -220,6 +220,12 @@ export type OidcUserClaims = {
   sub: string;
   /** Most providers include this; we require it for user matching. */
   email: string;
+  /**
+   * Whether the IdP asserts the email was verified. Standard OIDC claim
+   * (`email_verified`). `null` means the claim was absent — distinguish
+   * from explicit `false` so callers can apply per-provider policy.
+   */
+  emailVerified: boolean | null;
   /** Display name; falls back to email if absent. */
   name: string;
   /** Optional groups claim — used by the (future) group-mapping feature. */
@@ -289,5 +295,9 @@ export async function completeOidcAuthorization(
     ? groupsRaw.filter((g): g is string => typeof g === "string")
     : [];
 
-  return { sub, email, name, groups };
+  const emailVerifiedRaw = (claims as Record<string, unknown>).email_verified;
+  const emailVerified =
+    typeof emailVerifiedRaw === "boolean" ? emailVerifiedRaw : null;
+
+  return { sub, email, emailVerified, name, groups };
 }

@@ -50,7 +50,7 @@ export async function createIdpProviderAction(
       message: `Created OIDC provider "${provider.name}" (slug=${provider.slug})`,
     }).catch(() => {});
 
-    revalidatePath("/settings/identity-providers");
+    revalidatePath("/identity-providers");
     return {
       message: `Provider "${provider.name}" created.`,
       requestId: randomUUID(),
@@ -100,7 +100,7 @@ export async function updateIdpProviderAction(
       message: `Updated OIDC provider "${provider.name}" (slug=${provider.slug})`,
     }).catch(() => {});
 
-    revalidatePath("/settings/identity-providers");
+    revalidatePath("/identity-providers");
     return {
       message: `Provider "${provider.name}" updated.`,
       requestId: randomUUID(),
@@ -147,7 +147,7 @@ export async function deleteIdpProviderAction(
       message: `Deleted OIDC provider "${provider?.name ?? id}"`,
     }).catch(() => {});
 
-    revalidatePath("/settings/identity-providers");
+    revalidatePath("/identity-providers");
     return {
       message: "Provider deleted.",
       requestId: randomUUID(),

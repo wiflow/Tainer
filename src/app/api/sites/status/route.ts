@@ -13,7 +13,13 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const sites = await listEnabledSites();
+  const allSites = await listEnabledSites();
+  const sites =
+    session.user.role === "admin"
+      ? allSites
+      : allSites.filter((s) =>
+          session.user.accessibleSiteIds.includes(s.id),
+        );
   const results: Record<string, {
     ok: boolean;
     latencyMs: number;

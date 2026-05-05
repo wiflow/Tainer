@@ -6,7 +6,17 @@ COPY package.json package-lock.json ./
 RUN npm ci
 
 COPY . .
-RUN npm run build
+RUN npm run build \
+    && rm -rf /app/.next/cache/webpack \
+    && find /app/.next -name '*.map' -delete \
+    && find /app/.next -name '*.ts' -not -name '*.d.ts' -delete
+
+# Strip source maps + TypeScript files from the build output in the SAME
+# RUN as `npm run build`, before stage 2 copies anything. Docker layers are
+# append-only: a later `RUN ... -delete` only writes a "whiteout" to the
+# next layer — the original bytes still live in the COPY layer and remain
+# extractable via `docker save` + tar. Cleaning here means the runtime
+# image never carries source maps in its history at all.
 
 # Minify server.mjs to strip comments and make it harder to read
 RUN npx esbuild server.mjs --bundle --platform=node --target=node20 \
@@ -17,27 +27,33 @@ RUN npx esbuild server.mjs --bundle --platform=node --target=node20 \
 FROM node:20-alpine AS runtime
 WORKDIR /app
 
-# Install system dependencies
+# openssh-client + sshpass are required for the password-based SSH path used
+# when a Proxmox node has no managed key (see src/lib/ssh-command.ts). Both
+# stay; nothing else from the build toolchain ships.
 RUN apk add --no-cache openssh-client sshpass
 
 # Install production dependencies only
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
-# Copy build output only (no source code)
+# Copy build output only — already stripped of maps + .ts in the builder.
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/server.min.mjs ./server.mjs
 COPY --from=builder /app/next.config.ts ./next.config.ts
 
-# Remove leftover files that could leak info
-RUN rm -rf /app/.next/cache/webpack \
-    && find /app/.next -name '*.map' -delete \
-    && find /app/.next -name '*.ts' -not -name '*.d.ts' -delete
-
-# Non-root user
+# Non-root user. /app is owned by root and only group-readable by tainer,
+# so the runtime user can read application code but cannot rewrite it
+# (server.mjs, node_modules, .next/server bundles, etc.). Only /app/data
+# is writable. This means a future code-exec-in-container bug cannot
+# silently replace server.mjs and persist across restarts.
 RUN addgroup -g 1001 tainer && adduser -u 1001 -G tainer -s /bin/false -D tainer
-RUN mkdir -p /app/data && chown -R tainer:tainer /app /app/data
+RUN mkdir -p /app/data \
+    && chown -R root:tainer /app \
+    && chown -R tainer:tainer /app/data \
+    && find /app -path /app/data -prune -o -type d -exec chmod 0750 {} + \
+    && find /app -path /app/data -prune -o -type f -exec chmod 0640 {} + \
+    && chmod 0770 /app/data
 USER tainer
 
 ENV NODE_ENV=production

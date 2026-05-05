@@ -37,6 +37,7 @@ import {
   type Permission,
 } from "@/lib/auth";
 import { recordAdminAudit } from "@/lib/admin-audit-log";
+import { getClientIpForRateLimit } from "@/lib/proxy-trust";
 
 function errorState<T extends BasicActionState>(state: T, message: string): T {
   return {
@@ -45,13 +46,6 @@ function errorState<T extends BasicActionState>(state: T, message: string): T {
     requestId: randomUUID(),
     status: "error",
   };
-}
-
-async function getClientIp() {
-  const headerStore = await headers();
-  return headerStore.get("x-forwarded-for")?.split(",")[0]?.trim()
-    || headerStore.get("x-real-ip")?.trim()
-    || undefined;
 }
 
 function isPrivateIpv4Host(hostname: string) {
@@ -195,7 +189,7 @@ export async function bootstrapAdministratorAction(
       password,
     });
 
-    await beginLogin(email, password, await getClientIp());
+    await beginLogin(email, password, await getClientIpForRateLimit());
   } catch (error) {
     return errorState(
       _previousState,
@@ -214,22 +208,42 @@ export async function loginAction(
   _previousState: LoginActionState,
   formData: FormData,
 ): Promise<LoginActionState> {
+  // Capture the email up-front so the catch-block audit entry can attribute
+  // a failed attempt even when `beginLogin` throws before we know the user.
+  let attemptedEmail = "";
+
   try {
     const twoFactorCode = String(formData.get("twoFactorCode") ?? "").trim();
 
     if (twoFactorCode) {
       await completeTwoFactorLogin(twoFactorCode);
+      const session = await getCurrentSession();
+      if (session) {
+        recordAdminAudit({
+          action: "login-success",
+          actorEmail: session.user.email,
+          actorName: session.user.name,
+          message: "Local password + 2FA sign-in",
+        }).catch(() => {});
+      }
     } else {
       const email = String(formData.get("email") ?? "").trim();
+      attemptedEmail = email;
       const password = String(formData.get("password") ?? "");
 
       if (!email || !password) {
         return errorState(_previousState, "Enter both your email and password.");
       }
 
-      const result = await beginLogin(email, password, await getClientIp());
+      const result = await beginLogin(email, password, await getClientIpForRateLimit());
 
       if (result.requiresTwoFactor) {
+        recordAdminAudit({
+          action: "login-success",
+          actorEmail: email,
+          actorName: email,
+          message: "Local password sign-in — awaiting 2FA challenge",
+        }).catch(() => {});
         return {
           message: "Enter your authenticator code or one of your recovery codes to finish signing in.",
           requestId: randomUUID(),
@@ -237,10 +251,26 @@ export async function loginAction(
           status: "success",
         };
       }
+
+      recordAdminAudit({
+        action: "login-success",
+        actorEmail: email,
+        actorName: email,
+        message: "Local password sign-in",
+      }).catch(() => {});
     }
   } catch (error) {
+    const reason = error instanceof Error ? error.message : "Failed to sign in.";
+    if (attemptedEmail) {
+      recordAdminAudit({
+        action: "login-failure",
+        actorEmail: attemptedEmail,
+        actorName: attemptedEmail,
+        message: `Local password sign-in failed: ${reason}`,
+      }).catch(() => {});
+    }
     return {
-      message: error instanceof Error ? error.message : "Failed to sign in.",
+      message: reason,
       requestId: randomUUID(),
       requiresTwoFactor: false,
       status: "error",
@@ -272,7 +302,7 @@ export async function requestPasswordResetAction(
       message:
         delivery.delivery === "email"
           ? "If that account exists, a password reset email has been sent."
-          : "If that account exists, a password reset link has been saved to password-reset-debug.json in the data directory. Ask your server administrator to retrieve it.",
+          : "If that account exists, a password reset link has been written to the server logs. Ask your server administrator to retrieve it from the Tainer container output.",
       requestId: randomUUID(),
       status: "success",
     };

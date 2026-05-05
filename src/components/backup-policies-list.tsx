@@ -59,12 +59,10 @@ function formatNextRun(iso: string | null): string {
 
 function PolicyCard({
   availableTags,
-  cloudBackupEnabled,
   healthyPools,
   policy,
 }: {
   availableTags: ContainerTag[];
-  cloudBackupEnabled?: boolean;
   healthyPools: ProxmoxBackupStoragePool[];
   policy: BackupPolicy;
 }) {
@@ -93,7 +91,6 @@ function PolicyCard({
     return (
       <BackupPolicyEditor
         availableTags={availableTags}
-        cloudBackupEnabled={cloudBackupEnabled}
         healthyPools={healthyPools}
         onClose={() => setEditing(false)}
         policy={policy}
@@ -273,12 +270,10 @@ function PolicyCard({
 
 export function BackupPoliciesList({
   availableTags,
-  cloudBackupEnabled,
   healthyPools,
   policies,
 }: {
   availableTags: ContainerTag[];
-  cloudBackupEnabled?: boolean;
   healthyPools: ProxmoxBackupStoragePool[];
   policies: BackupPolicy[];
 }) {
@@ -318,7 +313,6 @@ export function BackupPoliciesList({
         {policies.map((policy) => (
           <PolicyCard
             availableTags={availableTags}
-            cloudBackupEnabled={cloudBackupEnabled}
             healthyPools={healthyPools}
             key={policy.id}
             policy={policy}
@@ -328,7 +322,6 @@ export function BackupPoliciesList({
         {creating ? (
           <BackupPolicyEditor
             availableTags={availableTags}
-            cloudBackupEnabled={cloudBackupEnabled}
             healthyPools={healthyPools}
             onClose={() => setCreating(false)}
           />

@@ -93,15 +93,41 @@ function validateProviderInput(input: IdpProviderInput, isCreate: boolean): void
     throw new Error("Provider slug must be lowercase letters, numbers, and dashes (max 33 chars).");
   }
   if (!input.name.trim()) throw new Error("Provider name is required.");
-  if (!input.issuer.trim() || !/^https?:\/\//.test(input.issuer.trim())) {
+
+  const issuer = input.issuer.trim();
+  if (!issuer || !/^https?:\/\//.test(issuer)) {
     throw new Error("Issuer must be a URL starting with http:// or https://.");
   }
+  if (
+    issuer.startsWith("http://") &&
+    process.env.TAINER_OIDC_ALLOW_INSECURE_ISSUER !== "true"
+  ) {
+    throw new Error(
+      "Issuer must use https:// in production. Set TAINER_OIDC_ALLOW_INSECURE_ISSUER=true to allow http:// for local development.",
+    );
+  }
+
   if (!input.clientId.trim()) throw new Error("Client ID is required.");
   if (isCreate && !input.clientSecret) {
     throw new Error("Client secret is required when creating a provider.");
   }
   if (!["admin", "operator"].includes(input.defaultRole)) {
     throw new Error("Default role must be admin or operator.");
+  }
+
+  // Foot-gun guard: an IdP that auto-provisions admins with no domain
+  // restriction means anyone who can sign in at the IdP becomes a Tainer
+  // admin. Refuse the combination — operators can opt into wide auto-
+  // provisioning at the operator role, but admin auto-provisioning must
+  // be domain-scoped.
+  if (input.autoProvision && input.defaultRole === "admin") {
+    const domains = parseAllowedDomains(input.allowedEmailDomains ?? "");
+    if (domains === null || domains.length === 0) {
+      throw new Error(
+        "Auto-provisioning admin users requires at least one allowed email domain. " +
+          "Set allowedEmailDomains to a comma-separated list of trusted domains.",
+      );
+    }
   }
 }
 
@@ -268,6 +294,14 @@ export function parseAllowedDomains(raw: string): string[] | null {
 export function isEmailAllowed(email: string, allowedEmailDomains: string): boolean {
   const list = parseAllowedDomains(allowedEmailDomains);
   if (list === null) return true; // unrestricted
-  const domain = email.toLowerCase().split("@")[1] ?? "";
+  // Use the canonical domain — the substring after the LAST @. `split("@")[1]`
+  // misclassifies addresses like `attacker@evil.example@trusted.example` as
+  // belonging to `evil.example`, letting them pass an allowlist that only
+  // names `trusted.example`.
+  const lower = email.toLowerCase();
+  const at = lower.lastIndexOf("@");
+  if (at === -1) return false;
+  const domain = lower.slice(at + 1);
+  if (!domain) return false;
   return list.includes(domain);
 }

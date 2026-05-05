@@ -46,13 +46,11 @@ const fieldClassName =
 
 export function BackupPolicyEditor({
   availableTags,
-  cloudBackupEnabled,
   healthyPools,
   onClose,
   policy,
 }: {
   availableTags: ContainerTag[];
-  cloudBackupEnabled?: boolean;
   healthyPools: ProxmoxBackupStoragePool[];
   onClose?: () => void;
   policy?: BackupPolicy;
@@ -194,9 +192,6 @@ export function BackupPolicyEditor({
                 required
               >
                 <option value="">Select storage pool...</option>
-                {cloudBackupEnabled && (
-                  <option value="__cloud__">Cloud Backup (tainer.sh)</option>
-                )}
                 {uniquePools.map((pool) => (
                   <option key={pool.storage} value={pool.storage}>
                     {pool.storage} ({pool.type})
@@ -204,9 +199,7 @@ export function BackupPolicyEditor({
                 ))}
               </select>
               <p className="mt-1.5 text-[11px] text-zinc-500">
-                {cloudBackupEnabled
-                  ? "Choose Cloud Backup for off-site storage, or a local Proxmox pool."
-                  : "Backup-capable storage pool for vzdump archives."}
+                Backup-capable storage pool for vzdump archives.
               </p>
             </label>
           </div>

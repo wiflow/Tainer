@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { getCurrentSession } from "@/lib/auth";
+import { getCurrentSession, hasSiteAccess } from "@/lib/auth";
 import { getTaskSnapshot, withSiteConfig } from "@/lib/proxmox";
 import { resolveSiteConfigBySlug } from "@/lib/site-resolver";
 
@@ -114,6 +114,9 @@ export async function GET(request: NextRequest) {
 
   if (siteSlug) {
     const config = await resolveSiteConfigBySlug(siteSlug);
+    if (!hasSiteAccess(session, config.siteId)) {
+      return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+    }
     return withSiteConfig(config, handler);
   }
 
@@ -198,6 +201,9 @@ export async function POST(request: NextRequest) {
 
   if (siteSlug) {
     const config = await resolveSiteConfigBySlug(siteSlug);
+    if (!hasSiteAccess(session, config.siteId)) {
+      return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+    }
     return withSiteConfig(config, handler);
   }
 

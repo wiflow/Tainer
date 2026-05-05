@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 
 import { resolveDataFilePath } from "@/lib/app-data";
-import { writeJsonFileAtomically } from "@/lib/store-utils";
+import { createStoreMutator, writeJsonFileAtomically } from "@/lib/store-utils";
 
 export type AdminAuditAction =
   | "user-created"
@@ -30,6 +30,8 @@ export type AdminAuditAction =
   | "group-updated"
   | "group-deleted"
   | "user-groups-updated"
+  | "login-success"
+  | "login-failure"
   | "sso-login"
   | "sso-user-provisioned"
   | "sso-provider-created"
@@ -70,23 +72,30 @@ async function writeStore(store: AdminAuditLogStore) {
   await writeJsonFileAtomically(filePath, store);
 }
 
+const mutateStore = createStoreMutator("admin-audit-log", readStore, writeStore);
+
 export async function recordAdminAudit(
   input: Omit<AdminAuditEntry, "id" | "recordedAt">,
 ) {
-  const store = await readStore();
-  const entry: AdminAuditEntry = {
-    ...input,
-    id: randomUUID(),
-    recordedAt: new Date().toISOString(),
-  };
+  // Serialise read-modify-write: without the queue two concurrent calls can
+  // both read the current store, append independently, and the second write
+  // silently overwrites the first — losing audit entries during the very
+  // bursts (parallel admin actions, mass user import, incident response)
+  // when the log is most useful.
+  return mutateStore((store) => {
+    const entry: AdminAuditEntry = {
+      ...input,
+      id: randomUUID(),
+      recordedAt: new Date().toISOString(),
+    };
 
-  store.entries.unshift(entry);
-  if (store.entries.length > MAX_ENTRIES) {
-    store.entries = store.entries.slice(0, MAX_ENTRIES);
-  }
+    store.entries.unshift(entry);
+    if (store.entries.length > MAX_ENTRIES) {
+      store.entries = store.entries.slice(0, MAX_ENTRIES);
+    }
 
-  await writeStore(store);
-  return entry;
+    return entry;
+  });
 }
 
 export async function getAdminAuditLog(

@@ -8,14 +8,13 @@ import {
   scrypt as scryptCallback,
   timingSafeEqual,
 } from "node:crypto";
-import { chmod, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { promisify } from "node:util";
 
 import { cookies } from "next/headers";
 import QRCode from "qrcode";
 import nodemailer from "nodemailer";
 
-import { getDataDirectoryPath, resolveDataFilePath } from "@/lib/app-data";
+import { resolveDataFilePath } from "@/lib/app-data";
 import { decryptText, encryptText, getAuthSecret } from "@/lib/crypto";
 import { SSH_STEP_UP_COOKIE_NAME, SSH_STEP_UP_TTL_MINUTES } from "@/lib/guest-access";
 import {
@@ -622,6 +621,18 @@ async function sanitizeUser(user: StoredUser): Promise<SessionUser> {
   // (e.g. the initial admin created during setup).
   const effectiveAdmin = resolved.isAdmin || user.role === "admin";
 
+  // Admins get the full permission set populated explicitly. Previously
+  // `hasPermission` short-circuited on `role === "admin"` — meaning anything
+  // that flipped role to admin was a full takeover even if `permissions`
+  // stayed empty. With permissions enumerated here, the source of truth is
+  // the list itself: a future code path that mutated role without going
+  // through sanitizeUser would no longer escalate. The visible behaviour is
+  // unchanged (admins still see / do everything), but the security property
+  // tightens.
+  const permissions = effectiveAdmin
+    ? [...ALL_PERMISSIONS]
+    : resolved.globalPermissions;
+
   return {
     accessibleSiteIds: resolved.accessibleSiteIds,
     email: user.email,
@@ -629,7 +640,7 @@ async function sanitizeUser(user: StoredUser): Promise<SessionUser> {
     hasTwoFactor: Boolean(user.twoFactorSecret),
     id: user.id,
     name: user.name,
-    permissions: resolved.globalPermissions,
+    permissions,
     role: effectiveAdmin ? "admin" : "operator",
     sitePermissions: resolved.sitePermissions,
   };
@@ -803,27 +814,15 @@ async function readGuestShellStepUpCookie() {
 }
 
 async function savePasswordResetDebugEntry(entry: PasswordResetDebugEntry) {
-  console.info(`[auth] Password reset link saved to password-reset-debug.json for ${entry.email}.`);
-
-  const filePath = await resolveDataFilePath("password-reset-debug.json");
-  await mkdir(getDataDirectoryPath(), { recursive: true });
-
-  let entries: PasswordResetDebugEntry[] = [];
-
-  try {
-    const raw = await readFile(filePath, "utf8");
-    const parsed = JSON.parse(raw) as PasswordResetDebugEntry[];
-    entries = Array.isArray(parsed) ? parsed : [];
-  } catch {
-    entries = [];
-  }
-
-  const nextEntries = [entry, ...entries].slice(0, 25);
-  const tempPath = `${filePath}.${randomUUID()}.tmp`;
-
-  await writeFile(tempPath, `${JSON.stringify(nextEntries, null, 2)}\n`, "utf8");
-  await chmod(tempPath, 0o600);
-  await rename(tempPath, filePath);
+  // Previously this persisted the reset link (with the single-use token in
+  // the path) to password-reset-debug.json in the data directory. That made
+  // any disk-level compromise — backup leak, snapshot copy, post-RCE read
+  // — a path to hijack any pending reset within the link's TTL. We now log
+  // the link to stderr only; the operator running the container is the
+  // only intended audience, and the link disappears with the log line.
+  console.info(
+    `[auth] Password reset link for ${entry.email} (expires ${entry.expiresAt}): ${entry.link}`,
+  );
 }
 
 async function sendPasswordResetEmail(email: string, name: string, link: string) {
@@ -940,7 +939,13 @@ export async function requireAdminSession() {
 }
 
 export function hasPermission(session: AuthSession, permission: Permission): boolean {
-  if (session.user.role === "admin") return true;
+  // No `role === "admin"` short-circuit: admin grants are now explicit in
+  // `session.user.permissions` (see sanitizeUser). The list is the source
+  // of truth for capability checks, so any path that grants a permission
+  // has to go through sanitizeUser → group resolution. `requireAdminSession`
+  // remains for things that gate specifically on admin role (audit log,
+  // IdP config, user management UI), but ad-hoc `role === "admin"` checks
+  // for capability-style gates are an antipattern — use `requirePermission`.
   return session.user.permissions.includes(permission);
 }
 
@@ -1558,6 +1563,12 @@ export type SsoSignInInput = {
   /** Stable identifier from the IdP (`sub` claim). */
   subject: string;
   email: string;
+  /**
+   * `email_verified` claim from the IdP. `null` if absent. When `false` the
+   * sign-in is refused outright — an attacker controlling a permissive IdP
+   * can otherwise assert any email.
+   */
+  emailVerified: boolean | null;
   name: string;
   /** Whether to auto-create a Tainer user if no match is found. */
   autoProvision: boolean;
@@ -1573,30 +1584,68 @@ export type SsoSignInResult = {
 
 /**
  * Sign a user in using credentials already validated by an OIDC provider.
- * Looks up by (providerId, subject) first, then by email, then optionally
- * provisions a new user. Sets the same `tainer_session` cookie that the
- * password login flow uses, so downstream auth is identical.
  *
- * 2FA is NOT enforced for SSO users — the IdP is responsible for that.
+ * Trust boundary: the IdP is allowed to assert *its own* users — it is not
+ * allowed to take over Tainer users that already have local credentials.
+ * Specifically:
+ *
+ *   - We refuse if the IdP reported `email_verified: false`.
+ *   - We match by (providerId, subject) first — that's the stable, IdP-scoped
+ *     identifier and survives email rotation.
+ *   - We fall back to matching by email ONLY for users that are linkable:
+ *     no local password, no 2FA enrolled, and no prior SSO link to a
+ *     different provider. Otherwise an attacker who registers the same
+ *     email at a permissive IdP could bypass the local password and 2FA.
+ *     The remediation in that case is for an admin to remove the local
+ *     credential or pre-link the user.
+ *
+ * 2FA is therefore enforced indirectly: if a user has it enrolled, SSO
+ * cannot adopt that account without admin action — the local 2FA challenge
+ * is what authorises the link.
  */
 export async function signInWithSso(
   input: SsoSignInInput,
 ): Promise<SsoSignInResult> {
   const email = normalizeEmail(input.email);
   if (!email) throw new Error("Identity provider did not return a valid email.");
+  if (input.emailVerified === false) {
+    throw new Error(
+      "Identity provider reported the email address is not verified. " +
+        "Sign-in refused.",
+    );
+  }
   const name = input.name.trim() || email;
 
   let provisioned = false;
   const user = await mutateAuthStore((store) => {
-    // 1. Try to match by stable IdP subject — survives email changes.
+    // 1. Match by stable IdP subject — survives email changes and is the
+    //    only path that can adopt an existing record.
     let existing = store.users.find(
       (u) => u.ssoProviderId === input.providerId && u.ssoSubject === input.subject,
     );
 
-    // 2. Fall back to matching by email. If found, attach the SSO subject
-    //    so subsequent logins use the stable lookup path.
+    // 2. Fall back to email match — but only for users that are safe to
+    //    auto-link (no local password, no 2FA, no other SSO binding).
     if (!existing) {
-      existing = store.users.find((u) => u.email === email);
+      const candidate = store.users.find((u) => u.email === email);
+      if (candidate) {
+        const hasLocalPassword = Boolean(candidate.passwordHash);
+        const hasTwoFactor = Boolean(candidate.twoFactorSecret);
+        const linkedToDifferentProvider =
+          (candidate.ssoProviderId &&
+            candidate.ssoProviderId !== input.providerId) ||
+          (candidate.ssoSubject && candidate.ssoSubject !== input.subject);
+
+        if (hasLocalPassword || hasTwoFactor || linkedToDifferentProvider) {
+          throw new Error(
+            "An account with this email already exists in Tainer with " +
+              "different credentials. Ask an administrator to link your " +
+              "identity provider before signing in this way.",
+          );
+        }
+
+        existing = candidate;
+      }
     }
 
     if (existing) {
@@ -2333,6 +2382,6 @@ export async function revokeAllOtherSessions() {
 export async function getAuthDebugPaths() {
   return {
     authStorePath: await resolveDataFilePath("auth-store.json"),
-    passwordResetDebugPath: "password-reset-debug.json (in data directory)",
+    passwordResetDebugPath: "stderr (Tainer container logs)",
   };
 }

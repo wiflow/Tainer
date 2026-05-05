@@ -2,7 +2,6 @@
 
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
-import { headers } from "next/headers";
 
 import {
   beginLogin,
@@ -25,12 +24,7 @@ import {
 import type { ResolvedSiteConfig, SiteInput } from "@/lib/site-types";
 import { validateSiteConnection } from "@/lib/site-validation";
 
-async function getClientIp() {
-  const headerStore = await headers();
-  return headerStore.get("x-forwarded-for")?.split(",")[0]?.trim()
-    || headerStore.get("x-real-ip")?.trim()
-    || undefined;
-}
+import { getClientIpForRateLimit } from "@/lib/proxy-trust";
 
 function errorState(prev: BasicActionState, message: string): BasicActionState {
   return { message, requestId: randomUUID(), status: "error" };
@@ -107,7 +101,7 @@ export async function bootstrapWorkspaceAction(
 
     const site = await createSite(siteInput, fingerprints);
 
-    await beginLogin(email, password, await getClientIp());
+    await beginLogin(email, password, await getClientIpForRateLimit());
 
     return {
       message: site.slug,

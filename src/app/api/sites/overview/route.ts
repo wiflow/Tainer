@@ -35,7 +35,13 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const enabledSites = await listEnabledSites();
+  const allEnabledSites = await listEnabledSites();
+  const enabledSites =
+    session.user.role === "admin"
+      ? allEnabledSites
+      : allEnabledSites.filter((s) =>
+          session.user.accessibleSiteIds.includes(s.id),
+        );
 
   const entries: SiteOverviewEntry[] = [];
   let totalDeployments = 0;

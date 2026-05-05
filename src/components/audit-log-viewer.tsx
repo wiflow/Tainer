@@ -49,6 +49,8 @@ const ACTION_META: Record<AdminAuditAction, { category: string; level: Level }> 
   "sso-provider-created": { category: "sso", level: "info" },
   "sso-provider-updated": { category: "sso", level: "info" },
   "sso-provider-deleted": { category: "sso", level: "destructive" },
+  "login-success": { category: "logins", level: "info" },
+  "login-failure": { category: "logins", level: "warning" },
 };
 
 function actionMeta(action: string): { category: string; level: Level } {

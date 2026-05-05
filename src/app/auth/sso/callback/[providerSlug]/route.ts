@@ -136,6 +136,7 @@ export async function GET(
       providerId: provider.id,
       subject: claims.sub,
       email: claims.email,
+      emailVerified: claims.emailVerified,
       name: claims.name,
       autoProvision: provider.autoProvision,
       defaultRole: provider.defaultRole,
