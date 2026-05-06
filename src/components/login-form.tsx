@@ -38,7 +38,7 @@ function ProviderIcon({ brand }: { brand: IdpBrand | null }) {
   if (brand === "microsoft") {
     return <MicrosoftLogo className="h-4 w-4" />;
   }
-  return <KeyRound className="h-4 w-4 text-sky-400" />;
+  return <KeyRound className="h-4 w-4 text-zinc-300" />;
 }
 
 const inputClassName =
@@ -112,7 +112,7 @@ export function LoginForm({
             "animate-slide-down rounded-xl border px-4 py-3 text-[13px]",
             state.status === "error"
               ? "border-rose-500/20 bg-rose-500/[0.06] text-rose-300"
-              : "border-sky-500/20 bg-sky-500/[0.06] text-sky-200",
+              : "border-white/10 bg-white/[0.04] text-zinc-200",
           )}
           role={state.status === "error" ? "alert" : "status"}
         >

@@ -17,10 +17,11 @@ const buttonVariants = cva(
         // Subtle elevated button — the most common "neutral action" look.
         default: "bg-white/10 text-white hover:bg-white/20 border border-white/5 shadow-sm",
         primary: "bg-white/10 text-white hover:bg-white/20 border border-white/5 shadow-sm",
-        // Accent = primary call to action. Was white via `bg-accent`; now
-        // a teal CTA — same hue Tainer uses for accent labels in forms,
-        // distinct from the status-coloured variants (success/warning/etc).
-        accent: "bg-teal-500 text-zinc-950 hover:bg-teal-400 shadow-sm",
+        // Accent = primary call to action. Pure white tile against the
+        // dark surface — high contrast, no brand-colour clash. Status-
+        // coloured variants (success/warning/danger) carry the only
+        // chromatic accents in the app.
+        accent: "bg-white text-zinc-950 hover:bg-zinc-100 shadow-sm",
         // Secondary = subdued action. Was light grey via `bg-secondary`;
         // now a darker translucent tile that reads as a button without
         // dominating.

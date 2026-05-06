@@ -42,7 +42,6 @@ function avatarTint(seed: string): string {
     "bg-violet-500/15 text-violet-300",
     "bg-amber-500/15 text-amber-300",
     "bg-rose-500/15 text-rose-300",
-    "bg-teal-500/15 text-teal-300",
     "bg-fuchsia-500/15 text-fuchsia-300",
   ];
   let hash = 0;
@@ -112,7 +111,7 @@ function relativeTime(iso: string | null): string {
 }
 
 const inputClassName =
-  "mt-1.5 w-full rounded-xl border border-white/[0.06] bg-white/[0.025] px-4 py-3 text-[13px] text-zinc-200 outline-none transition-all duration-200 placeholder:text-zinc-600 focus:border-teal-500/40 focus:bg-white/[0.04] focus:shadow-[0_0_0_3px_rgba(20,184,166,0.08),0_0_24px_-4px_rgba(20,184,166,0.1)]";
+  "mt-1.5 w-full rounded-xl border border-white/[0.06] bg-white/[0.025] px-4 py-3 text-[13px] text-zinc-200 outline-none transition-all duration-200 placeholder:text-zinc-600 focus:border-white/30 focus:bg-white/[0.04] focus:shadow-[0_0_0_3px_rgba(255,255,255,0.04)]";
 
 function useRefreshOnSuccess(status: string) {
   const router = useRouter();
@@ -261,7 +260,7 @@ function UserGroupsCell({
             <Badge
               className={
                 g.isAdmin
-                  ? "border-teal-500/20 bg-teal-500/10 text-teal-300"
+                  ? "border-white/15 bg-white/10 text-white"
                   : "border-white/10 bg-zinc-800 text-zinc-400"
               }
               key={g.id}
@@ -280,7 +279,7 @@ function UserGroupsCell({
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Shield className="h-4 w-4 text-teal-400" />
+              <Shield className="h-4 w-4 text-zinc-300" />
               Edit groups
             </DialogTitle>
             <DialogDescription>
@@ -306,21 +305,21 @@ function UserGroupsCell({
                       className={cn(
                         "flex cursor-pointer items-center gap-3 rounded-md border border-transparent px-3 py-2 transition-colors",
                         isSelected
-                          ? "border-teal-500/20 bg-teal-500/10"
+                          ? "border-white/15 bg-white/10"
                           : "hover:border-white/[0.08] hover:bg-white/[0.025]",
                       )}
                       key={g.id}
                     >
                       <input
                         checked={isSelected}
-                        className="h-4 w-4 rounded border-white/10 bg-zinc-900 text-teal-400 accent-teal-400"
+                        className="h-4 w-4 rounded border-white/10 bg-zinc-900 text-white accent-white"
                         onChange={() => toggle(g.id)}
                         type="checkbox"
                       />
                       <span className="flex-1 text-[13px] text-zinc-200">{g.name}</span>
                       {g.isAdmin && (
                         <Badge
-                          className="border-teal-500/20 bg-teal-500/10 text-teal-300"
+                          className="border-white/15 bg-white/10 text-white"
                           variant="neutral"
                         >
                           admin
@@ -411,7 +410,7 @@ export function UserManagementPanel({
             <div className="grid gap-4 md:grid-cols-2">
               <label className="block">
                 <span className="flex items-center gap-2 text-[13px] font-medium text-zinc-300">
-                  <UserRound className="h-4 w-4 text-teal-400/50" />
+                  <UserRound className="h-4 w-4 text-zinc-500" />
                   Full name
                 </span>
                 <input className={inputClassName} name="name" placeholder="Jane Operator" />
@@ -419,7 +418,7 @@ export function UserManagementPanel({
 
               <label className="block">
                 <span className="flex items-center gap-2 text-[13px] font-medium text-zinc-300">
-                  <Mail className="h-4 w-4 text-teal-400/50" />
+                  <Mail className="h-4 w-4 text-zinc-500" />
                   Email address
                 </span>
                 <input
@@ -449,7 +448,7 @@ export function UserManagementPanel({
                         />
                         {g.name}
                         {g.isAdmin && (
-                          <span className="text-[10px] text-teal-400">(admin)</span>
+                          <span className="text-[10px] text-zinc-300">(admin)</span>
                         )}
                       </label>
                     ))}
