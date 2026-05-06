@@ -505,20 +505,27 @@ export function AppSidebar({
 
       </div>
 
-      {/* Bottom Nav */}
+      {/* Bottom Nav. Two rows: identity on top (full width so the name
+          isn't truncated by inline action icons), action icons on a
+          separate row below. break-words on the name handles unusually
+          long names by wrapping to a second line. */}
       <div className="p-3 border-t border-white/5">
-        <div className="flex items-center gap-3 px-3 py-2">
+        <div className="flex items-start gap-3 px-3 pt-2">
           <div className="flex items-center justify-center w-8 h-8 rounded-full bg-zinc-800 border border-white/10 text-[11px] font-bold text-zinc-400 shrink-0">
             {initials}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-[13px] font-medium text-zinc-200 truncate">{currentUser.name}</p>
-            <p className="text-[11px] text-zinc-400 truncate">{currentUser.role}</p>
-            <p className="text-[10px] text-zinc-600 truncate">v{version}</p>
+            <p className="text-[13px] font-medium text-zinc-200 break-words leading-tight">
+              {currentUser.name}
+            </p>
+            <p className="mt-0.5 text-[11px] text-zinc-400">{currentUser.role}</p>
+            <p className="text-[10px] text-zinc-600">v{version}</p>
           </div>
+        </div>
+        <div className="mt-2 flex justify-end gap-1 px-3 pb-1">
           <IntentLink
             aria-label="Account settings"
-            className="shrink-0 flex items-center justify-center w-9 h-9 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-white/5 transition-colors cursor-pointer"
+            className="flex items-center justify-center w-8 h-8 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-white/5 transition-colors cursor-pointer"
             href="/account"
           >
             <Settings className="w-4 h-4" />
@@ -526,7 +533,7 @@ export function AppSidebar({
           <Form action={signOutAction}>
             <button
               aria-label="Sign out"
-              className="shrink-0 flex items-center justify-center w-9 h-9 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-white/5 transition-colors cursor-pointer"
+              className="flex items-center justify-center w-8 h-8 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-white/5 transition-colors cursor-pointer"
               type="submit"
             >
               <LogOut className="w-4 h-4" />
