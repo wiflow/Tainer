@@ -204,18 +204,19 @@ export function AppSidebar({
       <div className="flex flex-1 flex-col overflow-y-auto px-3 py-4">
 
         {/* ── Brand header ──
-            Uses the Tainer wordmark logo. The source image has a lot of
-            transparent padding around the actual artwork, so we render it
-            tall (h-16) and let the natural aspect ratio fill the sidebar
-            width. Negative top margin pulls it tight against the top. */}
+            Uses the Tainer long wordmark (1890×715, ~2.64:1). The natural
+            ratio fills the sidebar width nicely; height is constrained
+            with `h-12 w-auto` so it doesn't dominate the column. The
+            previous reference (/tainer-wordmark.png) wasn't in public/,
+            so the tile rendered as the broken-image glyph. */}
         <div className="mb-2 flex items-start px-1 -mt-2">
           <Image
             alt="Tainer"
-            className="h-16 w-auto"
-            height={64}
+            className="h-12 w-auto brightness-90"
+            height={48}
             priority
-            src="/tainer-wordmark.png"
-            width={300}
+            src="/tainerlong.png"
+            width={127}
           />
           <div className="flex-1" />
           <button
