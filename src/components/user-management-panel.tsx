@@ -517,18 +517,18 @@ export function UserManagementPanel({
                   key={user.id}
                   className="md:grid md:grid-cols-[minmax(220px,1.4fr)_120px_160px_minmax(160px,1.2fr)_88px] items-center gap-4 px-5 py-3.5 transition-colors hover:bg-white/[0.02]"
                 >
-                  {/* Identity column */}
+                  {/* Identity column. The "admin" / "operator" role used
+                      to render here as a separate badge but it duplicated
+                      the group-membership column on the right of the row
+                      (an admin user is one who's in an admin group). The
+                      role is now derived from groups at session-hydration
+                      time, so the column is the source of truth. */}
                   <div className="flex items-center gap-3 min-w-0">
                     <UserAvatar user={user} />
                     <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="text-[13px] font-medium text-zinc-100 truncate">
-                          {user.name || user.email.split("@")[0]}
-                        </span>
-                        <Badge variant={user.role === "admin" ? "review" : "neutral"}>
-                          {user.role}
-                        </Badge>
-                      </div>
+                      <p className="text-[13px] font-medium text-zinc-100 truncate">
+                        {user.name || user.email.split("@")[0]}
+                      </p>
                       <p className="text-[11px] text-zinc-500 truncate">{user.email}</p>
                     </div>
                   </div>
