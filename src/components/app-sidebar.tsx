@@ -505,12 +505,14 @@ export function AppSidebar({
 
       </div>
 
-      {/* Bottom Nav. Two rows: identity on top (full width so the name
-          isn't truncated by inline action icons), action icons on a
-          separate row below. break-words on the name handles unusually
-          long names by wrapping to a second line. */}
+      {/* Bottom Nav. Identity column gets full sidebar width on its
+          own row (so long names don't get truncated by inline icons),
+          but the role + version row is split between text on the left
+          and the action icons on the right — keeping the icons
+          visually close to the user info rather than orphaned on a
+          row of their own. */}
       <div className="p-3 border-t border-white/5">
-        <div className="flex items-start gap-3 px-3 pt-2">
+        <div className="flex items-start gap-3 px-3 py-2">
           <div className="flex items-center justify-center w-8 h-8 rounded-full bg-zinc-800 border border-white/10 text-[11px] font-bold text-zinc-400 shrink-0">
             {initials}
           </div>
@@ -518,27 +520,31 @@ export function AppSidebar({
             <p className="text-[13px] font-medium text-zinc-200 break-words leading-tight">
               {currentUser.name}
             </p>
-            <p className="mt-0.5 text-[11px] text-zinc-400">{currentUser.role}</p>
-            <p className="text-[10px] text-zinc-600">v{version}</p>
+            <div className="mt-0.5 flex items-end justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-[11px] text-zinc-400">{currentUser.role}</p>
+                <p className="text-[10px] text-zinc-600">v{version}</p>
+              </div>
+              <div className="flex shrink-0 items-center gap-1">
+                <IntentLink
+                  aria-label="Account settings"
+                  className="flex items-center justify-center w-7 h-7 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-white/5 transition-colors cursor-pointer"
+                  href="/account"
+                >
+                  <Settings className="w-3.5 h-3.5" />
+                </IntentLink>
+                <Form action={signOutAction}>
+                  <button
+                    aria-label="Sign out"
+                    className="flex items-center justify-center w-7 h-7 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-white/5 transition-colors cursor-pointer"
+                    type="submit"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                  </button>
+                </Form>
+              </div>
+            </div>
           </div>
-        </div>
-        <div className="mt-2 flex justify-end gap-1 px-3 pb-1">
-          <IntentLink
-            aria-label="Account settings"
-            className="flex items-center justify-center w-8 h-8 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-white/5 transition-colors cursor-pointer"
-            href="/account"
-          >
-            <Settings className="w-4 h-4" />
-          </IntentLink>
-          <Form action={signOutAction}>
-            <button
-              aria-label="Sign out"
-              className="flex items-center justify-center w-8 h-8 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-white/5 transition-colors cursor-pointer"
-              type="submit"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
-          </Form>
         </div>
       </div>
     </>
