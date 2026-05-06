@@ -19,11 +19,14 @@ export function AuthShell({ children, footer }: AuthShellProps) {
         <div className="animate-slide-up mb-8 flex flex-col items-center gap-3">
           <Image
             alt="Tainer"
+            // Source is 1890x715 (~2.64:1) — display width/height preserve
+            // that ratio so Next/Image doesn't squash or pad. brightness-90
+            // matches the dim-on-dark treatment used elsewhere.
             className="brightness-90"
-            height={32}
+            height={83}
             priority
-            src="/logo.png"
-            width={140}
+            src="/tainerlong.png"
+            width={220}
           />
           <p className="text-[12px] font-medium tracking-wide text-zinc-600">
             Proxmox container management
