@@ -35,6 +35,7 @@ import {
   Bell,
   Globe,
   MapIcon,
+  Network,
   X,
 } from "lucide-react";
 
@@ -451,6 +452,7 @@ export function AppSidebar({
                 pathname.startsWith("/users") ||
                 pathname.startsWith("/groups") ||
                 pathname.startsWith("/identity-providers") ||
+                pathname.startsWith("/ldap") ||
                 pathname.startsWith("/audit-log") ||
                 pathname === "/sites"
               }
@@ -474,6 +476,12 @@ export function AppSidebar({
                 href="/identity-providers"
                 icon={KeyRound}
                 label="Identity Providers"
+              />
+              <NavLink
+                active={pathname.startsWith("/ldap")}
+                href="/ldap"
+                icon={Network}
+                label="LDAP / AD"
               />
               <NavLink
                 active={pathname.startsWith("/audit-log")}

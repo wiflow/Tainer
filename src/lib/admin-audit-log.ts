@@ -36,7 +36,12 @@ export type AdminAuditAction =
   | "sso-user-provisioned"
   | "sso-provider-created"
   | "sso-provider-updated"
-  | "sso-provider-deleted";
+  | "sso-provider-deleted"
+  | "ldap-login-success"
+  | "ldap-login-failure"
+  | "ldap-user-provisioned"
+  | "ldap-config-updated"
+  | "ldap-config-deleted";
 
 export type AdminAuditEntry = {
   action: AdminAuditAction;

@@ -51,6 +51,11 @@ const ACTION_META: Record<AdminAuditAction, { category: string; level: Level }> 
   "sso-provider-deleted": { category: "sso", level: "destructive" },
   "login-success": { category: "logins", level: "info" },
   "login-failure": { category: "logins", level: "warning" },
+  "ldap-login-success": { category: "ldap", level: "info" },
+  "ldap-login-failure": { category: "ldap", level: "warning" },
+  "ldap-user-provisioned": { category: "ldap", level: "info" },
+  "ldap-config-updated": { category: "ldap", level: "warning" },
+  "ldap-config-deleted": { category: "ldap", level: "destructive" },
 };
 
 function actionMeta(action: string): { category: string; level: Level } {

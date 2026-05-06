@@ -82,6 +82,14 @@ type StoredUser = {
    * across email changes — emails get re-used and re-assigned at IdPs, this
    * doesn't. Set on first SSO login alongside ssoProviderId. */
   ssoSubject?: string | null;
+  /**
+   * The user's distinguished name in the configured LDAP directory, set on
+   * first successful LDAP authentication. Stable per-user identifier — the
+   * `mail` attribute can change but the DN typically does not. Used both
+   * to recognise the user on later sign-ins and to distinguish LDAP-backed
+   * accounts from local-password accounts in the trust boundary.
+   */
+  ldapDN?: string | null;
 };
 
 type StoredSession = {
@@ -1302,34 +1310,106 @@ export async function beginLogin(email: string, password: string, clientIp?: str
   const normalizedEmail = normalizeEmail(email);
   await checkLoginRateLimit(normalizedEmail, clientIp);
 
+  // ── 1. Local password ──────────────────────────────────────────────
   const store = await readAuthStore();
-  const user = store.users.find((entry) => entry.email === normalizedEmail);
+  const localUser = store.users.find((entry) => entry.email === normalizedEmail);
+  const localOk = localUser && (await verifyPassword(password, localUser.passwordHash));
 
-  if (!user || !(await verifyPassword(password, user.passwordHash))) {
+  let authedUser: StoredUser | undefined = localOk ? localUser : undefined;
+
+  // ── 2. LDAP fallback ────────────────────────────────────────────────
+  // Tried only when local auth didn't succeed AND LDAP is configured. The
+  // directory is the source of truth for the *LDAP-backed* subset of
+  // users; locally-created accounts always take precedence (they hit the
+  // local-password branch above first). Trust-boundary checks live inside
+  // signInWithLdap.
+  if (!authedUser) {
+    const { isLdapEnabled, getLdapConfig, isEmailAllowed } = await import("@/lib/ldap-config");
+    if (await isLdapEnabled()) {
+      const config = await getLdapConfig();
+      if (config) {
+        // Domain allowlist applied BEFORE we touch the directory — saves
+        // a directory round-trip for emails that are obviously out of
+        // scope and avoids leaking the existence of arbitrary emails to
+        // the LDAP audit log.
+        if (!isEmailAllowed(normalizedEmail, config.allowedEmailDomains)) {
+          // Fall through; no special-casing — user gets the generic
+          // "Invalid email or password" treatment below.
+        } else {
+          const { authenticateLdap } = await import("@/lib/ldap");
+          const ldapResult = await authenticateLdap(config, normalizedEmail, password);
+          if (ldapResult.ok) {
+            try {
+              const signed = await signInWithLdap({
+                dn: ldapResult.user.dn,
+                email: ldapResult.user.email,
+                name: ldapResult.user.name,
+                autoProvision: config.autoProvision,
+                defaultRole: config.defaultRole,
+              });
+              authedUser = signed.user;
+              const { recordAdminAudit } = await import("@/lib/admin-audit-log");
+              recordAdminAudit({
+                action: signed.provisioned ? "ldap-user-provisioned" : "ldap-login-success",
+                actorEmail: signed.user.email,
+                actorName: signed.user.name,
+                message: signed.provisioned
+                  ? `Provisioned new ${signed.user.role} via LDAP (dn=${ldapResult.user.dn})`
+                  : `Signed in via LDAP`,
+              }).catch(() => {});
+            } catch (err) {
+              // Trust-boundary refusal lands here. We surface a generic
+              // "invalid credentials" to the user rather than the precise
+              // reason — exposing "this email is taken by a local-password
+              // user" would let an attacker enumerate which Tainer users
+              // exist locally vs in LDAP.
+              const { recordAdminAudit } = await import("@/lib/admin-audit-log");
+              recordAdminAudit({
+                action: "ldap-login-failure",
+                actorEmail: normalizedEmail,
+                actorName: normalizedEmail,
+                message: `LDAP sign-in refused: ${err instanceof Error ? err.message : "unknown"}`,
+              }).catch(() => {});
+            }
+          } else {
+            const { recordAdminAudit } = await import("@/lib/admin-audit-log");
+            recordAdminAudit({
+              action: "ldap-login-failure",
+              actorEmail: normalizedEmail,
+              actorName: normalizedEmail,
+              message: `LDAP sign-in failed: ${ldapResult.reason}`,
+            }).catch(() => {});
+          }
+        }
+      }
+    }
+  }
+
+  if (!authedUser) {
     throw new Error("Invalid email or password.");
   }
 
   await clearLoginRateLimit(normalizedEmail, clientIp);
 
-  if (user.twoFactorSecret) {
+  if (authedUser.twoFactorSecret) {
     const challenge: LoginChallenge = {
       expiresAt: addMinutes(new Date(), LOGIN_CHALLENGE_TTL_MINUTES).toISOString(),
       nonce: randomBytes(16).toString("base64url"),
-      userId: user.id,
+      userId: authedUser.id,
     };
 
     await setLoginChallengeCookie(challenge);
 
     return {
       requiresTwoFactor: true,
-      user: sanitizeUser(user),
+      user: sanitizeUser(authedUser),
     };
   }
 
-  await createSession(user.id);
+  await createSession(authedUser.id);
   return {
     requiresTwoFactor: false,
-    user: sanitizeUser(user),
+    user: sanitizeUser(authedUser),
   };
 }
 
@@ -1689,6 +1769,122 @@ export async function signInWithSso(
   });
 
   await createSession(user.id);
+  return { provisioned, user };
+}
+
+export type LdapSignInInput = {
+  /** Distinguished name returned by the directory search. Stable. */
+  dn: string;
+  /** Canonical email pulled from the LDAP `mail` attribute. */
+  email: string;
+  /** Display name from the directory; falls back to email. */
+  name: string;
+  /** Whether to auto-create a Tainer user if no match is found. */
+  autoProvision: boolean;
+  /** Role assigned to a newly-provisioned user. Ignored if user already exists. */
+  defaultRole: AuthRole;
+};
+
+export type LdapSignInResult = {
+  /** True if a brand-new Tainer user was just created. */
+  provisioned: boolean;
+  user: StoredUser;
+};
+
+/**
+ * Sign a user in using credentials already verified by an LDAP directory.
+ *
+ * Trust boundary (mirrors `signInWithSso`): the directory is allowed to
+ * assert *its own* users — it is not allowed to take over Tainer users
+ * that already have local credentials. Specifically:
+ *
+ *   - We match by stored `ldapDN` first (stable across email changes).
+ *   - We fall back to email match ONLY when the existing user is
+ *     adoptable: no local password, no 2FA enrolled, no SSO link, and
+ *     no different LDAP DN already attached. Otherwise an attacker who
+ *     gets credentials at the corporate directory could bypass a Tainer
+ *     user's locally-set password and 2FA. The remediation in that case
+ *     is for an admin to remove the local credential or pre-link the
+ *     LDAP DN.
+ *
+ * Note that 2FA is enforced indirectly: if a user has it enrolled, LDAP
+ * cannot adopt that account without admin action — the local 2FA challenge
+ * is what authorises the link.
+ */
+export async function signInWithLdap(
+  input: LdapSignInInput,
+): Promise<LdapSignInResult> {
+  const email = normalizeEmail(input.email);
+  if (!email) throw new Error("LDAP returned an empty email — refusing to sign in.");
+  const name = input.name.trim() || email;
+
+  let provisioned = false;
+  const user = await mutateAuthStore((store) => {
+    // 1. Match by stored DN — survives email changes and is the only
+    //    path that can adopt an existing record without further checks.
+    let existing = store.users.find((u) => u.ldapDN && u.ldapDN === input.dn);
+
+    // 2. Fall back to email match — only for users safe to auto-link.
+    if (!existing) {
+      const candidate = store.users.find((u) => u.email === email);
+      if (candidate) {
+        const hasLocalPassword = Boolean(candidate.passwordHash);
+        const hasTwoFactor = Boolean(candidate.twoFactorSecret);
+        const linkedToSso = Boolean(candidate.ssoProviderId || candidate.ssoSubject);
+        const linkedToDifferentDn = Boolean(
+          candidate.ldapDN && candidate.ldapDN !== input.dn,
+        );
+
+        if (hasLocalPassword || hasTwoFactor || linkedToSso || linkedToDifferentDn) {
+          throw new Error(
+            "An account with this email already exists in Tainer with " +
+              "different credentials. Ask an administrator to link your " +
+              "directory account before signing in this way.",
+          );
+        }
+
+        existing = candidate;
+      }
+    }
+
+    if (existing) {
+      const timestamp = nowIso();
+      existing.ldapDN = input.dn;
+      // Refresh display name — directories are usually the source of truth.
+      if (name && name !== existing.name) existing.name = name;
+      existing.updatedAt = timestamp;
+      return existing;
+    }
+
+    if (!input.autoProvision) {
+      throw new Error(
+        "Your account isn't set up in Tainer yet. Ask an administrator to add you, then try signing in again.",
+      );
+    }
+
+    const timestamp = nowIso();
+    const newUser: StoredUser = {
+      createdAt: timestamp,
+      email,
+      groupIds: [],
+      id: randomUUID(),
+      name,
+      passwordHash: "", // LDAP-provisioned, no local password
+      passwordUpdatedAt: timestamp,
+      pendingTwoFactorSecret: null,
+      pendingTwoFactorExpiresAt: null,
+      role: input.defaultRole,
+      twoFactorRecoveryCodeHashes: [],
+      twoFactorSecret: null,
+      twoFactorUpdatedAt: null,
+      updatedAt: timestamp,
+      ldapDN: input.dn,
+    };
+    store.users.push(newUser);
+    provisioned = true;
+    return newUser;
+  });
+
   return { provisioned, user };
 }
 
