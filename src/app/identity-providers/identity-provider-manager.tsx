@@ -146,38 +146,40 @@ function ProviderForm({
         />
       </label>
 
-      <div className="grid gap-3 md:grid-cols-2">
-        <label className="block">
-          <span className="text-[12px] font-medium text-zinc-400">Default role for new users</span>
-          <select
-            className={fieldClassName}
-            defaultValue={initial?.defaultRole ?? "operator"}
-            name="defaultRole"
-          >
-            <option value="operator">Operator</option>
-            <option value="admin">Administrator</option>
-          </select>
+      {/* The defaultRole field stays in the data model for backward
+          compatibility, but auto-provisioning now always creates users
+          with no permissions and no group memberships (effectively
+          read-only / "guest"). The hidden input keeps the form
+          submission shape intact. */}
+      <input name="defaultRole" type="hidden" value="operator" />
+
+      <div className="rounded-md border border-white/[0.05] bg-zinc-900/40 p-3">
+        <p className="text-[11px] text-zinc-400">
+          Auto-provisioned users land with <span className="text-zinc-200">no groups and no permissions</span>.
+          They can sign in and view their account; an admin must assign
+          them to groups via the <span className="text-zinc-200">Users</span> page to grant access.
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <label className="flex items-center gap-2">
+          <input
+            defaultChecked={initial?.autoProvision ?? false}
+            className="h-4 w-4 rounded border-white/10 bg-zinc-900 text-sky-400"
+            name="autoProvision"
+            type="checkbox"
+          />
+          <span className="text-[13px] text-zinc-200">Auto-provision unknown users</span>
         </label>
-        <div className="flex flex-col gap-2 pt-5 md:pt-0">
-          <label className="flex items-center gap-2">
-            <input
-              defaultChecked={initial?.autoProvision ?? false}
-              className="h-4 w-4 rounded border-white/10 bg-zinc-900 text-sky-400"
-              name="autoProvision"
-              type="checkbox"
-            />
-            <span className="text-[13px] text-zinc-200">Auto-provision unknown users</span>
-          </label>
-          <label className="flex items-center gap-2">
-            <input
-              defaultChecked={initial?.enabled ?? true}
-              className="h-4 w-4 rounded border-white/10 bg-zinc-900 text-sky-400"
-              name="enabled"
-              type="checkbox"
-            />
-            <span className="text-[13px] text-zinc-200">Enabled (show on login page)</span>
-          </label>
-        </div>
+        <label className="flex items-center gap-2">
+          <input
+            defaultChecked={initial?.enabled ?? true}
+            className="h-4 w-4 rounded border-white/10 bg-zinc-900 text-sky-400"
+            name="enabled"
+            type="checkbox"
+          />
+          <span className="text-[13px] text-zinc-200">Enabled (show on login page)</span>
+        </label>
       </div>
 
       <div className="flex items-center justify-end gap-2 border-t border-white/5 pt-4">
@@ -225,7 +227,6 @@ function ProviderRow({
             {provider.enabled ? "enabled" : "disabled"}
           </Badge>
           <Badge variant="info">slug: {provider.slug}</Badge>
-          <Badge variant="neutral">{provider.defaultRole}</Badge>
           {provider.autoProvision && <Badge variant="warning">auto-provision</Badge>}
         </div>
         <p className="mt-0.5 text-[11px] text-zinc-600 font-mono">{provider.issuer}</p>
@@ -298,7 +299,6 @@ function LdapRow({
             {config.enabled ? "enabled" : "disabled"}
           </Badge>
           <Badge variant="info">type: ldap</Badge>
-          <Badge variant="neutral">{config.defaultRole}</Badge>
           {config.autoProvision && <Badge variant="warning">auto-provision</Badge>}
         </div>
         <p className="mt-0.5 text-[11px] text-zinc-600 font-mono">{config.url}</p>

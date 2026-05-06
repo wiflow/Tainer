@@ -233,37 +233,34 @@ export function LdapConfigForm({
           </div>
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-2">
-          <label className="block">
-            <span className={labelClassName}>Allowed email domains</span>
-            <input
-              autoComplete="off"
-              className={fieldClassName}
-              defaultValue={config?.allowedEmailDomains ?? ""}
-              name="allowedEmailDomains"
-              placeholder="corp.example.com, subsidiary.example.com"
-            />
-            <p className={helpClassName}>
-              Comma-separated. Empty = no restriction (use only with
-              auto-provisioning <em>off</em>). Required when auto-provisioning
-              admins.
-            </p>
-          </label>
+        <label className="block">
+          <span className={labelClassName}>Allowed email domains</span>
+          <input
+            autoComplete="off"
+            className={fieldClassName}
+            defaultValue={config?.allowedEmailDomains ?? ""}
+            name="allowedEmailDomains"
+            placeholder="corp.example.com, subsidiary.example.com"
+          />
+          <p className={helpClassName}>
+            Comma-separated. Empty = no domain restriction.
+          </p>
+        </label>
 
-          <label className="block">
-            <span className={labelClassName}>Default role for auto-provisioned users</span>
-            <select
-              className={fieldClassName}
-              defaultValue={config?.defaultRole ?? "operator"}
-              name="defaultRole"
-            >
-              <option value="operator">operator</option>
-              <option value="admin">admin</option>
-            </select>
-            <p className={helpClassName}>
-              Admin auto-provisioning requires a non-empty domain allowlist.
-            </p>
-          </label>
+        {/* defaultRole stays in the data model for backward compatibility
+            but auto-provisioning always creates users as operators with
+            no group memberships (zero permissions / "guest read-only").
+            Admin promotion happens explicitly via /users group assignment. */}
+        <input name="defaultRole" type="hidden" value="operator" />
+
+        <div className="rounded-md border border-white/[0.05] bg-zinc-900/40 p-3">
+          <p className="text-[11px] text-zinc-400">
+            Auto-provisioned users land with{" "}
+            <span className="text-zinc-200">no groups and no permissions</span>.
+            They can sign in and view their account; an admin must assign
+            them to groups via the <span className="text-zinc-200">Users</span>{" "}
+            page to grant access.
+          </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-6 pt-2">

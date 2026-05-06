@@ -1755,7 +1755,15 @@ export async function signInWithSso(
       passwordUpdatedAt: timestamp,
       pendingTwoFactorSecret: null,
       pendingTwoFactorExpiresAt: null,
-      role: input.defaultRole,
+      // Auto-provisioned users always land as operators with no group
+      // memberships — that means zero permissions and zero site access
+      // ("guest read-only" by default). An admin promotes them by
+      // assigning groups via /users. The configured `defaultRole` is
+      // ignored here; previously it could be set to "admin" with a
+      // domain-allowlist guard, but that left a foot-gun where a
+      // misconfigured allowlist auto-created admins. Now the only path
+      // to admin is admin-side group assignment.
+      role: "operator",
       twoFactorRecoveryCodeHashes: [],
       twoFactorSecret: null,
       twoFactorUpdatedAt: null,
@@ -1873,7 +1881,10 @@ export async function signInWithLdap(
       passwordUpdatedAt: timestamp,
       pendingTwoFactorSecret: null,
       pendingTwoFactorExpiresAt: null,
-      role: input.defaultRole,
+      // See signInWithSso for the same reasoning: auto-provisioned
+      // users always land as operators with no groups (zero
+      // permissions, zero site access). Promotion happens via /users.
+      role: "operator",
       twoFactorRecoveryCodeHashes: [],
       twoFactorSecret: null,
       twoFactorUpdatedAt: null,

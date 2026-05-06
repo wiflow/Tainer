@@ -25,6 +25,18 @@ export default async function OverviewPage() {
     redirect("/setup");
   }
 
+  // Auto-provisioned users (and any non-admin without group assignments)
+  // would otherwise land on the overview map with nothing visible —
+  // every API call filters by `accessibleSiteIds`, which is empty for
+  // them. Send them to /no-access so the empty state is explained
+  // rather than silently broken. Admins always have access.
+  if (
+    session.user.role !== "admin" &&
+    session.user.accessibleSiteIds.length === 0
+  ) {
+    redirect("/no-access");
+  }
+
   return (
     <div className="overview-map-fullbleed relative h-screen bg-[#0e0e0e]" style={{ touchAction: "none" }}>
       {/* Server-rendered loading state visible immediately */}
