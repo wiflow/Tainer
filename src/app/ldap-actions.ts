@@ -50,7 +50,7 @@ export async function saveLdapConfigAction(
       message: `LDAP config updated: url=${config.url}, autoProvision=${config.autoProvision}, enabled=${config.enabled}`,
     });
 
-    revalidatePath("/ldap");
+    revalidatePath("/identity-providers");
 
     return {
       message: "LDAP configuration saved.",
@@ -88,7 +88,7 @@ export async function deleteLdapConfigAction(
       message: "LDAP configuration removed",
     });
 
-    revalidatePath("/ldap");
+    revalidatePath("/identity-providers");
 
     return {
       message: "LDAP configuration removed.",
