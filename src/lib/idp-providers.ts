@@ -172,13 +172,21 @@ export async function listIdpProvidersPublic(): Promise<IdpProviderPublic[]> {
 /**
  * Lightweight public listing for the login page — only enabled providers,
  * only fields needed to render a button. Safe to call from anywhere.
+ *
+ * The `brand` field is a UI hint derived from the issuer hostname so the
+ * button can show a brand-correct icon (e.g. the Microsoft four-square
+ * logo for Entra) without leaking issuer URLs into client bundles.
  */
 export async function listLoginIdpButtons(): Promise<
-  { slug: string; name: string }[]
+  { slug: string; name: string; brand: IdpBrand | null }[]
 > {
   return (await listIdpProviders())
     .filter((p) => p.enabled)
-    .map((p) => ({ slug: p.slug, name: p.name }));
+    .map((p) => ({
+      slug: p.slug,
+      name: p.name,
+      brand: detectIdpBrand(p.issuer),
+    }));
 }
 
 export async function getIdpProviderBySlug(slug: string): Promise<IdpProvider | null> {
@@ -288,6 +296,40 @@ export function parseAllowedDomains(raw: string): string[] | null {
         .filter((s) => s.length > 0),
     ),
   );
+}
+
+/**
+ * Recognised IdP "brand" hints, used purely to render a brand-correct icon
+ * on the sign-in button. Resolution is by issuer hostname — no extra data
+ * is stored and no admin configuration is required. Returning `null` falls
+ * back to the generic key icon.
+ */
+export type IdpBrand = "microsoft";
+
+export function detectIdpBrand(issuer: string): IdpBrand | null {
+  let hostname: string;
+  try {
+    hostname = new URL(issuer).hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+
+  // Microsoft Entra ID (formerly Azure AD) issues tokens from a small set
+  // of well-known hostnames. v2.0 endpoints use login.microsoftonline.com;
+  // legacy v1.0 (sometimes still in tenant config) uses sts.windows.net.
+  // The .us / .de / .cn variants cover sovereign-cloud tenants. Match
+  // exact hostnames rather than substrings so a customer-controlled domain
+  // can't impersonate the brand by including "microsoft" in its name.
+  const microsoftHosts = new Set([
+    "login.microsoftonline.com",
+    "login.microsoftonline.us",
+    "login.microsoftonline.de",
+    "login.partner.microsoftonline.cn",
+    "sts.windows.net",
+  ]);
+  if (microsoftHosts.has(hostname)) return "microsoft";
+
+  return null;
 }
 
 /** Returns true if `email`'s domain is permitted by `allowedEmailDomains`. */

@@ -16,6 +16,7 @@ Sections per release:
 
 ### Added
 
+- **Microsoft logo on the "Sign in with Microsoft" SSO button.** Identity providers whose issuer URL is one of Microsoft Entra's well-known hostnames (`login.microsoftonline.com`, the sovereign-cloud variants, or the legacy `sts.windows.net`) now render with Microsoft's four-colour brand mark instead of the generic key icon. Detection is by issuer hostname only — no admin configuration, no migration. Other providers fall back to the existing key icon.
 - **CI gate that fails the build if a Docker image leaks source maps or TypeScript files** ([scripts/check-image-layers.sh](scripts/check-image-layers.sh)). Catches the F1/F10 class of regression — Docker layers are append-only, so a `RUN ... -delete` in a later stage doesn't actually remove map bytes from the published image. The script extracts every layer blob, walks the entries, and exits non-zero if it finds `*.js.map`, `*.ts` (excluding `.d.ts`), `.tsbuildinfo`, or `password-reset-debug.json`. Wired into [scripts/publish-docker.sh](scripts/publish-docker.sh) as a pre-push gate (a single-arch local build is inspected before the multi-arch push runs) and into a new [GitHub Actions workflow](.github/workflows/image-layer-check.yml) that runs on every PR touching the build pipeline.
 
 ### Changed
