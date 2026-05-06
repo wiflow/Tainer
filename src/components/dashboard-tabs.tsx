@@ -1,12 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowUpRight, MoreVertical, AlertTriangle } from "lucide-react";
+import { ArrowUpRight, ChevronLeft, ChevronRight, MoreVertical, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { LiveDeployment, LiveNode, LiveTemplate } from "@/lib/proxmox";
 import type { DeploymentTemplate } from "@/lib/deployment-templates";
 import type { AlertRuntimeEntry } from "@/lib/alert-runtime-state";
+
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const;
+const PAGE_SIZE_STORAGE_KEY = "tainer.dashboard.deployments.pageSize";
+
+function loadPageSize(): number {
+  if (typeof window === "undefined") return 10;
+  const raw = window.localStorage.getItem(PAGE_SIZE_STORAGE_KEY);
+  const parsed = raw ? Number.parseInt(raw, 10) : NaN;
+  return PAGE_SIZE_OPTIONS.includes(parsed as (typeof PAGE_SIZE_OPTIONS)[number])
+    ? parsed
+    : 10;
+}
 
 type Tab = "deployments" | "templates" | "nodes" | "alerts";
 
@@ -124,6 +136,34 @@ export function DashboardTabs({
 }
 
 function DeploymentsTable({ deployments, siteSlug }: { deployments: LiveDeployment[]; siteSlug: string }) {
+  // Page size persists in localStorage so an operator's preferred view
+  // sticks across reloads. Initialise from a hardcoded default for SSR
+  // (no localStorage on the server) and replace after hydration so the
+  // client-side preference takes effect on the first render where the
+  // user can actually see the table.
+  const [pageSize, setPageSize] = useState<number>(10);
+  const [page, setPage] = useState(1);
+
+  useEffect(() => {
+    setPageSize(loadPageSize());
+  }, []);
+
+  // If the deployments list shrinks (e.g. one was deleted) past the
+  // current page boundary, snap back to the last page that still has
+  // rows. Keeps the table from showing an empty body silently.
+  const totalPages = Math.max(1, Math.ceil(deployments.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const startIdx = (currentPage - 1) * pageSize;
+  const visible = deployments.slice(startIdx, startIdx + pageSize);
+
+  function changePageSize(next: number) {
+    setPageSize(next);
+    setPage(1);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(PAGE_SIZE_STORAGE_KEY, String(next));
+    }
+  }
+
   if (deployments.length === 0) {
     return (
       <div className="px-4 py-8 text-center text-[13px] text-zinc-500">
@@ -133,40 +173,88 @@ function DeploymentsTable({ deployments, siteSlug }: { deployments: LiveDeployme
   }
 
   return (
-    <table className="w-full text-left text-[13px]">
-      <thead>
-        <tr className="border-b border-white/5 bg-black/40">
-          <th className="px-4 py-3 font-medium text-zinc-400 w-10"></th>
-          <th className="px-4 py-3 font-medium text-zinc-400 w-10">VMID</th>
-          <th className="px-4 py-3 font-medium text-zinc-400">Name</th>
-          <th className="px-4 py-3 font-medium text-zinc-400">Node</th>
-          <th className="px-4 py-3 font-medium text-zinc-400">Status</th>
-          <th className="px-4 py-3 font-medium text-zinc-400 text-right">Uptime</th>
-          <th className="px-4 py-3 font-medium text-zinc-400 w-10"></th>
-        </tr>
-      </thead>
-      <tbody className="divide-y divide-white/5">
-        {deployments.slice(0, 10).map((d) => (
-          <tr key={d.id} className="hover:bg-white/5 transition-colors group">
-            <td className="px-4 py-3 text-zinc-600"><MoreVertical className="h-3.5 w-3.5" /></td>
-            <td className="px-4 py-3 text-zinc-500 font-mono text-[11px]">{d.vmid}</td>
-            <td className="px-4 py-3 font-medium text-zinc-200">
-              <Link href={`/sites/${siteSlug}/deployments/${d.id}`} className="hover:underline">{d.name}</Link>
-            </td>
-            <td className="px-4 py-3">
-              <span className="rounded-md border border-white/10 bg-black/50 px-2 py-0.5 text-[11px] text-zinc-400">{d.node}</span>
-            </td>
-            <td className="px-4 py-3">
-              <StatusBadge status={d.rawStatus} label={d.statusLabel} />
-            </td>
-            <td className="px-4 py-3 text-right text-zinc-300 text-[12px]">{d.uptime || "—"}</td>
-            <td className="px-4 py-3 text-zinc-600 opacity-0 group-hover:opacity-100">
-              <Link href={`/sites/${siteSlug}/deployments/${d.id}`}><ArrowUpRight className="h-3.5 w-3.5" /></Link>
-            </td>
+    <>
+      <table className="w-full text-left text-[13px]">
+        <thead>
+          <tr className="border-b border-white/5 bg-black/40">
+            <th className="px-4 py-3 font-medium text-zinc-400 w-10"></th>
+            <th className="px-4 py-3 font-medium text-zinc-400 w-10">VMID</th>
+            <th className="px-4 py-3 font-medium text-zinc-400">Name</th>
+            <th className="px-4 py-3 font-medium text-zinc-400">Node</th>
+            <th className="px-4 py-3 font-medium text-zinc-400">Status</th>
+            <th className="px-4 py-3 font-medium text-zinc-400 text-right">Uptime</th>
+            <th className="px-4 py-3 font-medium text-zinc-400 w-10"></th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody className="divide-y divide-white/5">
+          {visible.map((d) => (
+            <tr key={d.id} className="hover:bg-white/5 transition-colors group">
+              <td className="px-4 py-3 text-zinc-600"><MoreVertical className="h-3.5 w-3.5" /></td>
+              <td className="px-4 py-3 text-zinc-500 font-mono text-[11px]">{d.vmid}</td>
+              <td className="px-4 py-3 font-medium text-zinc-200">
+                <Link href={`/sites/${siteSlug}/deployments/${d.id}`} className="hover:underline">{d.name}</Link>
+              </td>
+              <td className="px-4 py-3">
+                <span className="rounded-md border border-white/10 bg-black/50 px-2 py-0.5 text-[11px] text-zinc-400">{d.node}</span>
+              </td>
+              <td className="px-4 py-3">
+                <StatusBadge status={d.rawStatus} label={d.statusLabel} />
+              </td>
+              <td className="px-4 py-3 text-right text-zinc-300 text-[12px]">{d.uptime || "—"}</td>
+              <td className="px-4 py-3 text-zinc-600 opacity-0 group-hover:opacity-100">
+                <Link href={`/sites/${siteSlug}/deployments/${d.id}`}><ArrowUpRight className="h-3.5 w-3.5" /></Link>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/5 bg-black/20 px-4 py-2.5">
+        <div className="flex items-center gap-2 text-[12px] text-zinc-500">
+          <span>Show</span>
+          <select
+            aria-label="Rows per page"
+            className="h-7 rounded-md border border-white/10 bg-[#111113] px-2 text-[12px] text-zinc-300 outline-none focus:border-zinc-500"
+            onChange={(e) => changePageSize(Number.parseInt(e.target.value, 10))}
+            value={pageSize}
+          >
+            {PAGE_SIZE_OPTIONS.map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </select>
+          <span>
+            of <span className="tabular-nums text-zinc-300">{deployments.length}</span> deployments
+          </span>
+        </div>
+
+        <div className="flex items-center gap-1">
+          <button
+            aria-label="Previous page"
+            className="flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-[#111113] text-zinc-400 transition-colors hover:bg-white/5 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-[#111113] disabled:hover:text-zinc-400"
+            disabled={currentPage <= 1}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            type="button"
+          >
+            <ChevronLeft className="h-3.5 w-3.5" />
+          </button>
+          <span className="px-2 text-[12px] tabular-nums text-zinc-400">
+            Page <span className="text-zinc-200">{currentPage}</span> of{" "}
+            <span className="text-zinc-200">{totalPages}</span>
+          </span>
+          <button
+            aria-label="Next page"
+            className="flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-[#111113] text-zinc-400 transition-colors hover:bg-white/5 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-[#111113] disabled:hover:text-zinc-400"
+            disabled={currentPage >= totalPages}
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            type="button"
+          >
+            <ChevronRight className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
+    </>
   );
 }
 

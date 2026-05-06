@@ -1,7 +1,7 @@
 "use client";
 
 import { TestTube2, Trash2 } from "lucide-react";
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 
 import {
   deleteLdapConfigAction,
@@ -23,7 +23,18 @@ const helpClassName = "mt-1 text-[11px] text-zinc-500";
 
 const DEFAULT_USER_FILTER = "(&(objectClass=user)(mail={email}))";
 
-export function LdapConfigForm({ config }: { config: LdapConfigPublic | null }) {
+export function LdapConfigForm({
+  config,
+  onCancel,
+  onSaved,
+}: {
+  config: LdapConfigPublic | null;
+  /** Optional — if provided, a Cancel button is rendered that calls back. */
+  onCancel?: () => void;
+  /** Optional — called after a successful save / delete so the parent can
+   * close the form view and return to its list/manager. */
+  onSaved?: () => void;
+}) {
   const [saveState, saveAction, isSaving] = useActionState(
     saveLdapConfigAction,
     initialBasicActionState,
@@ -49,6 +60,17 @@ export function LdapConfigForm({ config }: { config: LdapConfigPublic | null }) 
     errorTitle: "Delete failed",
     successTitle: "LDAP removed",
   });
+
+  // Bubble save / delete success back up to the parent manager so it can
+  // close this form and return to the provider list. We only fire on
+  // requestId changes so the same success doesn't re-trigger across
+  // re-renders.
+  useEffect(() => {
+    if (saveState.status === "success" && onSaved) onSaved();
+  }, [saveState.status, saveState.requestId, onSaved]);
+  useEffect(() => {
+    if (deleteState.status === "success" && onSaved) onSaved();
+  }, [deleteState.status, deleteState.requestId, onSaved]);
 
   // Surface the "change password" UI only on demand. New deployments always
   // show the password field; for existing configs we hide it behind a toggle
@@ -269,6 +291,11 @@ export function LdapConfigForm({ config }: { config: LdapConfigPublic | null }) 
           <Button disabled={isSaving} type="submit" variant="accent">
             {isSaving ? "Saving…" : "Save configuration"}
           </Button>
+          {onCancel ? (
+            <Button onClick={onCancel} type="button" variant="ghost">
+              Cancel
+            </Button>
+          ) : null}
           {config?.hasBindPassword ? (
             <>
               <Button
