@@ -7,7 +7,7 @@ RUN npm ci
 
 COPY . .
 RUN npm run build \
-    && rm -rf /app/.next/cache/webpack \
+    && rm -rf /app/.next/cache \
     && find /app/.next -name '*.map' -delete \
     && find /app/.next -name '*.ts' -not -name '*.d.ts' -delete
 
@@ -17,6 +17,10 @@ RUN npm run build \
 # next layer — the original bytes still live in the COPY layer and remain
 # extractable via `docker save` + tar. Cleaning here means the runtime
 # image never carries source maps in its history at all.
+#
+# Removing the entire .next/cache (not just .next/cache/webpack) also gets
+# rid of .next/cache/.tsbuildinfo, which embeds absolute build paths and
+# the file list; the runtime needs nothing under cache/ to actually serve.
 
 # Minify server.mjs to strip comments and make it harder to read
 RUN npx esbuild server.mjs --bundle --platform=node --target=node20 \
@@ -37,10 +41,12 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
 # Copy build output only — already stripped of maps + .ts in the builder.
+# next.config is shipped as .mjs (not .ts) so the runtime stage doesn't
+# need the typescript package (~23 MB) just to load the config at boot.
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/server.min.mjs ./server.mjs
-COPY --from=builder /app/next.config.ts ./next.config.ts
+COPY --from=builder /app/next.config.mjs ./next.config.mjs
 
 # Non-root user. /app is owned by root and only group-readable by tainer,
 # so the runtime user can read application code but cannot rewrite it
