@@ -18,6 +18,7 @@ import {
   beginLogin,
   beginTwoFactorEnrollment,
   changePassword,
+  clearLoginLockoutsForUser,
   completeTwoFactorLogin,
   confirmTwoFactorEnrollment,
   createInitialAdministrator,
@@ -756,6 +757,45 @@ export async function adminResetPasswordAction(
     return errorState(
       _previousState,
       error instanceof Error ? error.message : "Failed to reset password.",
+    );
+  }
+}
+
+export async function clearUserLoginLockoutAction(
+  _previousState: BasicActionState,
+  formData: FormData,
+): Promise<BasicActionState> {
+  try {
+    const session = await requireSession();
+    requirePermission(session, "manage-users");
+
+    const userId = String(formData.get("userId") ?? "").trim();
+    if (!userId) {
+      return errorState(_previousState, "User ID is required.");
+    }
+
+    const removed = await clearLoginLockoutsForUser(userId);
+
+    recordAdminAudit({
+      action: "login-lockout-cleared",
+      actorEmail: session.user.email,
+      actorName: session.user.name,
+      message: `Cleared login lockout for user ${userId} (${removed} bucket${removed === 1 ? "" : "s"})`,
+    }).catch(() => {});
+
+    revalidatePath("/users");
+
+    return {
+      message: removed > 0
+        ? `Login lockout cleared (${removed} bucket${removed === 1 ? "" : "s"}).`
+        : "No active lockout to clear.",
+      requestId: randomUUID(),
+      status: "success",
+    };
+  } catch (error) {
+    return errorState(
+      _previousState,
+      error instanceof Error ? error.message : "Failed to clear lockout.",
     );
   }
 }

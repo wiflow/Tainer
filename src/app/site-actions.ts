@@ -231,6 +231,7 @@ export async function createSiteAction(
     const lngRaw = String(formData.get("longitude") ?? "").trim();
     const latitude = latRaw ? parseFloat(latRaw) : null;
     const longitude = lngRaw ? parseFloat(lngRaw) : null;
+    const countryCodeRaw = String(formData.get("countryCode") ?? "").trim();
 
     await createSite({
       name: siteName,
@@ -243,6 +244,7 @@ export async function createSiteAction(
       defaultNode,
       latitude: latitude != null && isFinite(latitude) ? latitude : null,
       longitude: longitude != null && isFinite(longitude) ? longitude : null,
+      countryCode: countryCodeRaw || null,
     }, fingerprints);
 
     revalidatePath("/sites");
@@ -394,6 +396,12 @@ export async function updateSiteAction(
       const lng = lngRaw ? parseFloat(lngRaw) : null;
       updates.latitude = lat != null && isFinite(lat) ? lat : null;
       updates.longitude = lng != null && isFinite(lng) ? lng : null;
+    }
+
+    // The country select always submits a value (even if empty for "—").
+    // formData.has() distinguishes "field absent" from "field cleared".
+    if (formData.has("countryCode")) {
+      updates.countryCode = String(formData.get("countryCode") ?? "").trim() || null;
     }
 
     const result = await updateSite(siteId, updates);

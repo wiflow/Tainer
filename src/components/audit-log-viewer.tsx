@@ -56,6 +56,10 @@ const ACTION_META: Record<AdminAuditAction, { category: string; level: Level }> 
   "ldap-user-provisioned": { category: "ldap", level: "info" },
   "ldap-config-updated": { category: "ldap", level: "warning" },
   "ldap-config-deleted": { category: "ldap", level: "destructive" },
+  "integration-configured": { category: "integrations", level: "info" },
+  "integration-updated": { category: "integrations", level: "info" },
+  "integration-removed": { category: "integrations", level: "destructive" },
+  "login-lockout-cleared": { category: "logins", level: "warning" },
 };
 
 function actionMeta(action: string): { category: string; level: Level } {

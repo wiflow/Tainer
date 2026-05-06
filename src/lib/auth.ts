@@ -2033,6 +2033,41 @@ export async function listManagedUsers() {
     .map((user) => summarizeManagedUser(user, store));
 }
 
+/**
+ * Clear every login-lockout bucket associated with a user.
+ *
+ * Login attempts are tracked under keys that are either `email` (no client
+ * IP available) or `email:{ip}` (when proxy headers are trusted). An admin
+ * unlocking a user from the GUI doesn't know the offending IP set, so we
+ * wipe every bucket whose key starts with their email — covering all
+ * IP variants in one shot.
+ *
+ * Returns the number of buckets removed; 0 means there was nothing to clear.
+ */
+export async function clearLoginLockoutsForUser(userId: string): Promise<number> {
+  const session = await requireSession();
+  requirePermission(session, "manage-users");
+
+  const store = await readAuthStore();
+  const target = store.users.find((entry) => entry.id === userId);
+  if (!target) {
+    throw new Error("User not found.");
+  }
+
+  const emailPrefix = `${target.email}:`;
+  return mutateAuthSecurityState((state) => {
+    pruneAuthSecurityState(state);
+    let removed = 0;
+    for (const key of Object.keys(state.loginAttempts)) {
+      if (key === target.email || key.startsWith(emailPrefix)) {
+        delete state.loginAttempts[key];
+        removed += 1;
+      }
+    }
+    return removed;
+  });
+}
+
 export async function createUserAsAdmin(input: {
   email: string;
   groupIds?: string[];

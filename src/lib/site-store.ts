@@ -3,6 +3,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 
 import { resolveDataFilePath } from "@/lib/app-data";
+import { normalizeCountryCode } from "@/lib/countries";
 import { encryptText } from "@/lib/crypto";
 import type {
   ProxmoxSitePayload,
@@ -35,9 +36,10 @@ async function readStore(): Promise<SiteStore> {
     normalize: (parsed) => {
       const store = parsed as Partial<SiteStore>;
       const sites = Array.isArray(store.sites) ? store.sites : [];
-      // Backfill location for sites created before location support.
+      // Backfill optional fields for sites created before each was added.
       for (const site of sites) {
         if (!site.location) site.location = null;
+        if (site.countryCode === undefined) site.countryCode = null;
       }
       return {
         schemaVersion: 1,
@@ -186,6 +188,7 @@ export async function createSite(
       lastValidationOk: null,
       ...(nodeFingerprints && nodeFingerprints.length > 0 ? { nodeFingerprints } : {}),
       location: buildLocation(input),
+      countryCode: normalizeCountryCode(input.countryCode ?? null),
       payload,
     };
 
@@ -236,6 +239,13 @@ export async function updateSite(
       const lat = input.latitude ?? site.location?.latitude;
       const lng = input.longitude ?? site.location?.longitude;
       site.location = buildLocation({ latitude: lat, longitude: lng });
+    }
+
+    // `countryCode === ""` is the explicit "clear it" signal from the form;
+    // `undefined` means the field wasn't submitted (partial update) and we
+    // leave the existing value alone.
+    if (input.countryCode !== undefined) {
+      site.countryCode = normalizeCountryCode(input.countryCode);
     }
 
     site.updatedAt = now;

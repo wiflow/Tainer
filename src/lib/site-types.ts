@@ -46,6 +46,8 @@ export type SiteRecord = {
   /** SSL fingerprints of all cluster nodes, stored during creation/validation. */
   nodeFingerprints?: string[];
   location: SiteLocation | null;
+  /** ISO-3166-1 alpha-2 (e.g. "DK", "US"). Drives the per-site flag in the sidebar. */
+  countryCode: string | null;
   payload: ProxmoxSitePayload;
 };
 
@@ -107,6 +109,8 @@ export type SiteInput = {
 
   latitude?: number | null;
   longitude?: number | null;
+  /** ISO-3166-1 alpha-2; empty string clears, undefined leaves untouched. */
+  countryCode?: string | null;
 };
 
 export type SiteValidationResult = {

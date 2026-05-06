@@ -41,7 +41,11 @@ export type AdminAuditAction =
   | "ldap-login-failure"
   | "ldap-user-provisioned"
   | "ldap-config-updated"
-  | "ldap-config-deleted";
+  | "ldap-config-deleted"
+  | "integration-configured"
+  | "integration-updated"
+  | "integration-removed"
+  | "login-lockout-cleared";
 
 export type AdminAuditEntry = {
   action: AdminAuditAction;

@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useState } from "react";
 import {
   KeyRound,
+  LockKeyholeOpen,
   Mail,
   Shield,
   UserPlus2,
@@ -11,7 +12,11 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
-import { adminResetPasswordAction, createUserAction } from "@/app/auth-actions";
+import {
+  adminResetPasswordAction,
+  clearUserLoginLockoutAction,
+  createUserAction,
+} from "@/app/auth-actions";
 import { updateUserGroupsAction } from "@/app/group-management-actions";
 import { useActionFlashFeedback } from "@/components/task-toast-provider";
 import { Badge } from "@/components/ui/badge";
@@ -201,6 +206,32 @@ function UserResetPasswordButton({ user }: { user: ManagedUserSummary }) {
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+function UserClearLockoutButton({ user }: { user: ManagedUserSummary }) {
+  const [state, formAction, isPending] = useActionState(
+    clearUserLoginLockoutAction,
+    initialBasicActionState,
+  );
+
+  useActionFlashFeedback(state, {
+    errorTitle: "Couldn't clear lockout",
+    successTitle: "Lockout cleared",
+  });
+
+  return (
+    <Form action={formAction}>
+      <input name="userId" type="hidden" value={user.id} />
+      <button
+        className="rounded-md p-1.5 text-zinc-500 transition-colors hover:bg-white/5 hover:text-emerald-300 disabled:opacity-50"
+        disabled={isPending}
+        title="Clear login lockout (resets the 'too many login attempts' rate limit)"
+        type="submit"
+      >
+        <LockKeyholeOpen className="h-3.5 w-3.5" />
+      </button>
+    </Form>
   );
 }
 
@@ -572,7 +603,8 @@ export function UserManagementPanel({
                   </div>
 
                   {/* Actions */}
-                  <div className="mt-2 md:mt-0 flex md:justify-end">
+                  <div className="mt-2 md:mt-0 flex md:justify-end gap-1">
+                    <UserClearLockoutButton user={user} />
                     <UserResetPasswordButton user={user} />
                   </div>
                 </li>

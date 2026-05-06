@@ -22,6 +22,7 @@ import {
   Mail,
   Menu,
   MoreHorizontal,
+  Plug,
   RefreshCw,
   Scale,
   Search,
@@ -40,6 +41,7 @@ import {
 
 import { signOutAction } from "@/app/auth-actions";
 import type { SessionUser } from "@/lib/auth";
+import { normalizeCountryCode } from "@/lib/countries";
 import { cn } from "@/lib/utils";
 import Form from "next/form";
 
@@ -50,7 +52,46 @@ type SiteInfo = {
   slug: string;
   name: string;
   healthy: boolean | null;
+  countryCode: string | null;
 };
+
+/**
+ * Render the per-site avatar in the switcher button as an SVG flag pulled
+ * from flagcdn.com when the site is tagged with an ISO 3166-1 alpha-2
+ * country code, falling back to the generic Box icon otherwise.
+ *
+ * flagcdn.com URLs follow `/{lowercase-code}.svg`. We deliberately use a
+ * plain <img> rather than next/image: the assets are already small SVGs
+ * (under 5KB), so the optimisation pipeline adds no value, and skipping
+ * it avoids the remotePatterns config dance and Next's SVG-policy warnings.
+ */
+function SiteAvatar({ site }: { site: SiteInfo | null | undefined }) {
+  const code = normalizeCountryCode(site?.countryCode ?? null);
+  if (code) {
+    const lower = code.toLowerCase();
+    return (
+      <div
+        className="flex items-center justify-center w-6 h-6 rounded-md bg-white/10 shrink-0 overflow-hidden"
+        title={code}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          alt={`${code} flag`}
+          className="h-full w-full object-cover"
+          height={24}
+          loading="lazy"
+          src={`https://flagcdn.com/${lower}.svg`}
+          width={24}
+        />
+      </div>
+    );
+  }
+  return (
+    <div className="flex items-center justify-center p-1 rounded-md bg-white/10 shrink-0">
+      <Box className="w-4 h-4 text-white p-0.5" />
+    </div>
+  );
+}
 
 function getSiteHealth(site: SiteInfo) {
   if (site.healthy === true) return "connected";
@@ -250,9 +291,7 @@ export function AppSidebar({
                 aria-expanded={switcherOpen}
                 type="button"
               >
-                <div className="flex items-center justify-center p-1 rounded-md bg-white/10 shrink-0">
-                  <Box className="w-4 h-4 text-white p-0.5" />
-                </div>
+                <SiteAvatar site={currentSite} />
                 <span className="min-w-0 flex-1 truncate">
                   {currentSite?.name ?? "No site"}
                 </span>
@@ -443,6 +482,18 @@ export function AppSidebar({
               label="ISOs"
             />
           </NavSection>
+
+          {/* Integrations — admin-only third-party connections. Sits as a
+              flat link rather than a one-item section while phpIPAM is the
+              only entry; promote to a section when more integrations land. */}
+          {currentUser.role === "admin" && (
+            <NavLink
+              active={pathname.startsWith("/integrations")}
+              href="/integrations"
+              icon={Plug}
+              label="Integrations"
+            />
+          )}
 
           {/* Access — admin-only management. Hide the section entirely for
               non-admins so they don't see an empty header. */}

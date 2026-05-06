@@ -108,6 +108,7 @@ export async function migrateLegacyEnvSite(): Promise<void> {
     lastValidatedAt: null,
     lastValidationOk: null,
     location: null,
+    countryCode: null,
     payload,
   };
 

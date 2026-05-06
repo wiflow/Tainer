@@ -40,7 +40,7 @@ const nextConfig = {
               "default-src 'self'",
               "script-src 'self' 'unsafe-inline'",
               "style-src 'self' 'unsafe-inline'",
-              "img-src 'self' data: blob: https://*.basemaps.cartocdn.com https://*.cartocdn.com",
+              "img-src 'self' data: blob: https://*.basemaps.cartocdn.com https://*.cartocdn.com https://flagcdn.com",
               "font-src 'self' https://*.basemaps.cartocdn.com https://*.cartocdn.com",
               "connect-src 'self' https://*.basemaps.cartocdn.com https://basemaps.cartocdn.com https://*.cartocdn.com",
               "worker-src 'self' blob:",

@@ -23,6 +23,7 @@ export default async function SitesManagementPage() {
     lastValidatedAt: site.lastValidatedAt,
     isDefault: site.id === store.defaultSiteId,
     location: site.location ?? null,
+    countryCode: site.countryCode ?? null,
   }));
 
   return (

@@ -3,6 +3,14 @@ import "server-only";
 import http from "node:http";
 import https from "node:https";
 
+import {
+  DEFAULT_IPAM_TIMEOUT_MS,
+  IPAM_TIMEOUT_MS_MAX,
+  getDecryptedIpamToken,
+  getIpamIntegration,
+  type PhpIpamIntegrationInput,
+} from "@/lib/integrations";
+
 type PhpIpamEnvelope<T> = {
   code?: number;
   data?: T;
@@ -25,10 +33,9 @@ type PhpIpamSubnetRecord = {
   subnet?: string | null;
 };
 
-type PhpIpamConfig = {
+type PhpIpamRuntimeConfig = {
   apiBaseUrl: string;
   appId: string;
-  configured: boolean;
   tlsInsecure: boolean;
   timeoutMs: number;
   token: string;
@@ -47,8 +54,6 @@ export type ExternalIpamUsageResult = {
   issue: string | null;
 };
 
-const DEFAULT_IPAM_TIMEOUT_MS = 3_500;
-const IPAM_TIMEOUT_MS_MAX = 30_000;
 const IPAM_USAGE_CACHE_TTL_MS = 15_000;
 
 const ipamUsageCache = new Map<string, {
@@ -56,14 +61,17 @@ const ipamUsageCache = new Map<string, {
   result: ExternalIpamUsageResult;
 }>();
 
-function normalizeIpamTimeoutMs(value: string | undefined) {
-  const parsed = Number.parseInt(value?.trim() || "", 10);
-
-  if (!Number.isFinite(parsed) || parsed < 500) {
+function clampTimeoutMs(value: number | undefined): number {
+  if (!Number.isFinite(value) || (value as number) < 500) {
     return DEFAULT_IPAM_TIMEOUT_MS;
   }
+  return Math.min(value as number, IPAM_TIMEOUT_MS_MAX);
+}
 
-  return Math.min(parsed, IPAM_TIMEOUT_MS_MAX);
+function buildApiBaseUrl(serverUrl: string, appId: string): string {
+  const trimmedRoot = serverUrl.replace(/\/+$/, "");
+  const trimmedApp = appId.replace(/^\/+|\/+$/g, "");
+  return `${trimmedRoot}/api/${trimmedApp}`;
 }
 
 function readCachedIpamUsage(key: string) {
@@ -88,74 +96,23 @@ function writeCachedIpamUsage(key: string, result: ExternalIpamUsageResult) {
   });
 }
 
-function derivePhpIpamConfig(): PhpIpamConfig {
-  const rawBaseUrl = process.env.IPAM_BASE_URL?.trim().replace(/\/+$/, "") || "";
-  const token = process.env.IPAM_TOKEN?.trim() || "";
-  const envAppId = process.env.IPAM_APP_ID?.trim() || "";
-  const tlsInsecure = process.env.IPAM_TLS_INSECURE === "true";
-  const timeoutMs = normalizeIpamTimeoutMs(process.env.IPAM_TIMEOUT_MS);
-
-  if (!rawBaseUrl || !token) {
-    return {
-      apiBaseUrl: "",
-      appId: "",
-      configured: false,
-      tlsInsecure,
-      timeoutMs,
-      token,
-    };
+async function loadActiveRuntimeConfig(): Promise<PhpIpamRuntimeConfig | null> {
+  const integration = await getIpamIntegration();
+  if (!integration || !integration.enabled) return null;
+  if (!integration.serverUrl || !integration.appId || !integration.encryptedToken) {
+    return null;
   }
-
-  let parsedUrl: URL;
-  try {
-    parsedUrl = new URL(rawBaseUrl);
-  } catch {
-    return {
-      apiBaseUrl: "",
-      appId: "",
-      configured: false,
-      tlsInsecure,
-      timeoutMs,
-      token,
-    };
-  }
-
-  const pathSegments = parsedUrl.pathname.split("/").filter(Boolean);
-  const apiIndex = pathSegments.findIndex((segment) => segment === "api");
-  const pathAppId = apiIndex >= 0 ? (pathSegments[apiIndex + 1] ?? "") : "";
-  const appId = pathAppId || envAppId;
-
-  if (!appId) {
-    return {
-      apiBaseUrl: "",
-      appId: "",
-      configured: false,
-      tlsInsecure,
-      timeoutMs,
-      token,
-    };
-  }
-
-  const prefixSegments = apiIndex >= 0 ? pathSegments.slice(0, apiIndex) : pathSegments;
-  const prefixPath = prefixSegments.length > 0 ? `/${prefixSegments.join("/")}` : "";
-
+  const token = await getDecryptedIpamToken(integration);
   return {
-    apiBaseUrl: `${parsedUrl.origin}${prefixPath}/api/${appId}`,
-    appId,
-    configured: true,
-    tlsInsecure,
-    timeoutMs,
+    apiBaseUrl: buildApiBaseUrl(integration.serverUrl, integration.appId),
+    appId: integration.appId,
+    tlsInsecure: integration.tlsInsecure,
+    timeoutMs: clampTimeoutMs(integration.timeoutMs),
     token,
   };
 }
 
-function phpIpamRequest<T>(endpoint: string): Promise<T> {
-  const config = derivePhpIpamConfig();
-
-  if (!config.configured) {
-    return Promise.reject(new Error("IPAM is not fully configured. Set IPAM_BASE_URL, IPAM_TOKEN, and IPAM_APP_ID."));
-  }
-
+function phpIpamRequest<T>(config: PhpIpamRuntimeConfig, endpoint: string): Promise<T> {
   const url = new URL(endpoint.replace(/^\/+/, ""), `${config.apiBaseUrl}/`);
   const transport = url.protocol === "https:" ? https : http;
 
@@ -255,18 +212,71 @@ function isNotFoundError(error: unknown) {
     && /IPAM request failed \((404|409)\):/i.test(error.message);
 }
 
-export function getIpamConfigState() {
-  const config = derivePhpIpamConfig();
+export async function getIpamConfigState() {
+  const config = await loadActiveRuntimeConfig();
   return {
-    appId: config.appId,
-    configured: config.configured,
+    appId: config?.appId ?? "",
+    configured: Boolean(config),
   };
 }
 
-export async function getIpamUsedAddressesForSubnet(cidr: string): Promise<ExternalIpamUsageResult> {
-  const config = derivePhpIpamConfig();
+/**
+ * Probe the supplied phpIPAM credentials with a single lightweight call.
+ * Used by the "Test connection" button so an admin can verify config
+ * before saving — accepts plaintext input (with an optional fallback
+ * token from the existing saved integration) so we don't have to
+ * persist broken settings just to test them.
+ */
+export async function testPhpIpamConnection(
+  input: PhpIpamIntegrationInput,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const serverUrl = input.serverUrl.trim().replace(/\/+$/, "");
+  const appId = input.appId.trim().replace(/^\/+|\/+$/g, "");
 
-  if (!config.configured) {
+  if (!serverUrl || !appId) {
+    return { ok: false, error: "Server URL and App ID are required." };
+  }
+
+  let token = input.token.trim();
+  if (!token) {
+    const existing = await getIpamIntegration();
+    if (existing?.encryptedToken) {
+      try {
+        token = await getDecryptedIpamToken(existing);
+      } catch {
+        return { ok: false, error: "Saved token could not be decrypted. Re-enter the token." };
+      }
+    }
+  }
+  if (!token) {
+    return { ok: false, error: "API token is required." };
+  }
+
+  const config: PhpIpamRuntimeConfig = {
+    apiBaseUrl: buildApiBaseUrl(serverUrl, appId),
+    appId,
+    tlsInsecure: input.tlsInsecure,
+    timeoutMs: clampTimeoutMs(input.timeoutMs),
+    token,
+  };
+
+  try {
+    // /sections/ is universally available on a working phpIPAM API app.
+    // Returning here means auth + base URL + app ID all line up.
+    await phpIpamRequest<unknown>(config, "/sections/");
+    return { ok: true };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Unknown IPAM error.",
+    };
+  }
+}
+
+export async function getIpamUsedAddressesForSubnet(cidr: string): Promise<ExternalIpamUsageResult> {
+  const config = await loadActiveRuntimeConfig();
+
+  if (!config) {
     return {
       addresses: [],
       configured: false,
@@ -284,6 +294,7 @@ export async function getIpamUsedAddressesForSubnet(cidr: string): Promise<Exter
   try {
     const [subnetAddress = "", prefix = ""] = cidr.trim().split("/", 2);
     const subnetRecords = await phpIpamRequest<PhpIpamSubnetRecord[]>(
+      config,
       `/subnets/cidr/${subnetAddress}/${prefix}/`,
     ).catch((error) => {
       if (isNotFoundError(error)) {
@@ -307,6 +318,7 @@ export async function getIpamUsedAddressesForSubnet(cidr: string): Promise<Exter
     }
 
     const addressRecords = await phpIpamRequest<PhpIpamAddressRecord[]>(
+      config,
       `/subnets/${subnet.id}/addresses/`,
     ).catch((error) => {
       if (isNotFoundError(error)) {

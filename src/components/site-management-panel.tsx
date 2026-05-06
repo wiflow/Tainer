@@ -34,6 +34,7 @@ import { CaCertField } from "@/components/ca-cert-field";
 import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
 import { initialBasicActionState } from "@/lib/action-states";
+import { COUNTRIES } from "@/lib/countries";
 import { useSiteBasePath } from "@/lib/use-site-path";
 import { cn } from "@/lib/utils";
 
@@ -51,6 +52,7 @@ type SiteInfo = {
   lastValidatedAt: string | null;
   isDefault: boolean;
   location: { latitude: number; longitude: number } | null;
+  countryCode: string | null;
 };
 
 const inputClassName =
@@ -167,6 +169,25 @@ function EditSiteForm({ site, onClose }: { site: SiteInfo; onClose: () => void }
             <input className={inputClassName} name="longitude" type="number" step="any" placeholder="e.g. -74.0060" defaultValue={site.location?.longitude ?? ""} />
           </label>
         </div>
+
+        <label className="block">
+          <span className="flex items-center gap-1.5 text-[11px] font-medium text-zinc-500">
+            <Globe className="h-3.5 w-3.5" />
+            Country (drives the sidebar flag)
+          </span>
+          <select
+            className={cn(inputClassName, "appearance-none")}
+            defaultValue={site.countryCode ?? ""}
+            name="countryCode"
+          >
+            <option value="">— None</option>
+            {COUNTRIES.map((c) => (
+              <option key={c.code} value={c.code}>
+                {c.name} ({c.code})
+              </option>
+            ))}
+          </select>
+        </label>
 
         <div className="flex items-center gap-3">
           {/* Hidden field ensures "full" is sent when checkbox is unchecked */}
@@ -545,6 +566,25 @@ export function SiteManagementPanel({
                 <input className={inputClassName} name="longitude" type="number" step="any" placeholder="e.g. -74.0060" />
               </label>
             </div>
+
+            <label className="block">
+              <span className="flex items-center gap-1.5 text-[12px] font-medium text-zinc-400">
+                <Globe className="h-3.5 w-3.5" />
+                Country (drives the sidebar flag)
+              </span>
+              <select
+                className={cn(inputClassName, "appearance-none")}
+                defaultValue=""
+                name="countryCode"
+              >
+                <option value="">— None</option>
+                {COUNTRIES.map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.name} ({c.code})
+                  </option>
+                ))}
+              </select>
+            </label>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="block">
