@@ -68,6 +68,13 @@ for blob in "${LAYER_BLOBS[@]}"; do
   tar -tf "${blob}" 2>/dev/null | awk -v blob="$(basename "${blob}")" '
     # Skip path-prefix entries that just describe a directory.
     /\/$/  { next }
+    # Skip everything under node_modules. Public npm packages routinely
+    # ship .js.map, .ts, and other "source-y" files as part of their
+    # legitimate published distribution — those are not a leak of Tainer
+    # source. The gate is here to catch Tainer’s own .next/ build
+    # artefacts (the F1/F10 class), not third-party package contents.
+    /\/node_modules\// { next }
+    /^node_modules\//  { next }
     # Source maps — the headline issue.
     /\.js\.map$/  { print blob "\t" $0; next }
     /\.css\.map$/ { print blob "\t" $0; next }
