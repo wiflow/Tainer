@@ -2025,7 +2025,8 @@ type ProxmoxRRDDataPoint = {
 };
 
 export type RRDChartData = {
-  categories: string[];
+  /** Unix-millisecond timestamps; aligned 1:1 with the metric arrays. */
+  categories: number[];
   cpu: number[];
   memoryPercent: number[];
   netIn: number[];
@@ -2079,7 +2080,11 @@ export async function getClusterRRDData(
   const lengths = validResults.map((r) => r.data!.length);
   const minLength = Math.min(...lengths);
 
-  const categories: string[] = [];
+  // Emit raw millisecond timestamps so the chart can use ApexCharts'
+  // datetime axis. The chart auto-picks the right label granularity per
+  // zoom level (HH:mm for 1h ranges, "dd MMM" for week/month) instead of
+  // relying on the server to pre-format and the client to thin the result.
+  const categories: number[] = [];
   const cpu: number[] = [];
   const memoryPercent: number[] = [];
   const storagePercent: number[] = [];
@@ -2092,14 +2097,7 @@ export async function getClusterRRDData(
     const time = points[0]?.time;
     if (!time) continue;
 
-    const date = new Date(time * 1000);
-    if (timeframe === "hour") {
-      categories.push(date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
-    } else if (timeframe === "day") {
-      categories.push(date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
-    } else {
-      categories.push(date.toLocaleDateString([], { month: "short", day: "numeric" }));
-    }
+    categories.push(time * 1000);
 
     const cpuValues = points.map((p) => p.cpu).filter((v): v is number => v != null && !isNaN(v));
     cpu.push(cpuValues.length > 0 ? +(((cpuValues.reduce((a, b) => a + b, 0) / cpuValues.length) * 100).toFixed(1)) : 0);
