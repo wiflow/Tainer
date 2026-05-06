@@ -28,9 +28,6 @@ export function AuthShell({ children, footer }: AuthShellProps) {
             src="/tainerlong.png"
             width={220}
           />
-          <p className="text-[12px] font-medium tracking-wide text-zinc-600">
-            Proxmox container management
-          </p>
         </div>
 
         <div className="animate-slide-up w-full rounded-2xl border border-white/[0.06] bg-white/[0.02] p-7 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.6)] backdrop-blur-xl [animation-delay:80ms] sm:p-8">
