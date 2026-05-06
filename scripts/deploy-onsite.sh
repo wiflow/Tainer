@@ -173,8 +173,17 @@ if [[ -n "${ENV_FILE}" && -f "${ENV_FILE}" ]]; then
   echo ""
   echo "── Pushing environment file ${ENV_FILE} ──"
   "${SCP_CMD[@]}" "${ENV_FILE}" "${VM_USER}@${VM_HOST}:${APP_DIR}/.env.local"
+fi
 
-  # Append env_file directive to the tainer service.
+# Step 4b: Re-attach the env_file directive whenever a .env.local exists on
+# the server — whether we just pushed it or it was placed there out-of-band
+# (e.g. AUTH_SECRET written manually). The compose file is regenerated from
+# scratch above, so without this re-attach a deploy invoked with no
+# ENV_FILE silently strips the env_file binding and the container restarts
+# without AUTH_SECRET, locking everyone out.
+if remote "test -f ${APP_DIR}/.env.local"; then
+  echo ""
+  echo "── Detected ${APP_DIR}/.env.local — wiring env_file into docker-compose ──"
   # The block must indent under `tainer:` — careful with the heredoc whitespace.
   remote "sed -i '/^  tainer:/a\\    env_file:\\n      - .env.local' ${APP_DIR}/docker-compose.yml"
 fi
