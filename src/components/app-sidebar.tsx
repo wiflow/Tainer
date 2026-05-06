@@ -520,7 +520,8 @@ export function AppSidebar({
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-[13px] font-medium text-zinc-200 truncate">{currentUser.name}</p>
-            <p className="text-[11px] text-zinc-400 truncate">{currentUser.role} · v{version}</p>
+            <p className="text-[11px] text-zinc-400 truncate">{currentUser.role}</p>
+            <p className="text-[10px] text-zinc-600 truncate">v{version}</p>
           </div>
           <IntentLink
             aria-label="Account settings"
