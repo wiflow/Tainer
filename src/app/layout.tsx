@@ -8,7 +8,7 @@ import { CommandPalette } from "@/components/command-palette";
 import { TaskToastProvider } from "@/components/task-toast-provider";
 import { getCurrentSession, getUserCount } from "@/lib/auth";
 import { listEnabledSites } from "@/lib/site-store";
-import packageJson from "../../package.json";
+import { checkForUpdate } from "@/lib/update-check";
 
 import "./globals.css";
 import { cn } from "@/lib/utils";
@@ -113,7 +113,10 @@ export default async function RootLayout({
   }
 
   // Resolve sites for the sidebar, filtered by user access.
-  const allSites = await listEnabledSites();
+  const [allSites, updateInfo] = await Promise.all([
+    listEnabledSites(),
+    checkForUpdate(),
+  ]);
   const sites = session.user.role === "admin"
     ? allSites
     : allSites.filter((s) => session.user.accessibleSiteIds.includes(s.id));
@@ -128,7 +131,9 @@ export default async function RootLayout({
           <CommandPalette currentUser={session.user} />
           <AppSidebar
             currentUser={session.user}
-            version={packageJson.version}
+            version={updateInfo.current}
+            latestVersion={updateInfo.latest}
+            updateAvailable={updateInfo.updateAvailable}
             sites={sites.map((s) => ({ id: s.id, slug: s.slug, name: s.name, healthy: s.lastValidationOk, countryCode: s.countryCode ?? null }))}
           />
           <main className="min-h-screen lg:pl-[240px]" id="main-content" tabIndex={-1}>

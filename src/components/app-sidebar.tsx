@@ -121,10 +121,14 @@ function healthDot(site: SiteInfo, size: "sm" | "md" = "sm") {
 export function AppSidebar({
   currentUser,
   version,
+  latestVersion,
+  updateAvailable,
   sites,
 }: {
   currentUser: SessionUser;
   version: string;
+  latestVersion: string | null;
+  updateAvailable: boolean;
   sites: SiteInfo[];
 }) {
   const pathname = usePathname();
@@ -574,7 +578,17 @@ export function AppSidebar({
             <div className="mt-0.5 flex items-end justify-between gap-2">
               <div className="min-w-0">
                 <p className="text-[11px] text-zinc-400">{currentUser.role}</p>
-                <p className="text-[10px] text-zinc-600">v{version}</p>
+                <p className="text-[10px] text-zinc-600">
+                  v{version}
+                  {updateAvailable && latestVersion ? (
+                    <span
+                      className="ml-1.5 text-emerald-400"
+                      title={`Update available: v${latestVersion}`}
+                    >
+                      → v{latestVersion}
+                    </span>
+                  ) : null}
+                </p>
               </div>
               <div className="flex shrink-0 items-center gap-1">
                 <IntentLink
