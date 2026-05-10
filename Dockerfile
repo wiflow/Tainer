@@ -31,6 +31,12 @@ RUN npx esbuild server.mjs --bundle --platform=node --target=node20 \
 FROM node:20-alpine AS runtime
 WORKDIR /app
 
+# Baked at build time by scripts/publish-docker.sh from the release tag.
+# Defaults to "dev" so local `docker build` invocations stay out of the
+# update-check path and never trigger an "update available" banner.
+ARG TAINER_VERSION=dev
+ENV TAINER_VERSION=$TAINER_VERSION
+
 # openssh-client + sshpass are required for the password-based SSH path used
 # when a Proxmox node has no managed key (see src/lib/ssh-command.ts). Both
 # stay; nothing else from the build toolchain ships.

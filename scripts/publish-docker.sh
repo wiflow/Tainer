@@ -18,6 +18,17 @@ BUILDER="tainer-multiarch"
 PLATFORMS="linux/amd64,linux/arm64"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Bake the version into the image at build time. A real release passes
+# TAG=1.5.0 (optionally with a leading v), and that's the version the
+# running container reports + compares against Docker Hub. A bare
+# `./scripts/publish-docker.sh` (no TAG) is treated as a dev push and
+# stays out of the update-check entirely.
+if [[ "${TAG}" == "latest" ]]; then
+  BUILD_VERSION="dev"
+else
+  BUILD_VERSION="${TAG#v}"
+fi
+
 # Ensure a buildx builder with multi-arch support exists.
 if ! docker buildx inspect "${BUILDER}" &>/dev/null; then
   echo "── Creating buildx builder '${BUILDER}' ──"
@@ -42,6 +53,7 @@ echo "=== Pre-push gate: building linux/amd64 locally ==="
 docker buildx build \
   --platform linux/amd64 \
   --load \
+  --build-arg "TAINER_VERSION=${BUILD_VERSION}" \
   -t "${GATE_TAG}" \
   .
 
@@ -53,6 +65,7 @@ echo ""
 echo "=== Building ${IMAGE}:${TAG} for ${PLATFORMS} ==="
 docker buildx build \
   --platform "${PLATFORMS}" \
+  --build-arg "TAINER_VERSION=${BUILD_VERSION}" \
   "${TAGS[@]}" \
   --push \
   .
