@@ -128,8 +128,13 @@ function parseSubnet(value: string): ParsedSubnet {
 
   const addressInt = ipv4ToInt(address);
   const mask = prefix === 0 ? 0 : (0xffffffff << (32 - prefix)) >>> 0;
-  const networkInt = addressInt & mask;
-  const broadcastInt = networkInt | (~mask >>> 0);
+  // JavaScript's `&` and `|` operators return signed 32-bit integers. For any
+  // network whose address has the high bit set (first octet >= 128 — so
+  // 172.16.x, 192.168.x, every public IPv4 range), the result flips negative
+  // and downstream range comparisons against `>>> 0`-normalised inputs fail.
+  // Coerce back to unsigned explicitly. Same shape as `ipv4ToInt`.
+  const networkInt = (addressInt & mask) >>> 0;
+  const broadcastInt = (networkInt | (~mask >>> 0)) >>> 0;
   const firstHostInt = networkInt + 1;
   const lastHostInt = broadcastInt - 1;
   const usableHostCount = lastHostInt >= firstHostInt
