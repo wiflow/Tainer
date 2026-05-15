@@ -59,6 +59,12 @@ const ACTION_META: Record<AdminAuditAction, { category: string; level: Level }> 
   "integration-configured": { category: "integrations", level: "info" },
   "integration-updated": { category: "integrations", level: "info" },
   "integration-removed": { category: "integrations", level: "destructive" },
+  "lldp-token-issued": { category: "network", level: "info" },
+  "lldp-token-revoked": { category: "network", level: "warning" },
+  "lldp-snapshots-cleared": { category: "network", level: "warning" },
+  "lldp-ingest-rejected": { category: "network", level: "warning" },
+  "lldp-annotation-updated": { category: "network", level: "info" },
+  "lldp-annotation-removed": { category: "network", level: "info" },
   "login-lockout-cleared": { category: "logins", level: "warning" },
 };
 

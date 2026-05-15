@@ -73,8 +73,22 @@ export type UpdateCheckResult = {
 // highest vX.Y.Z tag on Docker Hub. Cached in-memory: 1h on success,
 // 5m on failure. Skipped entirely for dev builds and when the operator
 // sets TAINER_DISABLE_UPDATE_CHECK=true.
+//
+// Debug override: TAINER_DEBUG_FAKE_UPDATE=X.Y.Z forges an
+// "update available" result without hitting Docker Hub, so the
+// emerald `→ vX.Y.Z` indicator can be screenshotted / styled
+// against a known target. Bypasses the dev-build skip on purpose
+// (dev builds never see real updates, but devs need to see the UI).
 export async function checkForUpdate(): Promise<UpdateCheckResult> {
   const current = getRunningVersion();
+
+  const fakeRaw = process.env.TAINER_DEBUG_FAKE_UPDATE?.trim();
+  if (fakeRaw) {
+    const stripped = fakeRaw.startsWith("v") ? fakeRaw.slice(1) : fakeRaw;
+    if (SEMVER_RE.test(stripped)) {
+      return { current, latest: stripped, updateAvailable: true };
+    }
+  }
 
   if (process.env.TAINER_DISABLE_UPDATE_CHECK === "true" || isDevBuild()) {
     return { current, latest: null, updateAvailable: false };

@@ -9,6 +9,7 @@ import { TaskToastProvider } from "@/components/task-toast-provider";
 import { getCurrentSession, getUserCount } from "@/lib/auth";
 import { listEnabledSites } from "@/lib/site-store";
 import { checkForUpdate } from "@/lib/update-check";
+import { getBuildTag } from "@/lib/version";
 
 import "./globals.css";
 import { cn } from "@/lib/utils";
@@ -130,6 +131,7 @@ export default async function RootLayout({
           </a>
           <CommandPalette currentUser={session.user} />
           <AppSidebar
+            buildTag={getBuildTag()}
             currentUser={session.user}
             version={updateInfo.current}
             latestVersion={updateInfo.latest}
