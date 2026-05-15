@@ -45,6 +45,12 @@ export type AdminAuditAction =
   | "integration-configured"
   | "integration-updated"
   | "integration-removed"
+  | "lldp-token-issued"
+  | "lldp-token-revoked"
+  | "lldp-snapshots-cleared"
+  | "lldp-ingest-rejected"
+  | "lldp-annotation-updated"
+  | "lldp-annotation-removed"
   | "login-lockout-cleared";
 
 export type AdminAuditEntry = {

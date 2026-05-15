@@ -1,8 +1,8 @@
-import { Clock, HardDrive, Database, Network } from "lucide-react";
+import { Clock, HardDrive, Database } from "lucide-react";
+import Link from "next/link";
 import { unstable_cache } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { IpPoolSettingsPanel } from "@/components/ip-pool-settings-panel";
 import { ProxmoxIssues } from "@/components/proxmox-issues";
 import { BackupSettingsForm, SettingsForm } from "@/components/settings-form";
 import { SshKeySettingsForm } from "@/components/ssh-key-settings-form";
@@ -10,8 +10,6 @@ import { SectionPanel } from "@/components/ui/section-panel";
 import { MetricCard } from "@/components/ui/metric-card";
 import { getAppSettings, resolveDefaultRootfsStorage } from "@/lib/app-settings";
 import { getCurrentSession } from "@/lib/auth";
-import { listContainerTags } from "@/lib/container-groups";
-import { getIpPoolCatalog } from "@/lib/ip-pools";
 import { getRootfsTargets, listBackupStoragePools, withSiteConfig } from "@/lib/proxmox";
 import { ensureSiteConfig } from "@/lib/site-context";
 import { resolveSiteConfigBySlug } from "@/lib/site-resolver";
@@ -26,8 +24,6 @@ const getSettingsPageData = unstable_cache(
         getAppSettings(),
         getRootfsTargets(),
         listBackupStoragePools(),
-        getIpPoolCatalog(),
-        listContainerTags(),
       ]);
     });
   },
@@ -53,7 +49,7 @@ export default async function SettingsPage({
     redirect("/");
   }
 
-  const [settings, rootfsResult, backupStorageResult, ipPools, tags] = await getSettingsPageData(siteSlug);
+  const [settings, rootfsResult, backupStorageResult] = await getSettingsPageData(siteSlug);
   const sshKeyInfo = await getSshKeyInfo();
   const defaultRootfsStorage = resolveDefaultRootfsStorage(
     rootfsResult.targets,
@@ -63,7 +59,7 @@ export default async function SettingsPage({
   return (
     <div className="space-y-4">
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-3">
         <MetricCard
           icon={<HardDrive className="w-3.5 h-3.5" />}
           label="Default rootfs pool"
@@ -81,12 +77,6 @@ export default async function SettingsPage({
           label="Backup SLA"
           value={`${settings.defaultBackupSlaHours}h`}
           description="Maximum age for a backup to be considered within SLA."
-        />
-        <MetricCard
-          icon={<Network className="w-3.5 h-3.5" />}
-          label="IP pools"
-          value={String(ipPools.length)}
-          description="Named IPv4 subnets available for pool-based static addressing."
         />
       </div>
 
@@ -109,9 +99,24 @@ export default async function SettingsPage({
         updatedAt={settings.updatedAt}
       />
 
-      <IpPoolSettingsPanel availableTags={tags} pools={ipPools} />
-
       <SshKeySettingsForm keyInfo={sshKeyInfo} />
+
+      <SectionPanel
+        title="Looking for IP pools?"
+        description={
+          <>
+            IP pool configuration moved to{" "}
+            <Link
+              className="text-zinc-200 underline decoration-zinc-600 underline-offset-2 hover:decoration-zinc-300"
+              href={`/sites/${siteSlug}/network?tab=ip-pools`}
+            >
+              Network → IP pools
+            </Link>
+            . Storage, backup, and SSH defaults remain here.
+          </>
+        }
+      />
+
 
       <SectionPanel
         title="What this affects"
@@ -126,7 +131,6 @@ export default async function SettingsPage({
             "The backup storage default is used when triggering ad-hoc backups from deployment pages.",
             "Backup SLA determines when a deployment is flagged as unprotected due to stale backups.",
             "Backup storage must already be configured in Proxmox as a CIFS/SMB share with backup content type.",
-            "IP pools prefill bridge, gateway, DNS, and free IPv4 address choices for static container networking.",
           ].map((item) => (
             <div key={item} className="px-4 py-3 text-[13px] text-zinc-300">
               {item}

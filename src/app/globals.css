@@ -152,6 +152,16 @@ a {
   75% { transform: translate(-4%, -2%) scale(1.02); }
 }
 
+/* LLDP front-panel: subtle "alive" pulse on a port chip whose last LLDP push
+   was within the most recent agent cycle. Pulses the inner glow opacity
+   rather than the whole element, so the chip doesn't shift the surrounding
+   grid layout. Slow (2s) cycle keeps a full panel of ports from looking
+   like a strobe light. */
+@keyframes lldp-port-pulse {
+  0%, 100% { opacity: 0.65; }
+  50%      { opacity: 1; }
+}
+
 /* ── Animation utilities ── */
 
 .animate-fade-in {
@@ -168,6 +178,10 @@ a {
 
 .animate-gradient-drift {
   animation: gradient-drift 20s ease-in-out infinite;
+}
+
+.animate-lldp-port-pulse {
+  animation: lldp-port-pulse 2s ease-in-out infinite;
 }
 
 /* ── Auth background grid ── */

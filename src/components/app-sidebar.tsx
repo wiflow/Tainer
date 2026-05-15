@@ -9,6 +9,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   Activity,
   Box,
+  Cable,
   ChevronDown,
   Database,
   Disc3,
@@ -43,6 +44,7 @@ import { signOutAction } from "@/app/auth-actions";
 import type { SessionUser } from "@/lib/auth";
 import { normalizeCountryCode } from "@/lib/countries";
 import { cn } from "@/lib/utils";
+import { formatBuildTag } from "@/lib/version";
 import Form from "next/form";
 
 import { IntentLink } from "./intent-link";
@@ -123,12 +125,14 @@ export function AppSidebar({
   version,
   latestVersion,
   updateAvailable,
+  buildTag,
   sites,
 }: {
   currentUser: SessionUser;
   version: string;
   latestVersion: string | null;
   updateAvailable: boolean;
+  buildTag: string | null;
   sites: SiteInfo[];
 }) {
   const pathname = usePathname();
@@ -201,6 +205,7 @@ export function AppSidebar({
       `${prefix}/backups`,
       `${prefix}/alerts`,
       `${prefix}/node-configs`,
+      `${prefix}/network`,
       `${prefix}/templates`,
       `${prefix}/images`,
       `${prefix}/iso-images`,
@@ -411,14 +416,17 @@ export function AppSidebar({
             />
           </NavSection>
 
-          {/* Reliability — alerts + monitoring + security scans */}
+          {/* Reliability — per-site alerts + monitoring + security scans.
+              Heartbeat used to live here but is global (cluster connectivity
+              to all sites), so it moved up to the Platform section to keep
+              this section scope-homogeneous. */}
           <NavSection
             defaultOpen={
               isActive("/alerts") ||
-              pathname.startsWith("/heartbeat") ||
               isActive("/node-configs") ||
               isActive("/cve-scanner") ||
-              isActive("/load-balancer")
+              isActive("/load-balancer") ||
+              isActive("/network")
             }
             id="reliability"
             label="Reliability"
@@ -429,19 +437,17 @@ export function AppSidebar({
               icon={Bell}
               label="Alerts"
             />
-            {currentUser.role === "admin" && (
-              <NavLink
-                active={pathname.startsWith("/heartbeat")}
-                href="/heartbeat"
-                icon={Activity}
-                label="Heartbeat"
-              />
-            )}
             <NavLink
               active={isActive("/node-configs")}
               href={effectiveSlug ? `/sites/${effectiveSlug}/node-configs` : "/node-configs"}
               icon={Settings2}
               label="Node Configs"
+            />
+            <NavLink
+              active={isActive("/network")}
+              href={effectiveSlug ? `/sites/${effectiveSlug}/network` : "/network"}
+              icon={Cable}
+              label="Network"
             />
             <NavLink
               active={isActive("/cve-scanner")}
@@ -487,28 +493,62 @@ export function AppSidebar({
             />
           </NavSection>
 
-          {/* Integrations — admin-only third-party connections. Sits as a
-              flat link rather than a one-item section while phpIPAM is the
-              only entry; promote to a section when more integrations land. */}
+          {/* Platform — admin-only, global concerns about the Tainer install
+              itself. Hosts everything that isn't scoped to one site: the list
+              of sites you've connected (Sites), cluster-connectivity health
+              (Heartbeat), external system connectors (Integrations), and the
+              record of platform changes (Audit Log). Order is "most-touched
+              first" — operators add/edit sites more often than they review
+              the audit log. */}
           {currentUser.role === "admin" && (
-            <NavLink
-              active={pathname.startsWith("/integrations")}
-              href="/integrations"
-              icon={Plug}
-              label="Integrations"
-            />
+            <NavSection
+              defaultOpen={
+                pathname === "/sites" ||
+                pathname.startsWith("/heartbeat") ||
+                pathname.startsWith("/integrations") ||
+                pathname.startsWith("/audit-log")
+              }
+              id="platform"
+              label="Platform"
+            >
+              <NavLink
+                active={pathname === "/sites"}
+                href="/sites"
+                icon={Globe}
+                label="Sites"
+              />
+              <NavLink
+                active={pathname.startsWith("/heartbeat")}
+                href="/heartbeat"
+                icon={Activity}
+                label="Heartbeat"
+              />
+              <NavLink
+                active={pathname.startsWith("/integrations")}
+                href="/integrations"
+                icon={Plug}
+                label="Integrations"
+              />
+              <NavLink
+                active={pathname.startsWith("/audit-log")}
+                href="/audit-log"
+                icon={ScrollText}
+                label="Audit Log"
+              />
+            </NavSection>
           )}
 
-          {/* Access — admin-only management. Hide the section entirely for
-              non-admins so they don't see an empty header. */}
+          {/* Access — admin-only identity management.
+              Platform-level concerns (Sites, Heartbeat, Integrations, Audit
+              Log) moved up to the Platform section so this stays focused on
+              "who can do what" rather than mixing in "what the platform
+              itself is doing." */}
           {currentUser.role === "admin" && (
             <NavSection
               defaultOpen={
                 pathname.startsWith("/users") ||
                 pathname.startsWith("/groups") ||
-                pathname.startsWith("/identity-providers") ||
-                pathname.startsWith("/audit-log") ||
-                pathname === "/sites"
+                pathname.startsWith("/identity-providers")
               }
               id="access"
               label="Access"
@@ -530,18 +570,6 @@ export function AppSidebar({
                 href="/identity-providers"
                 icon={KeyRound}
                 label="Identity Providers"
-              />
-              <NavLink
-                active={pathname.startsWith("/audit-log")}
-                href="/audit-log"
-                icon={ScrollText}
-                label="Audit Log"
-              />
-              <NavLink
-                active={pathname === "/sites"}
-                href="/sites"
-                icon={Globe}
-                label="Site Manager"
               />
             </NavSection>
           )}
@@ -575,18 +603,29 @@ export function AppSidebar({
             <p className="text-[13px] font-medium text-zinc-200 break-words leading-tight">
               {currentUser.name}
             </p>
-            <div className="mt-0.5 flex items-end justify-between gap-2">
+            <div className="mt-0.5 flex items-end justify-between gap-6">
               <div className="min-w-0">
                 <p className="text-[11px] text-zinc-400">{currentUser.role}</p>
-                <p className="text-[10px] text-zinc-600">
+                <p
+                  className="text-[10px] text-zinc-600 whitespace-nowrap"
+                  title={
+                    buildTag
+                      ? `v${version} · build ${formatBuildTag(buildTag)} (${buildTag})`
+                      : undefined
+                  }
+                >
                   v{version}
                   {updateAvailable && latestVersion ? (
-                    <span
-                      className="ml-1.5 text-emerald-400"
-                      title={`Update available: v${latestVersion}`}
+                    <a
+                      href={`https://hub.docker.com/r/tainersh/tainer/tags?name=${encodeURIComponent(latestVersion)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title={`Update available: v${latestVersion} — view on Docker Hub`}
+                      className="ml-2 inline-flex items-center gap-0.5 rounded-full bg-emerald-500/15 px-2 py-px text-[10px] font-semibold text-emerald-300 hover:bg-emerald-500/25 hover:text-emerald-200 transition-colors"
                     >
-                      → v{latestVersion}
-                    </span>
+                      v{latestVersion}
+                      <span aria-hidden="true" className="text-emerald-400/80">↗</span>
+                    </a>
                   ) : null}
                 </p>
               </div>

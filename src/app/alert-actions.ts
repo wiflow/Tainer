@@ -90,7 +90,7 @@ export async function updateAlertSettingsAction(
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
     { const _s = await requireSession(); requireSitePermission(_s, siteConfig.siteId, "manage-alerts"); }
 
-    return withSiteConfig(siteConfig, async () => {
+    return await withSiteConfig(siteConfig, async () => {
 
     const webhookUrl = String(formData.get("webhookUrl") ?? "").trim();
     const webhookKind = String(formData.get("webhookKind") ?? "auto").trim();
@@ -263,7 +263,7 @@ export async function clearSingleAlertAction(
     if (!siteSlug) return { message: "Missing site context.", requestId: randomUUID(), status: "error" };
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
     requireSitePermission(session, siteConfig.siteId, "manage-alerts");
-    return withSiteConfig(siteConfig, async () => {
+    return await withSiteConfig(siteConfig, async () => {
     const alertKey = String(formData.get("alertKey") ?? "");
     if (!alertKey) throw new Error("Alert key is required.");
 

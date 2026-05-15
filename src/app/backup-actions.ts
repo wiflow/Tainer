@@ -43,7 +43,7 @@ export async function triggerBackupAction(
     requireSitePermission(session, siteConfig.siteId, "manage-backups");
     enforceRateLimit(session.user.id);
 
-    return withSiteConfig(siteConfig, async () => {
+    return await withSiteConfig(siteConfig, async () => {
 
     const deploymentId = String(formData.get("deploymentId") ?? "").trim();
     const storageOverride = String(formData.get("storage") ?? "").trim();
@@ -135,7 +135,7 @@ export async function restoreBackupAction(
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
     requireSitePermission(session, siteConfig.siteId, "manage-backups");
 
-    return withSiteConfig(siteConfig, async () => {
+    return await withSiteConfig(siteConfig, async () => {
 
     const volid = String(formData.get("volid") ?? "").trim();
     const targetNode = String(formData.get("node") ?? "").trim();
@@ -293,7 +293,7 @@ export async function deleteBackupAction(
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
     requireSitePermission(session, siteConfig.siteId, "manage-backups");
 
-    return withSiteConfig(siteConfig, async () => {
+    return await withSiteConfig(siteConfig, async () => {
 
     const volid = String(formData.get("volid") ?? "").trim();
     const node = String(formData.get("node") ?? "").trim();

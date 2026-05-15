@@ -46,7 +46,7 @@ export async function createTagAction(
     const siteSlug = String(formData.get("siteSlug") ?? "");
     if (!siteSlug) return { message: "Missing site context.", requestId: randomUUID(), status: "error" };
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
-    return withSiteConfig(siteConfig, async () => {
+    return await withSiteConfig(siteConfig, async () => {
 
     const name = String(formData.get("name") ?? "").trim();
     const description = String(formData.get("description") ?? "").trim();
@@ -120,7 +120,7 @@ export async function updateTagAction(
     const siteSlug = String(formData.get("siteSlug") ?? "");
     if (!siteSlug) return { message: "Missing site context.", requestId: randomUUID(), status: "error" };
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
-    return withSiteConfig(siteConfig, async () => {
+    return await withSiteConfig(siteConfig, async () => {
 
     const tagId = String(formData.get("groupId") ?? "").trim();
     const description = String(formData.get("description") ?? "").trim();
@@ -181,7 +181,7 @@ export async function deleteTagAction(
     const siteSlug = String(formData.get("siteSlug") ?? "");
     if (!siteSlug) return { message: "Missing site context.", requestId: randomUUID(), status: "error" };
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
-    return withSiteConfig(siteConfig, async () => {
+    return await withSiteConfig(siteConfig, async () => {
 
     const tagId = String(formData.get("groupId") ?? "").trim();
 
@@ -272,7 +272,7 @@ export async function assignContainerToTagAction(
       return { message: "Missing site context.", requestId: randomUUID(), status: "error", task: null };
     }
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
-    return withSiteConfig(siteConfig, async () => {
+    return await withSiteConfig(siteConfig, async () => {
 
     const deploymentId = String(formData.get("deploymentId") ?? "").trim();
     const tagSlug = String(formData.get("groupSlug") ?? "").trim();
@@ -355,7 +355,7 @@ export async function bulkTagLifecycleAction(
       return { message: "Missing site context.", requestId: randomUUID(), status: "error", tasks: [] };
     }
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
-    return withSiteConfig(siteConfig, async () => {
+    return await withSiteConfig(siteConfig, async () => {
 
     const tagSlug = String(formData.get("groupSlug") ?? "").trim();
     const command = String(formData.get("command") ?? "").trim() as
@@ -461,7 +461,7 @@ export async function bulkSetEnvAction(
     const siteSlug = String(formData.get("siteSlug") ?? "");
     if (!siteSlug) return { message: "Missing site context.", requestId: randomUUID(), status: "error" };
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
-    return withSiteConfig(siteConfig, async () => {
+    return await withSiteConfig(siteConfig, async () => {
 
     const tagSlug = String(formData.get("tagSlug") ?? "").trim();
     const envKey = String(formData.get("envKey") ?? "").trim();

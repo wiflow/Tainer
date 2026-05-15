@@ -30,8 +30,8 @@ IMAGE_NAME="tainersh/tainer"
 IMAGE_TAG="latest"
 IMAGE_FULL="${IMAGE_NAME}:${IMAGE_TAG}"
 
-VM_HOST="192.0.2.10"
-VM_USER="tainer"
+VM_HOST="${VM_HOST:-192.0.2.10}"
+VM_USER="${VM_USER:-tainer}"
 APP_DIR="/home/tainer/tainer"
 BUILD_DIR="/home/tainer/tainer-build"
 DATA_DIR="/home/tainer/.tainer"
@@ -114,13 +114,29 @@ else
   TLS_DIRECTIVE="tls internal"
 fi
 
+# Dedupe site addresses when TAINER_HOSTNAME and VM_HOST are the same
+# string (typical for IP-only lab deploys). Caddy v2.11 rejects the
+# handshake with `TLS alert: internal error` when a site block lists the
+# same address twice — listing it once works fine.
+if [[ "${TAINER_HOSTNAME}" == "${VM_HOST}" ]]; then
+  CADDY_SITE_ADDRESSES="${TAINER_HOSTNAME}"
+else
+  CADDY_SITE_ADDRESSES="${TAINER_HOSTNAME}, ${VM_HOST}"
+fi
+
 remote "cat > ${APP_DIR}/Caddyfile" <<CADDYFILE
 {
   # ACME email for self-signed mode is unused but Caddy expects a value.
   email admin@${TAINER_HOSTNAME}
+  # Caddy v2.11 with a bare-IP site address rejects the TLS handshake
+  # with "alert internal error" unless default_sni is set — even when
+  # the client's SNI exactly matches the site address. Setting it
+  # explicitly to the primary hostname is a no-op when SNI matches
+  # normally, and unblocks the IP-only path otherwise.
+  default_sni ${TAINER_HOSTNAME}
 }
 
-${TAINER_HOSTNAME}, ${VM_HOST} {
+${CADDY_SITE_ADDRESSES} {
   ${TLS_DIRECTIVE}
   encode zstd gzip
 

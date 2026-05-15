@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 
 interface SectionPanelProps extends React.HTMLAttributes<HTMLDivElement> {
   title?: string;
-  description?: string;
+  description?: React.ReactNode;
   headerRight?: React.ReactNode;
   noPadding?: boolean;
 }

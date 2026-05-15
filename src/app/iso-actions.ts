@@ -23,7 +23,7 @@ export async function downloadIsoFromUrlAction(
       return { message: "Missing site context.", requestId: randomUUID(), status: "error", task: null };
     }
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
-    return withSiteConfig(siteConfig, async () => {
+    return await withSiteConfig(siteConfig, async () => {
 
     const node = String(formData.get("node") ?? "").trim();
     const storage = String(formData.get("storage") ?? "").trim();

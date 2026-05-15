@@ -4664,6 +4664,34 @@ export async function getClusterFirewallRules(): Promise<unknown[]> {
   return proxmoxRequest<unknown[]>("/cluster/firewall/rules") ?? [];
 }
 
+/**
+ * Pull the raw `netN=...` strings out of a deployment's Proxmox config.
+ * Returns the `node` the deployment runs on plus a map of `net0`, `net1`, ...
+ * to their unparsed values. The caller is responsible for parsing the spec
+ * via `parseNetSpec` in `lldp-deployment-path`.
+ *
+ * Used by the deployment-detail page to render the LLDP-derived "Network
+ * path" card. Read-only, no Proxmox state mutation.
+ */
+export async function getDeploymentNetSpecs(
+  id: string,
+): Promise<{ node: string; specs: Record<string, string> } | null> {
+  const { node, vmid, type } = decodeDeploymentId(id);
+  const path =
+    type === "qemu"
+      ? `/nodes/${node}/qemu/${vmid}/config`
+      : `/nodes/${node}/lxc/${vmid}/config`;
+  const config = await safeRequest<Record<string, unknown>>(path);
+  if (!config.data) return null;
+  const specs: Record<string, string> = {};
+  for (const [key, value] of Object.entries(config.data)) {
+    if (/^net\d+$/.test(key) && typeof value === "string") {
+      specs[key] = value;
+    }
+  }
+  return { node, specs };
+}
+
 // ---------------------------------------------------------------------------
 // Node / cluster configuration setters (used by node-config snapshot restore)
 // ---------------------------------------------------------------------------

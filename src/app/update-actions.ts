@@ -28,7 +28,7 @@ export async function refreshAptIndexAction(
     }
 
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
-    return withSiteConfig(siteConfig, async () => {
+    return await withSiteConfig(siteConfig, async () => {
       const upid = await refreshNodeAptIndex(node);
       const validUpid = validateUpid(upid);
 

@@ -50,7 +50,7 @@ export async function updateLoadBalancerSettingsAction(
     const session = await requireSession();
     requireSitePermission(session, siteConfig.siteId, "manage-settings");
 
-    return withSiteConfig(siteConfig, async () => {
+    return await withSiteConfig(siteConfig, async () => {
       await saveLoadBalancerSettings({
         enabled: toBoolean(formData, "enabled"),
         migrationEnabled: toBoolean(formData, "migrationEnabled"),

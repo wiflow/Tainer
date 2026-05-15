@@ -78,7 +78,7 @@ export async function createBackupPolicyAction(
     const siteSlug = String(formData.get("siteSlug") ?? "");
     if (!siteSlug) return { message: "Missing site context.", requestId: randomUUID(), status: "error" };
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
-    return withSiteConfig(siteConfig, async () => {
+    return await withSiteConfig(siteConfig, async () => {
     const input = parsePolicyInput(formData);
     await createBackupPolicy(input);
     revalidatePath(`/sites/${siteSlug}/backups`);
@@ -108,7 +108,7 @@ export async function updateBackupPolicyAction(
     const siteSlug = String(formData.get("siteSlug") ?? "");
     if (!siteSlug) return { message: "Missing site context.", requestId: randomUUID(), status: "error" };
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
-    return withSiteConfig(siteConfig, async () => {
+    return await withSiteConfig(siteConfig, async () => {
     const policyId = String(formData.get("policyId") ?? "");
     if (!policyId) throw new Error("Policy ID is required.");
 
@@ -143,7 +143,7 @@ export async function deleteBackupPolicyAction(
     const siteSlug = String(formData.get("siteSlug") ?? "");
     if (!siteSlug) return { message: "Missing site context.", requestId: randomUUID(), status: "error" };
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
-    return withSiteConfig(siteConfig, async () => {
+    return await withSiteConfig(siteConfig, async () => {
     const policyId = String(formData.get("policyId") ?? "");
     if (!policyId) throw new Error("Policy ID is required.");
 
@@ -177,7 +177,7 @@ export async function duplicateBackupPolicyAction(
     const siteSlug = String(formData.get("siteSlug") ?? "");
     if (!siteSlug) return { message: "Missing site context.", requestId: randomUUID(), status: "error" };
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
-    return withSiteConfig(siteConfig, async () => {
+    return await withSiteConfig(siteConfig, async () => {
     const policyId = String(formData.get("policyId") ?? "");
     if (!policyId) throw new Error("Policy ID is required.");
 
@@ -211,7 +211,7 @@ export async function toggleBackupPolicyAction(
     const siteSlug = String(formData.get("siteSlug") ?? "");
     if (!siteSlug) return { message: "Missing site context.", requestId: randomUUID(), status: "error" };
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
-    return withSiteConfig(siteConfig, async () => {
+    return await withSiteConfig(siteConfig, async () => {
     const policyId = String(formData.get("policyId") ?? "");
     const enabled = formData.get("enabled") === "true";
 
@@ -245,7 +245,7 @@ export async function runBackupPolicyNowAction(
     const siteSlug = String(formData.get("siteSlug") ?? "");
     if (!siteSlug) return { message: "Missing site context.", requestId: randomUUID(), status: "error" };
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
-    return withSiteConfig(siteConfig, async () => {
+    return await withSiteConfig(siteConfig, async () => {
     const policyId = String(formData.get("policyId") ?? "");
     if (!policyId) throw new Error("Policy ID is required.");
 
