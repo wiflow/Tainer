@@ -243,7 +243,7 @@ export async function createLxcAction(
     }
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
     requireSitePermission(session, siteConfig.siteId, "create-deployments");
-    return withSiteConfig(siteConfig, async () => {
+    return await withSiteConfig(siteConfig, async () => {
 
     const node = String(formData.get("node") ?? "").trim();
     const vmid = String(formData.get("vmid") ?? "").trim();
@@ -554,7 +554,7 @@ export async function updateContainerEnvAction(
     }
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
     requireSitePermission(session, siteConfig.siteId, "manage-deployments");
-    return withSiteConfig(siteConfig, async () => {
+    return await withSiteConfig(siteConfig, async () => {
 
     const deploymentId = String(formData.get("deploymentId") ?? "").trim();
     const digest = String(formData.get("digest") ?? "").trim();
@@ -659,7 +659,7 @@ export async function updateDeploymentConfigAction(
     }
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
     requireSitePermission(session, siteConfig.siteId, "manage-deployments");
-    return withSiteConfig(siteConfig, async () => {
+    return await withSiteConfig(siteConfig, async () => {
 
     const deploymentId = String(formData.get("deploymentId") ?? "").trim();
     const digest = String(formData.get("digest") ?? "").trim();
@@ -862,7 +862,7 @@ export async function runDeploymentLifecycleAction(
     }
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
     requireSitePermission(session, siteConfig.siteId, "manage-deployments");
-    return withSiteConfig(siteConfig, async () => {
+    return await withSiteConfig(siteConfig, async () => {
 
     const deploymentId = String(formData.get("deploymentId") ?? "").trim();
     const command = String(formData.get("command") ?? "").trim() as ContainerLifecycleAction;
@@ -942,7 +942,7 @@ export async function importUpstreamTemplateAction(
       return { message: "Missing site context.", requestId: randomUUID(), status: "error", task: null };
     }
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
-    return withSiteConfig(siteConfig, async () => {
+    return await withSiteConfig(siteConfig, async () => {
 
     const node = String(formData.get("node") ?? "").trim();
     const storage = String(formData.get("storage") ?? "").trim();
@@ -1010,7 +1010,7 @@ export async function deleteDeploymentAction(
       return { message: "Missing site context.", requestId: randomUUID(), status: "error", task: null };
     }
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
-    return withSiteConfig(siteConfig, async () => {
+    return await withSiteConfig(siteConfig, async () => {
 
     const deploymentId = String(formData.get("deploymentId") ?? "").trim();
 
@@ -1079,7 +1079,7 @@ export async function migrateDeploymentAction(
       return { message: "Missing site context.", requestId: randomUUID(), status: "error", task: null };
     }
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
-    return withSiteConfig(siteConfig, async () => {
+    return await withSiteConfig(siteConfig, async () => {
 
     const deploymentId = String(formData.get("deploymentId") ?? "").trim();
     const target = String(formData.get("target") ?? "").trim();
@@ -1168,7 +1168,7 @@ export async function recreateFromTemplateAction(
       return { message: "Missing site context.", requestId: randomUUID(), status: "error", task: null };
     }
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
-    return withSiteConfig(siteConfig, async () => {
+    return await withSiteConfig(siteConfig, async () => {
 
     const deploymentId = String(formData.get("deploymentId") ?? "").trim();
     const templateId = String(formData.get("templateId") ?? "").trim();

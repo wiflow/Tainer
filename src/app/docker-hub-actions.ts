@@ -129,7 +129,7 @@ export async function syncDockerImageAction(
       return { message: "Missing site context.", requestId: randomUUID(), status: "error", task: null };
     }
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
-    return withSiteConfig(siteConfig, async () => {
+    return await withSiteConfig(siteConfig, async () => {
 
     const namespace = String(formData.get("namespace") ?? "").trim();
     const repository = String(formData.get("repository") ?? "").trim();
@@ -198,7 +198,7 @@ export async function pullOciTemplateAction(
       return { message: "Missing site context.", requestId: randomUUID(), status: "error", task: null };
     }
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
-    return withSiteConfig(siteConfig, async () => {
+    return await withSiteConfig(siteConfig, async () => {
 
     const namespace = String(formData.get("namespace") ?? "").trim();
     const repository = String(formData.get("repository") ?? "").trim();
@@ -359,7 +359,7 @@ export async function pullCustomRegistryAction(
       return { message: "Missing site context.", requestId: randomUUID(), status: "error", task: null };
     }
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
-    return withSiteConfig(siteConfig, async () => {
+    return await withSiteConfig(siteConfig, async () => {
 
     const rawReference = String(formData.get("reference") ?? "").trim();
     const target = String(formData.get("target") ?? "").trim();

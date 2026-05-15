@@ -33,7 +33,7 @@ export async function updateRootfsDefaultsAction(
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
     requireSitePermission(session, siteConfig.siteId, "manage-settings");
 
-    return withSiteConfig(siteConfig, async () => {
+    return await withSiteConfig(siteConfig, async () => {
 
     const defaultRootfsStorage = String(formData.get("defaultRootfsStorage") ?? "").trim();
 
@@ -102,7 +102,7 @@ export async function updateBackupDefaultsAction(
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
     { const _s = await requireSession(); requireSitePermission(_s, siteConfig.siteId, "manage-settings"); }
 
-    return withSiteConfig(siteConfig, async () => {
+    return await withSiteConfig(siteConfig, async () => {
 
     const defaultBackupStorage = String(formData.get("defaultBackupStorage") ?? "").trim();
     const slaHoursRaw = Number(formData.get("defaultBackupSlaHours"));
@@ -160,7 +160,7 @@ export async function createIpPoolAction(
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
     requireSitePermission(session, siteConfig.siteId, "manage-settings");
 
-    return withSiteConfig(siteConfig, async () => {
+    return await withSiteConfig(siteConfig, async () => {
 
     const name = String(formData.get("name") ?? "").trim();
     const subnet = String(formData.get("subnet") ?? "").trim();
@@ -225,7 +225,7 @@ export async function deleteIpPoolAction(
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
     requireSitePermission(session, siteConfig.siteId, "manage-settings");
 
-    return withSiteConfig(siteConfig, async () => {
+    return await withSiteConfig(siteConfig, async () => {
 
     const poolId = String(formData.get("poolId") ?? "").trim();
     const poolName = String(formData.get("poolName") ?? "").trim();

@@ -161,7 +161,7 @@ export async function createVmAction(
     }
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
     requireSitePermission(session, siteConfig.siteId, "create-deployments");
-    return withSiteConfig(siteConfig, async () => {
+    return await withSiteConfig(siteConfig, async () => {
 
     const node = String(formData.get("node") ?? "").trim();
     const vmid = String(formData.get("vmid") ?? "").trim();
@@ -323,7 +323,7 @@ export async function runVmLifecycleActionServer(
     }
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
     requireSitePermission(session, siteConfig.siteId, "manage-deployments");
-    return withSiteConfig(siteConfig, async () => {
+    return await withSiteConfig(siteConfig, async () => {
 
     const deploymentId = String(formData.get("deploymentId") ?? "").trim();
     const command = String(formData.get("command") ?? "").trim() as VmLifecycleAction;
@@ -403,7 +403,7 @@ export async function deleteVmAction(
       return { message: "Missing site context.", requestId: randomUUID(), status: "error", task: null };
     }
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
-    return withSiteConfig(siteConfig, async () => {
+    return await withSiteConfig(siteConfig, async () => {
 
     const deploymentId = String(formData.get("deploymentId") ?? "").trim();
 
@@ -472,7 +472,7 @@ export async function migrateVmAction(
       return { message: "Missing site context.", requestId: randomUUID(), status: "error", task: null };
     }
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
-    return withSiteConfig(siteConfig, async () => {
+    return await withSiteConfig(siteConfig, async () => {
 
     const deploymentId = String(formData.get("deploymentId") ?? "").trim();
     const target = String(formData.get("target") ?? "").trim();

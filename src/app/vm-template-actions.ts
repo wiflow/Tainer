@@ -20,7 +20,7 @@ export async function createVmTemplateAction(
     const siteSlug = String(formData.get("siteSlug") ?? "");
     if (!siteSlug) return { message: "Missing site context.", requestId: randomUUID(), status: "error" };
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
-    return withSiteConfig(siteConfig, async () => {
+    return await withSiteConfig(siteConfig, async () => {
 
     const name = String(formData.get("name") ?? "").trim();
     const description = String(formData.get("description") ?? "").trim();
@@ -133,7 +133,7 @@ export async function deleteVmTemplateAction(
     const siteSlug = String(formData.get("siteSlug") ?? "");
     if (!siteSlug) return { message: "Missing site context.", requestId: randomUUID(), status: "error" };
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
-    return withSiteConfig(siteConfig, async () => {
+    return await withSiteConfig(siteConfig, async () => {
 
     const id = String(formData.get("id") ?? "").trim();
 

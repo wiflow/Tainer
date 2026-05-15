@@ -33,7 +33,7 @@ export async function createSnapshotAction(
       return { message: "Missing site context.", requestId: randomUUID(), status: "error", task: null };
     }
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
-    return withSiteConfig(siteConfig, async () => {
+    return await withSiteConfig(siteConfig, async () => {
 
     const deploymentId = String(formData.get("deploymentId") ?? "").trim();
     const snapname = String(formData.get("snapname") ?? "").trim();
@@ -102,7 +102,7 @@ export async function deleteSnapshotAction(
     requireSitePermission(session, siteConfig.siteId, "manage-snapshots");
     enforceRateLimit(session.user.id);
 
-    return withSiteConfig(siteConfig, async () => {
+    return await withSiteConfig(siteConfig, async () => {
 
     const deploymentId = String(formData.get("deploymentId") ?? "").trim();
     const snapname = String(formData.get("snapname") ?? "").trim();
@@ -167,7 +167,7 @@ export async function rollbackSnapshotAction(
     requireSitePermission(session, siteConfig.siteId, "manage-snapshots");
     enforceRateLimit(session.user.id);
 
-    return withSiteConfig(siteConfig, async () => {
+    return await withSiteConfig(siteConfig, async () => {
 
     const deploymentId = String(formData.get("deploymentId") ?? "").trim();
     const snapname = String(formData.get("snapname") ?? "").trim();

@@ -23,7 +23,7 @@ export async function generateSshKeyAction(
     const siteSlug = String(formData.get("siteSlug") ?? "");
     if (!siteSlug) return { message: "Missing site context.", requestId: randomUUID(), status: "error" };
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
-    return withSiteConfig(siteConfig, async () => {
+    return await withSiteConfig(siteConfig, async () => {
 
     const info = await generateSshAccessAuthority();
 
@@ -58,7 +58,7 @@ export async function deleteSshKeyAction(
     const siteSlug = String(formData.get("siteSlug") ?? "");
     if (!siteSlug) return { message: "Missing site context.", requestId: randomUUID(), status: "error" };
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
-    return withSiteConfig(siteConfig, async () => {
+    return await withSiteConfig(siteConfig, async () => {
 
     await deleteSshAccessAuthority();
 

@@ -120,7 +120,7 @@ export async function createAlertPolicyAction(
     if (!siteSlug) return { message: "Missing site context.", requestId: randomUUID(), status: "error" };
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
     { const _s = await requireSession(); requireSitePermission(_s, siteConfig.siteId, "manage-alerts"); }
-    return withSiteConfig(siteConfig, async () => {
+    return await withSiteConfig(siteConfig, async () => {
     const input = await parsePolicyInput(formData);
     await createAlertPolicy(input);
     revalidatePath(`/sites/${siteSlug}/alerts`);
@@ -149,7 +149,7 @@ export async function updateAlertPolicyAction(
     if (!siteSlug) return { message: "Missing site context.", requestId: randomUUID(), status: "error" };
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
     { const _s = await requireSession(); requireSitePermission(_s, siteConfig.siteId, "manage-alerts"); }
-    return withSiteConfig(siteConfig, async () => {
+    return await withSiteConfig(siteConfig, async () => {
     const policyId = String(formData.get("policyId") ?? "");
     if (!policyId) throw new Error("Policy ID is required.");
 
@@ -183,7 +183,7 @@ export async function deleteAlertPolicyAction(
     if (!siteSlug) return { message: "Missing site context.", requestId: randomUUID(), status: "error" };
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
     { const _s = await requireSession(); requireSitePermission(_s, siteConfig.siteId, "manage-alerts"); }
-    return withSiteConfig(siteConfig, async () => {
+    return await withSiteConfig(siteConfig, async () => {
     const policyId = String(formData.get("policyId") ?? "");
     if (!policyId) throw new Error("Policy ID is required.");
 
@@ -216,7 +216,7 @@ export async function duplicateAlertPolicyAction(
     if (!siteSlug) return { message: "Missing site context.", requestId: randomUUID(), status: "error" };
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
     { const _s = await requireSession(); requireSitePermission(_s, siteConfig.siteId, "manage-alerts"); }
-    return withSiteConfig(siteConfig, async () => {
+    return await withSiteConfig(siteConfig, async () => {
     const policyId = String(formData.get("policyId") ?? "");
     if (!policyId) throw new Error("Policy ID is required.");
 
@@ -249,7 +249,7 @@ export async function toggleAlertPolicyAction(
     if (!siteSlug) return { message: "Missing site context.", requestId: randomUUID(), status: "error" };
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
     { const _s = await requireSession(); requireSitePermission(_s, siteConfig.siteId, "manage-alerts"); }
-    return withSiteConfig(siteConfig, async () => {
+    return await withSiteConfig(siteConfig, async () => {
     const policyId = String(formData.get("policyId") ?? "");
     const enabled = formData.get("enabled") === "true";
 

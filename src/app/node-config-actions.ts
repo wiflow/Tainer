@@ -58,7 +58,7 @@ export async function takeConfigSnapshotAction(
     const label = String(formData.get("label") ?? "").trim();
 
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
-    return withSiteConfig(siteConfig, async () => {
+    return await withSiteConfig(siteConfig, async () => {
       const snapshot = await takeConfigSnapshot(node, session.user.name, label);
 
       revalidatePath(`/sites/${siteSlug}/node-configs`);
@@ -131,7 +131,7 @@ export async function restoreConfigSnapshotAction(
     const reloadNetwork = formData.get("reloadNetwork") !== "off";
 
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
-    return withSiteConfig(siteConfig, async () => {
+    return await withSiteConfig(siteConfig, async () => {
       const result = await restoreConfigSnapshot(snapshotId, selection, {
         destructive,
         reloadNetwork,
@@ -188,7 +188,7 @@ export async function deleteConfigSnapshotAction(
     if (!snapshotId) return { message: "Snapshot ID is required.", requestId: randomUUID(), status: "error" };
 
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
-    return withSiteConfig(siteConfig, async () => {
+    return await withSiteConfig(siteConfig, async () => {
       const deleted = await deleteConfigSnapshot(snapshotId);
       if (!deleted) return { message: "Snapshot not found.", requestId: randomUUID(), status: "error" };
 
@@ -245,7 +245,7 @@ export async function createConfigSnapshotPolicyAction(
       return { message: "Node is required.", requestId: randomUUID(), status: "error" };
 
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
-    return withSiteConfig(siteConfig, async () => {
+    return await withSiteConfig(siteConfig, async () => {
       const policy = await createConfigSnapshotPolicy(input);
       revalidatePath(`/sites/${siteSlug}/node-configs`);
       return {
@@ -284,7 +284,7 @@ export async function updateConfigSnapshotPolicyAction(
       return { message: "Node is required.", requestId: randomUUID(), status: "error" };
 
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
-    return withSiteConfig(siteConfig, async () => {
+    return await withSiteConfig(siteConfig, async () => {
       const policy = await updateConfigSnapshotPolicy(id, input);
       if (!policy)
         return { message: "Schedule not found.", requestId: randomUUID(), status: "error" };
@@ -321,7 +321,7 @@ export async function deleteConfigSnapshotPolicyAction(
       return { message: "Schedule ID is required.", requestId: randomUUID(), status: "error" };
 
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
-    return withSiteConfig(siteConfig, async () => {
+    return await withSiteConfig(siteConfig, async () => {
       const deleted = await deleteConfigSnapshotPolicy(id);
       if (!deleted)
         return { message: "Schedule not found.", requestId: randomUUID(), status: "error" };
@@ -360,7 +360,7 @@ export async function toggleConfigSnapshotPolicyAction(
     const enabled = formData.get("enabled") === "on";
 
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
-    return withSiteConfig(siteConfig, async () => {
+    return await withSiteConfig(siteConfig, async () => {
       const policy = await toggleConfigSnapshotPolicy(id, enabled);
       if (!policy)
         return { message: "Schedule not found.", requestId: randomUUID(), status: "error" };
@@ -401,7 +401,7 @@ export async function runConfigSnapshotPolicyNowAction(
       return { message: "Schedule ID is required.", requestId: randomUUID(), status: "error" };
 
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
-    return withSiteConfig(siteConfig, async () => {
+    return await withSiteConfig(siteConfig, async () => {
       const forced = await forceConfigSnapshotPolicyDue(id);
       if (!forced)
         return { message: "Schedule not found.", requestId: randomUUID(), status: "error" };
