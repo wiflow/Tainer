@@ -217,7 +217,9 @@ echo "── Waiting for health check ──"
 sleep 8
 
 remote "cd ${APP_DIR} && docker compose ps --format 'table {{.Name}}\t{{.Status}}\t{{.Ports}}'"
-remote "docker logs \$(cd ${APP_DIR} && docker compose ps -q) 2>&1 | tail -5"
+# Target the tainer service explicitly — `ps -q` with no service returns the
+# caddy container too, and `docker logs` refuses multiple ids.
+remote "docker logs \$(cd ${APP_DIR} && docker compose ps -q tainer) 2>&1 | tail -5"
 
 echo ""
 echo "=== Deploy complete ==="

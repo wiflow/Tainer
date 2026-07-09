@@ -60,12 +60,17 @@ COPY --from=builder /app/next.config.mjs ./next.config.mjs
 # is writable. This means a future code-exec-in-container bug cannot
 # silently replace server.mjs and persist across restarts.
 RUN addgroup -g 1001 tainer && adduser -u 1001 -G tainer -s /bin/false -D tainer
-RUN mkdir -p /app/data \
+# .next/cache must stay writable: Next's incremental cache (unstable_cache,
+# revalidateTag, image optimizer) writes there at runtime. Without it every
+# request spams EACCES unhandled rejections and data caching silently
+# degrades to per-process memory. It holds cache artifacts only — no code —
+# so granting it doesn't weaken the read-only-code posture.
+RUN mkdir -p /app/data /app/.next/cache \
     && chown -R root:tainer /app \
-    && chown -R tainer:tainer /app/data \
-    && find /app -path /app/data -prune -o -type d -exec chmod 0750 {} + \
-    && find /app -path /app/data -prune -o -type f -exec chmod 0640 {} + \
-    && chmod 0770 /app/data
+    && chown -R tainer:tainer /app/data /app/.next/cache \
+    && find /app -path /app/data -prune -o -path /app/.next/cache -prune -o -type d -exec chmod 0750 {} + \
+    && find /app -path /app/data -prune -o -path /app/.next/cache -prune -o -type f -exec chmod 0640 {} + \
+    && chmod 0770 /app/data /app/.next/cache
 USER tainer
 
 ENV NODE_ENV=production
