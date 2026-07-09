@@ -27,15 +27,15 @@ import {
 } from "@/lib/copilot/tools/helpers";
 import type { ApprovalPlan } from "@/lib/copilot/types";
 
-const HOSTNAME_REGEX = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/;
+export const HOSTNAME_REGEX = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/;
 
-function generatePassword(): string {
+export function generatePassword(): string {
   // 18 base64url chars = ~108 bits of entropy. Mixed case + digits, safe
   // for shell pasting (no special chars Proxmox might reject).
   return randomBytes(14).toString("base64url");
 }
 
-async function assertUniqueHostname(hostname: string) {
+export async function assertUniqueHostname(hostname: string) {
   const target = hostname.trim().toLowerCase();
   if (!target) throw new Error("Hostname is required.");
   const { deployments } = await getDeploymentIndex();
@@ -52,7 +52,7 @@ async function assertUniqueHostname(hostname: string) {
  * the overrides winning. Returns a Proxmox-formatted env text — newline
  * separated KEY=VAL lines, ready to be passed through envTextToString.
  */
-function mergeEnvOverrides(
+export function mergeEnvOverrides(
   baseEnvText: string,
   overrides: Record<string, string> | null,
 ): string {
@@ -216,7 +216,7 @@ registerTool({
       recordDeploymentActivity({
         action: "created",
         deploymentId,
-        message: `Copilot launched CT ${vmid} (${hostname}) from template "${template.name}"${staticNet ? ` with static IP ${staticNet.assigned} (pool "${staticNet.pool}")` : ""}`,
+        message: `Tainy launched CT ${vmid} (${hostname}) from template "${template.name}"${staticNet ? ` with static IP ${staticNet.assigned} (pool "${staticNet.pool}")` : ""}`,
         userEmail: ctx.session.user.email,
         userName: ctx.session.user.name,
         vmid,
@@ -525,7 +525,7 @@ registerTool({
           recordDeploymentActivity({
             action: "created",
             deploymentId,
-            message: `Copilot batch-launched CT ${row.vmid} (${row.hostname}) from template "${template.name}"${plan.mode === "static" ? ` with static IP ${row.ip}` : ""}`,
+            message: `Tainy batch-launched CT ${row.vmid} (${row.hostname}) from template "${template.name}"${plan.mode === "static" ? ` with static IP ${row.ip}` : ""}`,
             userEmail: ctx.session.user.email,
             userName: ctx.session.user.name,
             vmid: row.vmid,

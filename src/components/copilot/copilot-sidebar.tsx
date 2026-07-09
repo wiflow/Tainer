@@ -8,6 +8,7 @@ import {
   AlertTriangle,
   Bot,
   Box,
+  Brain,
   Check,
   ChevronDown,
   CircleAlert,
@@ -41,7 +42,13 @@ import {
 
 // -- Turn types --------------------------------------------------------------
 
-type AssistantTurn = { role: "assistant"; text: string; toolCalls: ToolCallView[] };
+type AssistantTurn = {
+  role: "assistant";
+  text: string;
+  /** Model reasoning trace — shown collapsed, never sent back to the API. */
+  reasoning?: string;
+  toolCalls: ToolCallView[];
+};
 type UserTurn = { role: "user"; text: string };
 type ErrorTurn = { role: "error"; text: string };
 type Turn = UserTurn | AssistantTurn | ErrorTurn;
@@ -79,7 +86,7 @@ function decodeDeploymentBadge(id: string): { label: string; node: string } | nu
 }
 
 function emptyAssistantTurn(): AssistantTurn {
-  return { role: "assistant", text: "", toolCalls: [] };
+  return { role: "assistant", text: "", reasoning: "", toolCalls: [] };
 }
 
 /**
@@ -311,6 +318,13 @@ export function CopilotSidebar({
     switch (event.type) {
       case "text":
         updateActive((turn) => ({ ...turn, text: turn.text + event.text }));
+        break;
+      case "reasoning":
+        // Token-level deltas — append verbatim, no separators.
+        updateActive((turn) => ({
+          ...turn,
+          reasoning: (turn.reasoning ?? "") + event.text,
+        }));
         break;
       case "tool_call_started":
         updateActive((turn) => ({
@@ -576,7 +590,7 @@ export function CopilotSidebar({
         onClick={() => setOpen(false)}
       />
       <aside
-        aria-label="Tainer Copilot"
+        aria-label="Tainy"
         className={cn(
           "fixed right-0 top-0 z-50 flex h-screen w-full max-w-[460px] flex-col border-l border-white/5 bg-[#0a0a0c] shadow-2xl transition-transform",
           open ? "translate-x-0" : "translate-x-full",
@@ -588,7 +602,7 @@ export function CopilotSidebar({
               <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md bg-white/[0.06] border border-white/10">
                 <Sparkles className="h-3.5 w-3.5 text-zinc-200" />
               </div>
-              <div className="text-[13px] font-medium text-white">Tainer Copilot</div>
+              <div className="text-[13px] font-medium text-white">Tainy</div>
             </div>
             <div className="flex items-center gap-1 flex-shrink-0">
               <button
@@ -606,7 +620,7 @@ export function CopilotSidebar({
               <Link
                 href="/settings/copilot"
                 className="text-zinc-500 hover:text-zinc-200 p-1.5 rounded-md hover:bg-white/[0.05] transition-colors"
-                title="Copilot settings"
+                title="Tainy settings"
               >
                 <Settings className="h-4 w-4" />
               </Link>
@@ -684,11 +698,18 @@ export function CopilotSidebar({
               />
             ))}
           </AnimatePresence>
+          {/*
+            Shown whenever we're waiting on the model — including between
+            tool rounds, where the last turn already has content but the
+            model is composing its next step. Hidden only while a tool call
+            is visibly running (the plan view has its own spinner then).
+          */}
           {streaming &&
             !(
               turns[turns.length - 1]?.role === "assistant" &&
-              ((turns[turns.length - 1] as AssistantTurn).text ||
-                (turns[turns.length - 1] as AssistantTurn).toolCalls.length)
+              (turns[turns.length - 1] as AssistantTurn).toolCalls.some(
+                (tc) => tc.status === "running",
+              )
             ) && (
               <div className="flex items-center gap-2 text-[12px] text-zinc-500 px-1">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" /> Thinking…
@@ -956,12 +977,12 @@ function CopilotTrigger({ onClick, open }: { onClick: () => void; open: boolean 
       whileHover={{ y: -2 }}
       whileTap={{ scale: 0.97 }}
       className="fixed bottom-5 right-5 z-30 flex items-center gap-2 rounded-full border border-white/10 bg-[#111113]/95 backdrop-blur px-4 py-2.5 shadow-xl hover:bg-white/[0.06] transition-colors"
-      title="Open Copilot (Cmd+J)"
+      title="Open Tainy (Cmd+J)"
     >
       <div className="flex h-5 w-5 items-center justify-center rounded-full bg-white/[0.08]">
         <Sparkles className="h-3 w-3 text-zinc-200" />
       </div>
-      <span className="text-[12px] font-medium text-zinc-200">Copilot</span>
+      <span className="text-[12px] font-medium text-zinc-200">Tainy</span>
       <kbd className="hidden sm:inline-flex items-center rounded border border-white/10 bg-white/[0.04] px-1.5 py-0.5 text-[10px] text-zinc-500">
         ⌘J
       </kbd>
@@ -975,7 +996,7 @@ function EmptyState({ siteSlug }: { siteSlug: string | null }) {
       <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04]">
         <Bot className="h-4 w-4 text-zinc-300" />
       </div>
-      <div className="text-[13px] font-medium text-white">Tainer Copilot</div>
+      <div className="text-[13px] font-medium text-white">Tainy</div>
       <div className="text-[11.5px] text-zinc-500 max-w-[300px]">
         Ask about cluster state, deployments, or templates. I can also run actions — you&apos;ll
         see an approval card before anything destructive.
@@ -1038,6 +1059,18 @@ function TurnView({
       transition={{ duration: 0.2 }}
       className="space-y-2"
     >
+      {turn.reasoning && (
+        <details className="group px-1">
+          <summary className="flex cursor-pointer select-none items-center gap-1.5 text-[11px] text-zinc-600 transition-colors hover:text-zinc-400">
+            <Brain className="h-3 w-3 flex-shrink-0" />
+            <span>Thought process</span>
+            <ChevronDown className="h-3 w-3 transition-transform group-open:rotate-180" />
+          </summary>
+          <div className="mt-1.5 max-h-48 overflow-y-auto whitespace-pre-wrap rounded-md border border-white/[0.04] bg-white/[0.015] px-2.5 py-2 text-[11.5px] leading-relaxed text-zinc-500">
+            {turn.reasoning}
+          </div>
+        </details>
+      )}
       {turn.toolCalls.length > 0 && (
         <PlanView
           toolCalls={turn.toolCalls}

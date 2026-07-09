@@ -6,7 +6,7 @@ import { getCurrentSession } from "@/lib/auth";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Copilot · Tainer",
+  title: "Tainy · Tainer",
 };
 
 export default async function CopilotSettingsPage() {
@@ -18,7 +18,7 @@ export default async function CopilotSettingsPage() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-[20px] font-semibold text-white">Copilot</h1>
+        <h1 className="text-[20px] font-semibold text-white">Tainy</h1>
         <p className="text-[12.5px] text-zinc-500 mt-0.5">
           AI assistant for diagnosing and managing your cluster. One site-wide API key; actions
           bound to your permissions.

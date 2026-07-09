@@ -116,6 +116,7 @@ export type ApprovalPayload = {
 
 export type CopilotStreamEvent =
   | { type: "text"; text: string }
+  | { type: "reasoning"; text: string }
   | { type: "tool_call_started"; toolCallId: string; name: string; args: Record<string, unknown> }
   | { type: "tool_result"; toolCallId: string; content: unknown; isError: boolean; durationMs: number }
   | {

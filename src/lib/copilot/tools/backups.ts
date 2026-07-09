@@ -110,7 +110,7 @@ registerTool({
       recordDeploymentActivity({
         action: "backup-created",
         deploymentId,
-        message: `Copilot backed up ${type === "qemu" ? "VM" : "CT"} ${vmid} to ${storage}`,
+        message: `Tainy backed up ${type === "qemu" ? "VM" : "CT"} ${vmid} to ${storage}`,
         userEmail: ctx.session.user.email,
         userName: ctx.session.user.name,
         vmid,
@@ -188,7 +188,7 @@ registerTool({
       recordDeploymentActivity({
         action: "backup-restored",
         deploymentId,
-        message: `Copilot restored ${detail.name} (${vmid}) from ${archiveVolid}`,
+        message: `Tainy restored ${detail.name} (${vmid}) from ${archiveVolid}`,
         userEmail: ctx.session.user.email,
         userName: ctx.session.user.name,
         vmid,

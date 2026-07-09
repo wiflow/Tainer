@@ -97,7 +97,7 @@ export function CopilotSettingsPanel() {
 
   if (loading || !settings || !usage) {
     return (
-      <SectionPanel title="Copilot" description="Loading…">
+      <SectionPanel title="Tainy" description="Loading…">
         <div className="flex items-center gap-2 text-[13px] text-zinc-500">
           <Loader2 className="h-4 w-4 animate-spin" /> Loading copilot settings
         </div>
@@ -119,7 +119,7 @@ export function CopilotSettingsPanel() {
   return (
     <div className="space-y-4">
       <SectionPanel
-        title="Tainer Copilot"
+        title="Tainy"
         description="AI assistant for diagnosing and managing your Proxmox cluster. Runs on a single site-wide DeepInfra API key — every action still runs through each user's own permissions."
         headerRight={
           isAdmin ? (
@@ -180,7 +180,7 @@ export function CopilotSettingsPanel() {
               </div>
             ) : (
               <div className="mt-2 rounded-xl border border-amber-500/20 bg-amber-500/[0.04] px-3 py-2 text-[11.5px] text-amber-200">
-                No key configured. Copilot is disabled until an admin adds one.
+                No key configured. Tainy is disabled until an admin adds one.
               </div>
             )}
             {isAdmin && (

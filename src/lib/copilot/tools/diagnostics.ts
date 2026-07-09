@@ -49,7 +49,7 @@ registerTool({
       recordDeploymentActivity({
         action: "port-scanned",
         deploymentId,
-        message: `Copilot port scan (${ports.length} open)`,
+        message: `Tainy port scan (${ports.length} open)`,
         userEmail: ctx.session.user.email,
         userName: ctx.session.user.name,
         vmid: detail.vmid,

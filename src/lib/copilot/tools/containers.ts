@@ -173,7 +173,7 @@ function lifecycleTool(verb: LifecycleVerb, description: string) {
           recordDeploymentActivity({
             action: verb,
             deploymentId,
-            message: `Copilot ${verb} ${type === "qemu" ? "VM" : "CT"} ${vmid}`,
+            message: `Tainy ${verb} ${type === "qemu" ? "VM" : "CT"} ${vmid}`,
             userEmail: ctx.session.user.email,
             userName: ctx.session.user.name,
             vmid,
@@ -261,7 +261,7 @@ registerTool({
       recordDeploymentActivity({
         action: "resources-updated",
         deploymentId,
-        message: `Copilot updated resources for ${type === "qemu" ? "VM" : "CT"} ${vmid}`,
+        message: `Tainy updated resources for ${type === "qemu" ? "VM" : "CT"} ${vmid}`,
         userEmail: ctx.session.user.email,
         userName: ctx.session.user.name,
         vmid,
@@ -349,7 +349,7 @@ registerTool({
       recordDeploymentActivity({
         action: "env-updated",
         deploymentId,
-        message: `Copilot updated env on CT ${vmid} (${Object.keys(applied).join(", ")})`,
+        message: `Tainy updated env on CT ${vmid} (${Object.keys(applied).join(", ")})`,
         userEmail: ctx.session.user.email,
         userName: ctx.session.user.name,
         vmid,
@@ -410,7 +410,7 @@ registerTool({
       recordDeploymentActivity({
         action: "deleted",
         deploymentId,
-        message: `Copilot destroyed ${type === "qemu" ? "VM" : "CT"} ${vmid} (${detail.name})`,
+        message: `Tainy destroyed ${type === "qemu" ? "VM" : "CT"} ${vmid} (${detail.name})`,
         userEmail: ctx.session.user.email,
         userName: ctx.session.user.name,
         vmid,
@@ -559,7 +559,7 @@ registerTool({
           recordDeploymentActivity({
             action: "deleted",
             deploymentId: t.deploymentId,
-            message: `Copilot batch-destroyed ${t.type === "qemu" ? "VM" : "CT"} ${t.vmid} (${t.name})`,
+            message: `Tainy batch-destroyed ${t.type === "qemu" ? "VM" : "CT"} ${t.vmid} (${t.name})`,
             userEmail: ctx.session.user.email,
             userName: ctx.session.user.name,
             vmid: t.vmid,

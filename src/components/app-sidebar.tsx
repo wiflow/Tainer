@@ -292,7 +292,7 @@ export function AppSidebar({
             active={pathname === "/settings/copilot"}
             href="/settings/copilot"
             icon={Sparkles}
-            label="Copilot"
+            label="Tainy"
           />
         </nav>
 

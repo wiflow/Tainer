@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
 import {
   Check,
@@ -38,6 +38,7 @@ export type ToolCallView = {
 const TOOL_LABELS: Record<string, (args: Record<string, unknown>) => string> = {
   list_sites: () => "List accessible sites",
   list_nodes: (a) => `List nodes — ${String(a.siteSlug ?? "?")}`,
+  get_task_status: (a) => `Check task on ${String(a.node ?? "?")}`,
   get_cluster_overview: (a) => `Read cluster overview — ${String(a.siteSlug ?? "?")}`,
   list_containers: (a) => {
     const status = a.status && a.status !== "all" ? ` · ${a.status}` : "";
@@ -102,8 +103,11 @@ const TOOL_LABELS: Record<string, (args: Record<string, unknown>) => string> = {
   list_isos: (a) => `List ISOs — ${String(a.siteSlug ?? "?")}`,
   list_users: () => `List users`,
   list_groups: () => `List permission groups`,
+  search_docker_images: (a) => `Search Docker Hub — "${String(a.query ?? "?")}"`,
   pull_docker_image: (a) =>
-    `Pull ${String(a.namespace ?? "library")}/${String(a.repository ?? "?")}:${String(a.tag ?? "latest")}`,
+    `Pull ${String(a.namespace ?? "library")}/${String(a.repository ?? "?")}:${String(a.tag ?? "latest")} → ${String(a.storage ?? "?")}`,
+  create_container_from_image: (a) =>
+    `Create "${String(a.hostname ?? "?")}" from image template`,
   download_iso: (a) => `Download ISO → ${String(a.storage ?? "?")}`,
   create_vm_from_iso: (a) => `Create VM "${String(a.name ?? "?")}" from ISO`,
 };
@@ -280,18 +284,16 @@ function ToolSubtask({
   onApprove: () => void;
   onDeny: () => void;
 }) {
-  // Auto-expand by default — the entity cards (deployments, services, etc.)
-  // are the primary output and should be visible without a click. Running
-  // tools stay collapsed (no content yet); we auto-open on the transition
-  // out of "running" without clobbering a user-initiated collapse later.
-  const [open, setOpen] = useState(tc.status !== "running");
-  const lastStatus = useRef(tc.status);
-  useEffect(() => {
-    if (lastStatus.current === "running" && tc.status !== "running") {
-      setOpen(true);
-    }
-    lastStatus.current = tc.status;
-  }, [tc.status]);
+  // Steps stay collapsed by default — expanding every result made long turns
+  // noisy. The one exception is awaiting-approval: the approve/deny card must
+  // be visible without a click, so it forces open on that transition (state
+  // adjusted during render, per React's derived-state pattern).
+  const [open, setOpen] = useState(tc.status === "awaiting-approval");
+  const [prevStatus, setPrevStatus] = useState(tc.status);
+  if (prevStatus !== tc.status) {
+    setPrevStatus(tc.status);
+    if (tc.status === "awaiting-approval") setOpen(true);
+  }
   const label = labelForToolCall(tc);
   return (
     <motion.li

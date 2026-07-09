@@ -103,7 +103,7 @@ registerTool({
       recordDeploymentActivity({
         action: "resources-updated",
         deploymentId,
-        message: `Copilot updated tags on ${type === "qemu" ? "VM" : "CT"} ${vmid} → [${next.join(", ")}]`,
+        message: `Tainy updated tags on ${type === "qemu" ? "VM" : "CT"} ${vmid} → [${next.join(", ")}]`,
         userEmail: ctx.session.user.email,
         userName: ctx.session.user.name,
         vmid,
@@ -164,7 +164,7 @@ registerTool({
       recordDeploymentActivity({
         action: "migrated",
         deploymentId,
-        message: `Copilot migrated ${type === "qemu" ? "VM" : "CT"} ${vmid} from ${node} to ${targetNode}`,
+        message: `Tainy migrated ${type === "qemu" ? "VM" : "CT"} ${vmid} from ${node} to ${targetNode}`,
         userEmail: ctx.session.user.email,
         userName: ctx.session.user.name,
         vmid,

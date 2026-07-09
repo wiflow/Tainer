@@ -88,7 +88,7 @@ registerTool({
       recordDeploymentActivity({
         action: "snapshot-created",
         deploymentId,
-        message: `Copilot created snapshot "${snapshotName}"`,
+        message: `Tainy created snapshot "${snapshotName}"`,
         userEmail: ctx.session.user.email,
         userName: ctx.session.user.name,
         vmid,
@@ -155,7 +155,7 @@ registerTool({
       recordDeploymentActivity({
         action: "snapshot-rollback",
         deploymentId,
-        message: `Copilot rolled back to snapshot "${snapshotName}"`,
+        message: `Tainy rolled back to snapshot "${snapshotName}"`,
         userEmail: ctx.session.user.email,
         userName: ctx.session.user.name,
         vmid,
@@ -208,7 +208,7 @@ registerTool({
       recordDeploymentActivity({
         action: "snapshot-deleted",
         deploymentId,
-        message: `Copilot deleted snapshot "${snapshotName}"`,
+        message: `Tainy deleted snapshot "${snapshotName}"`,
         userEmail: ctx.session.user.email,
         userName: ctx.session.user.name,
         vmid,

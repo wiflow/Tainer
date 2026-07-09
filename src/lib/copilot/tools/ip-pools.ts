@@ -158,7 +158,7 @@ registerTool({
       recordDeploymentActivity({
         action: "network-updated",
         deploymentId,
-        message: `Copilot moved CT ${vmid} to ${selection.ipv4Cidr} (pool "${selection.pool.name}")`,
+        message: `Tainy moved CT ${vmid} to ${selection.ipv4Cidr} (pool "${selection.pool.name}")`,
         userEmail: ctx.session.user.email,
         userName: ctx.session.user.name,
         vmid,
