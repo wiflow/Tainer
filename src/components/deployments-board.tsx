@@ -6,24 +6,56 @@ import { Search } from "lucide-react";
 
 import { CopyableText } from "@/components/copyable-text";
 import { CreateDeploymentMenu } from "@/components/create-deployment-menu";
+import {
+  DeploymentStatusProvider,
+  useOptionalDeploymentStatus,
+} from "@/components/deployment-status-context";
 import { DeploymentTagList } from "@/components/deployment-tag-list";
 import { DeploymentQuickActions } from "@/components/deployment-quick-actions";
-import { DeploymentStatusBadge } from "@/components/deployment-status-badge";
 import { Pagination } from "@/components/pagination";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { TAG_PREFIX, type ManagedTagDefinition } from "@/lib/tag-utils";
 import type { LiveDeployment } from "@/lib/proxmox";
 import { useSiteBasePath } from "@/lib/use-site-path";
-import { cn } from "@/lib/utils";
 
 const PAGE_SIZE = 10;
 
-function getStatusAccent(status: string) {
-  if (status === "running") return "bg-emerald-500";
-  if (status === "stopped") return "bg-zinc-600";
-  if (status === "paused") return "bg-amber-500";
-  return "bg-blue-500";
+/**
+ * Status pill that follows the row's optimistic status (set by the quick
+ * actions when a lifecycle task completes) so the dot flips together with
+ * the buttons instead of waiting for the next server render.
+ */
+function RowStatusPill({
+  rawStatus,
+  statusLabel,
+}: {
+  rawStatus: string;
+  statusLabel: string;
+}) {
+  const ctx = useOptionalDeploymentStatus();
+  const status = ctx?.optimistic ?? rawStatus;
+  const label = ctx?.optimistic ?? statusLabel;
+
+  if (status === "running") {
+    return (
+      <span className="flex w-fit items-center gap-1.5 rounded-full border border-white/10 bg-black/50 px-2.5 py-0.5 text-[11px] text-emerald-400">
+        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]"></span> {label}
+      </span>
+    );
+  }
+  if (status === "stopped") {
+    return (
+      <span className="flex w-fit items-center gap-1.5 rounded-full border border-white/10 bg-black/50 px-2.5 py-0.5 text-[11px] text-zinc-400">
+        <span className="h-1.5 w-1.5 rounded-full bg-zinc-500"></span> {label}
+      </span>
+    );
+  }
+  return (
+    <span className="flex w-fit items-center gap-1.5 rounded-full border border-white/10 bg-black/50 px-2.5 py-0.5 text-[11px] text-amber-400">
+      <span className="h-1.5 w-1.5 rounded-full bg-amber-500"></span> {label}
+    </span>
+  );
 }
 
 export function DeploymentsBoard({ deployments, updateMap = {}, tags = [] }: { deployments: LiveDeployment[]; updateMap?: Record<string, boolean>; tags?: ManagedTagDefinition[] }) {
@@ -177,21 +209,13 @@ export function DeploymentsBoard({ deployments, updateMap = {}, tags = [] }: { d
               </thead>
               <tbody className="divide-y divide-white/5">
                 {paginatedDeployments.map((deployment) => (
-                  <tr key={deployment.id} className="hover:bg-white/5 transition-colors group">
+                  <DeploymentStatusProvider key={deployment.id}>
+                  <tr className="hover:bg-white/5 transition-colors group">
                     <td className="px-4 py-3">
-                      {deployment.rawStatus === "running" ? (
-                        <span className="flex w-fit items-center gap-1.5 rounded-full border border-white/10 bg-black/50 px-2.5 py-0.5 text-[11px] text-emerald-400">
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]"></span> {deployment.statusLabel}
-                        </span>
-                      ) : deployment.rawStatus === "stopped" ? (
-                        <span className="flex w-fit items-center gap-1.5 rounded-full border border-white/10 bg-black/50 px-2.5 py-0.5 text-[11px] text-zinc-400">
-                          <span className="h-1.5 w-1.5 rounded-full bg-zinc-500"></span> {deployment.statusLabel}
-                        </span>
-                      ) : (
-                        <span className="flex w-fit items-center gap-1.5 rounded-full border border-white/10 bg-black/50 px-2.5 py-0.5 text-[11px] text-amber-400">
-                           <span className="h-1.5 w-1.5 rounded-full bg-amber-500"></span> {deployment.statusLabel}
-                        </span>
-                      )}
+                      <RowStatusPill
+                        rawStatus={deployment.rawStatus}
+                        statusLabel={deployment.statusLabel}
+                      />
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-col gap-1.5">
@@ -241,6 +265,7 @@ export function DeploymentsBoard({ deployments, updateMap = {}, tags = [] }: { d
                       </div>
                     </td>
                   </tr>
+                  </DeploymentStatusProvider>
                 ))}
               </tbody>
             </table>

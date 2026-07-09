@@ -5,6 +5,7 @@ import { listDeploymentTemplates } from "@/lib/deployment-templates";
 import { getDashboardOverviewData, withSiteConfig } from "@/lib/proxmox";
 import { resolveSiteConfigBySlug } from "@/lib/site-resolver";
 import { formatBytes } from "@/lib/utils";
+import { AutoRefresh } from "@/components/auto-refresh";
 import { DashboardCharts } from "@/components/dashboard-charts";
 import { DashboardTabs } from "@/components/dashboard-tabs";
 import { ArrowUpRight, ArrowDownRight, Cpu, MemoryStick, HardDrive, RefreshCw } from "lucide-react";
@@ -53,6 +54,9 @@ export default async function HomePage({
 
   return (
     <div className="flex flex-col space-y-4">
+      {/* Matches the cache's 30s revalidate above — each refresh gets data
+          at most one revalidation window old without extra Proxmox load. */}
+      <AutoRefresh intervalMs={30_000} />
       {/* ── Top Metric Cards (Mapped to Tainer Data) ── */}
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard

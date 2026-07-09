@@ -6,6 +6,7 @@ import { useActionState, useEffect, useRef, useState, type ComponentType } from 
 import { ExternalLink, LoaderCircle, Play, Power, RotateCcw, SendHorizontal, Square, Trash2 } from "lucide-react";
 
 import { deleteDeploymentAction, migrateDeploymentAction, runDeploymentLifecycleAction } from "@/app/proxmox-actions";
+import { useOptionalDeploymentStatus } from "@/components/deployment-status-context";
 import { deleteVmAction, migrateVmAction, runVmLifecycleActionServer } from "@/app/vm-actions";
 import { useActionTaskFeedback, useTaskToasts } from "@/components/task-toast-provider";
 import { Button, buttonVariants, type ButtonProps } from "@/components/ui/button";
@@ -180,6 +181,23 @@ export function DeploymentQuickActions({
 
   const [pendingCommand, setPendingCommand] = useState<ExtendedAction | null>(null);
 
+  // Once a lifecycle task succeeds we KNOW the outcome (stop → stopped,
+  // start → running) — flip the buttons immediately instead of waiting the
+  // several seconds a full server re-render takes. It's a harmless no-op
+  // once the server catches up; the timer bounds how long a genuinely
+  // divergent server state could be masked. When a DeploymentStatusProvider
+  // wraps us (detail page header, list rows), the value is shared so the
+  // status badge/dot flips in the same instant.
+  const statusCtx = useOptionalDeploymentStatus();
+  const [localOptimistic, setLocalOptimistic] = useState<string | null>(null);
+  const optimisticStatus = statusCtx ? statusCtx.optimistic : localOptimistic;
+  const setOptimisticStatus = statusCtx ? statusCtx.setOptimistic : setLocalOptimistic;
+  useEffect(() => {
+    if (!optimisticStatus) return;
+    const timer = setTimeout(() => setOptimisticStatus(null), 30_000);
+    return () => clearTimeout(timer);
+  }, [optimisticStatus, setOptimisticStatus]);
+
   const activeState = pendingCommand === "delete" ? deleteState : lifecycleState;
   const isServerActionPending =
     pendingCommand === "delete"
@@ -192,33 +210,54 @@ export function DeploymentQuickActions({
     activeState.status === "success" ? activeState.task?.upid : null;
   const isTaskRunning = currentUpid ? activeTaskUpids.has(currentUpid) : false;
 
+  // The task-toast provider registers the UPID in `activeTaskUpids` one render
+  // AFTER the action state arrives, so "upid present but not in the set" also
+  // occurs at the start of a task's life. Only treat it as completion once
+  // we've actually observed the task running — otherwise the spinner clears
+  // (and refreshes fire) seconds before the container has stopped.
+  const seenTaskRunningRef = useRef(false);
+
   useEffect(() => {
     if (!pendingCommand) return;
 
     if (!isServerActionPending && activeState.status === "error") {
+      seenTaskRunningRef.current = false;
       queueMicrotask(() => setPendingCommand(null));
       return;
     }
 
-    let refreshTimer: ReturnType<typeof setTimeout> | undefined;
-    if (!isServerActionPending && currentUpid && !isTaskRunning) {
-      queueMicrotask(() => {
-        setPendingCommand(null);
-        router.refresh();
-        // Follow-up refresh to catch Proxmox state propagation delay
-        refreshTimer = setTimeout(() => router.refresh(), 1500);
-      });
+    if (isTaskRunning) {
+      seenTaskRunningRef.current = true;
+      return;
     }
 
-    return () => {
-      if (refreshTimer) clearTimeout(refreshTimer);
-    };
+    const taskFinished = Boolean(currentUpid) && seenTaskRunningRef.current;
+    const finishedWithoutTask =
+      !isServerActionPending && activeState.status === "success" && !currentUpid;
+
+    if (taskFinished || finishedWithoutTask) {
+      seenTaskRunningRef.current = false;
+      const finishedCommand = pendingCommand;
+      queueMicrotask(() => {
+        setPendingCommand(null);
+        if (finishedCommand === "start" || finishedCommand === "restart") {
+          setOptimisticStatus("running");
+        } else if (finishedCommand === "stop" || finishedCommand === "shutdown") {
+          setOptimisticStatus("stopped");
+        }
+        // The toast provider handles cache invalidation and staggered
+        // follow-up refreshes on task completion; this only covers the
+        // no-task case and snaps the row out of its pending state.
+        router.refresh();
+      });
+    }
   }, [
     pendingCommand,
     isServerActionPending,
     activeState.status,
     currentUpid,
     isTaskRunning,
+    setOptimisticStatus,
     router,
   ]);
 
@@ -232,7 +271,7 @@ export function DeploymentQuickActions({
     successTitle: "Container deletion queued",
   });
 
-  const actions = getAvailableActions(rawStatus).filter(
+  const actions = getAvailableActions(optimisticStatus ?? rawStatus).filter(
     (action) => allowDelete || action.command !== "delete",
   );
 
@@ -252,7 +291,10 @@ export function DeploymentQuickActions({
           <Form
             action={action.command === "delete" ? deleteAction : lifecycleAction}
             key={action.command}
-            onSubmit={() => setPendingCommand(action.command)}
+            onSubmit={() => {
+              seenTaskRunningRef.current = false;
+              setPendingCommand(action.command);
+            }}
           >
             <input name="siteSlug" type="hidden" value={siteSlug} />
             <input name="deploymentId" type="hidden" value={deploymentId} />

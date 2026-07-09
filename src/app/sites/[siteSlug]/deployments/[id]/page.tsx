@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Activity, ArrowLeft, Cpu, HardDrive, Network } from "lucide-react";
 import { notFound } from "next/navigation";
 
+import { AutoRefresh } from "@/components/auto-refresh";
 import { DeploymentActivityCard } from "@/components/deployment-activity-card";
 import { DeploymentNetworkPathCard } from "@/components/deployment-network-path-card";
 import { DeploymentTagList } from "@/components/deployment-tag-list";
@@ -12,10 +13,11 @@ import { CopyableText } from "@/components/copyable-text";
 import { DeploymentEnvEditor } from "@/components/deployment-env-editor";
 import { DeploymentEditButton } from "@/components/deployment-resource-editor";
 import { DeploymentQuickActions } from "@/components/deployment-quick-actions";
+import { DeploymentStatusProvider } from "@/components/deployment-status-context";
+import { LiveDeploymentStatusBadge } from "@/components/live-deployment-status-badge";
 import { GuestConsolePanel } from "@/components/guest-console-panel";
 import { DeploymentUpdateBanner } from "@/components/deployment-update-banner";
 import { PortScanCard } from "@/components/port-scan-panel";
-import { DeploymentStatusBadge } from "@/components/deployment-status-badge";
 import { ProxmoxIssues } from "@/components/proxmox-issues";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -162,6 +164,9 @@ export default async function DeploymentDetailPage({
 
   return (
     <div className="space-y-8">
+      {/* Status/uptime/metrics change outside the app and lag behind
+          lifecycle actions — converge without a manual reload. */}
+      <AutoRefresh intervalMs={15_000} />
       {/* Header with name, status, and actions */}
       <div>
         <Link
@@ -171,13 +176,14 @@ export default async function DeploymentDetailPage({
           <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
           Deployments
         </Link>
+        <DeploymentStatusProvider>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="flex flex-wrap items-center gap-2.5">
               <h1 className="text-xl font-semibold tracking-tight text-zinc-100">
                 {deployment.name}
               </h1>
-              <DeploymentStatusBadge
+              <LiveDeploymentStatusBadge
                 rawStatus={deployment.rawStatus}
                 statusLabel={deployment.statusLabel}
               />
@@ -202,6 +208,7 @@ export default async function DeploymentDetailPage({
             />
           </div>
         </div>
+        </DeploymentStatusProvider>
       </div>
 
       {updateAvailable && tainerMeta && (

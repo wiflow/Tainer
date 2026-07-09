@@ -432,12 +432,17 @@ export function TaskToastProvider({
         // Invalidate server-side caches first so router.refresh() gets fresh data
         fetch("/api/revalidate", { method: "POST" }).finally(() => {
           router.refresh();
-          // Follow-up refresh after a short delay to catch Proxmox state propagation
-          setTimeout(() => {
-            if (document.visibilityState === "visible") {
-              router.refresh();
-            }
-          }, 1500);
+          // Proxmox propagates guest status to /cluster/resources on
+          // pvestatd's ~10s cadence, so a task can complete well before the
+          // API reports the new state. Stagger follow-up refreshes to ride
+          // that out instead of refreshing once and going stale.
+          for (const delayMs of [1500, 5000, 12000]) {
+            setTimeout(() => {
+              if (document.visibilityState === "visible") {
+                router.refresh();
+              }
+            }, delayMs);
+          }
         });
       }
     } catch {

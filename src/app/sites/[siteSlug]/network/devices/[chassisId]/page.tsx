@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ChevronLeft, Router, Server, Wifi, Network, HelpCircle } from "lucide-react";
 import { notFound } from "next/navigation";
 
-import { NetworkAutoRefresh } from "@/components/network-auto-refresh";
+import { AutoRefresh } from "@/components/auto-refresh";
 import { NetworkDeviceAnnotationForm } from "@/components/network-device-annotation-form";
 import { NetworkDeviceEvents } from "@/components/network-device-events";
 import { NetworkSwitchPanel } from "@/components/network-switch-panel";
@@ -55,7 +55,7 @@ export default async function DeviceDetailPage({
 
   return (
     <main className="min-h-screen px-6 py-8 lg:px-10">
-      <NetworkAutoRefresh />
+      <AutoRefresh />
       <div className="mx-auto flex max-w-5xl flex-col gap-6">
         <Link
           className="inline-flex w-fit items-center gap-1 text-[11.5px] text-zinc-500 hover:text-zinc-300"

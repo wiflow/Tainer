@@ -4,6 +4,7 @@ import { unstable_cache } from "next/cache";
 import { ensureSiteConfig } from "@/lib/site-context";
 import { resolveSiteConfigBySlug } from "@/lib/site-resolver";
 
+import { AutoRefresh } from "@/components/auto-refresh";
 import { BulkOperationsPanel } from "@/components/bulk-operations-panel";
 import { DeploymentsBoard } from "@/components/deployments-board";
 import { ProxmoxIssues } from "@/components/proxmox-issues";
@@ -65,6 +66,9 @@ export default async function DeploymentsPage({
 
   return (
     <div className="space-y-4">
+      {/* Proxmox guest status changes outside the app (and lags behind
+          lifecycle tasks) — keep the list from going stale between actions. */}
+      <AutoRefresh intervalMs={15_000} />
       <ProxmoxIssues
         description="Deployment inventory and controls need VM.Audit plus lifecycle permissions. Empty results can still mean either no guests or a token that cannot see them yet."
         issues={issues}

@@ -4,16 +4,20 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 /**
- * Soft 60-second auto-refresh for LLDP pages. Aligned with the agent's
- * `OnUnitActiveSec=60s` push cadence — refreshing faster than that would
- * spend cycles re-fetching identical data because the source-of-truth
- * snapshots only change once per minute.
+ * Soft periodic auto-refresh for pages showing live external state. Drop it
+ * into a server-component page and the router re-fetches on the given
+ * interval, so state changes that happen outside the app (or lag behind an
+ * action, like Proxmox status propagation) surface without a manual reload.
+ *
+ * Pick an interval matched to how fast the source of truth actually changes —
+ * e.g. 15s for Proxmox guest status, 60s for LLDP snapshots that agents only
+ * push once a minute.
  *
  * Pauses while the tab is hidden (saves cycles + spares Tainer/Proxmox
  * background load when an operator leaves the page open). Resumes on
  * `visibilitychange`.
  */
-export function NetworkAutoRefresh({ intervalMs = 60_000 }: { intervalMs?: number }) {
+export function AutoRefresh({ intervalMs = 60_000 }: { intervalMs?: number }) {
   const router = useRouter();
 
   useEffect(() => {
