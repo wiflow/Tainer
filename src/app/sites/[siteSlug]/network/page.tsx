@@ -19,6 +19,10 @@ import {
   deriveTopology,
   getLldpSnapshotsForSite,
 } from "@/lib/lldp-snapshots";
+import {
+  getSnmpConfigForSite,
+  resolveAgentBaseUrl,
+} from "@/lib/lldp-snmp-config";
 import { getPublicOrigin } from "@/lib/oidc";
 import { withSiteConfig } from "@/lib/proxmox";
 import { ensureSiteConfig } from "@/lib/site-context";
@@ -50,10 +54,11 @@ export default async function NetworkPage({
   // alongside the discovery tabs.
   const canManageIpPools = session.user.role === "admin";
 
-  const [snapshots, tokens, annotations, ipPoolData] = await Promise.all([
+  const [snapshots, tokens, annotations, snmpConfig, ipPoolData] = await Promise.all([
     getLldpSnapshotsForSite(siteConfig.siteId),
     listLldpTokensForSite(siteConfig.siteId),
     getLldpAnnotationsForSite(siteConfig.siteId),
+    getSnmpConfigForSite(siteConfig.siteId),
     canManageIpPools
       ? withSiteConfig(siteConfig, () =>
           Promise.all([getIpPoolCatalog(), listContainerTags()]),
@@ -82,13 +87,18 @@ export default async function NetworkPage({
   ).sort();
 
   const headerStore = await headers();
-  let ingestUrl: string;
+  let fallbackOrigin: string;
   try {
-    const origin = getPublicOrigin(headerStore);
-    ingestUrl = `${origin}/api/internal/lldp-ingest`;
+    fallbackOrigin = getPublicOrigin(headerStore);
   } catch {
-    ingestUrl = "https://YOUR-TAINER-HOST/api/internal/lldp-ingest";
+    fallbackOrigin = "https://YOUR-TAINER-HOST";
   }
+  // Precedence: per-site override → TAINER_AGENT_BASE_URL → request origin.
+  // The override exists because the public origin (APP_URL) is often not
+  // resolvable from the Proxmox nodes (LAN box reached by IP, split DNS).
+  const agentBase = resolveAgentBaseUrl(snmpConfig.agentBaseUrl, fallbackOrigin);
+  const ingestUrl = `${agentBase}/api/internal/lldp-ingest`;
+  const snmpIngestUrl = `${agentBase}/api/internal/snmp-ingest`;
 
   const activeTokenCount = tokens.filter((t) => !t.revokedAt).length;
 
@@ -170,6 +180,8 @@ export default async function NetworkPage({
             tokens={tokens}
             agentHosts={agentHosts}
             ingestUrl={ingestUrl}
+            snmpIngestUrl={snmpIngestUrl}
+            snmpConfig={snmpConfig}
             canManage={canManage}
           />
         ) : null}

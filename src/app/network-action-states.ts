@@ -5,6 +5,9 @@ export type LldpIssueTokenActionState = BasicActionState & {
   plaintext: string;
   /** Label of the newly-issued token, echoed back for the success modal. */
   label: string;
+  /** SNMP community for the site, returned so the snippet can bake it in.
+   *  Empty when SNMP isn't configured for this site. */
+  snmpCommunity: string;
 };
 
 export const initialLldpIssueTokenActionState: LldpIssueTokenActionState = {
@@ -13,4 +16,5 @@ export const initialLldpIssueTokenActionState: LldpIssueTokenActionState = {
   status: "idle",
   plaintext: "",
   label: "",
+  snmpCommunity: "",
 };

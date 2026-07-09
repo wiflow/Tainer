@@ -17,6 +17,7 @@ import {
   deriveTopology,
   getLldpSnapshotsForSite,
 } from "@/lib/lldp-snapshots";
+import { getSnmpSnapshotForChassis } from "@/lib/lldp-snmp-snapshots";
 import type { LldpDevice } from "@/lib/lldp-types";
 import { ensureSiteConfig } from "@/lib/site-context";
 
@@ -35,10 +36,11 @@ export default async function DeviceDetailPage({
   requireSiteAccess(session, siteConfig.siteId);
   const canManage = hasSitePermission(session, siteConfig.siteId, "manage-security");
 
-  const [snapshots, annotation, events] = await Promise.all([
+  const [snapshots, annotation, events, snmpSnapshot] = await Promise.all([
     getLldpSnapshotsForSite(siteConfig.siteId),
     getLldpAnnotation(siteConfig.siteId, chassisId),
     listLldpEventsForSite(siteConfig.siteId, { chassisId, limit: 200 }),
+    getSnmpSnapshotForChassis(siteConfig.siteId, chassisId),
   ]);
   const topology = deriveTopology(snapshots);
   const device = topology.devices.find((d) => d.chassisId === chassisId);
@@ -128,20 +130,31 @@ export default async function DeviceDetailPage({
         </header>
 
         <section className="rounded-xl border border-white/[0.06] bg-zinc-950/40 p-4">
-          <header className="mb-4">
-            <h2 className="text-[13px] font-medium text-zinc-100">
-              Ports observed ({ports.length})
-            </h2>
-            <p className="mt-0.5 text-[11px] text-zinc-500">
-              Front-panel mock based on LLDP-observed ports. Only ports with one of
-              this site&apos;s Proxmox nodes attached are visible — LLDP does not
-              expose the full port inventory of a remote device. Click a port for
-              details.
-            </p>
+          <header className="mb-4 flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-[13px] font-medium text-zinc-100">
+                {snmpSnapshot ? `Front panel (${snmpSnapshot.ports.length} ports)` : `Ports observed (${ports.length})`}
+              </h2>
+              <p className="mt-0.5 text-[11px] text-zinc-500">
+                {snmpSnapshot
+                  ? `Live port inventory from SNMP, last polled ${new Date(snmpSnapshot.collectedAt).toLocaleTimeString()}. Click a port for details.`
+                  : "Front-panel mock based on LLDP-observed ports. Only ports with one of this site's Proxmox nodes attached are visible — enable SNMP polling in the Integrations panel to see the full chassis."}
+              </p>
+            </div>
+            {snmpSnapshot ? (
+              <span className="rounded-full border border-emerald-500/30 bg-emerald-500/[0.06] px-2 py-0.5 text-[10px] font-medium text-emerald-300">
+                SNMP
+              </span>
+            ) : (
+              <span className="rounded-full border border-white/[0.08] bg-white/[0.03] px-2 py-0.5 text-[10px] font-medium text-zinc-400">
+                LLDP only
+              </span>
+            )}
           </header>
           <NetworkSwitchPanel
             ports={ports}
             portCountOverride={annotation?.portCountOverride ?? null}
+            snmpPorts={snmpSnapshot?.ports ?? null}
           />
         </section>
 

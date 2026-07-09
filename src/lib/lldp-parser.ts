@@ -16,7 +16,12 @@ import type { LldpNeighbor } from "@/lib/lldp-types";
  * has no LLDP neighbours).
  */
 export function parseLldpcliJson(raw: unknown): LldpNeighbor[] {
-  const lldp = pickObject(pickObject(raw)?.["lldp"]);
+  // lldpcli's `json0` format wraps the top-level `lldp` value in a single-
+  // element array (`{"lldp": [{...}]}`), while the older `json` format uses
+  // an object directly (`{"lldp": {...}}`). Accept either — unwrap the array
+  // if present, then fall back to treating it as an object.
+  const lldpRaw = pickObject(raw)?.["lldp"];
+  const lldp = pickObject(lldpRaw) ?? pickObject(toArray(lldpRaw)[0]);
   if (!lldp) return [];
 
   const interfaces = toArray(lldp["interface"]);

@@ -5,12 +5,18 @@ import { ArrowDownToLine, Cable, Tag, X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import type { LldpDevicePort } from "@/lib/lldp-types";
+import type { SnmpPort } from "@/lib/lldp-snmp-types";
 
 type Props = {
   ports: LldpDevicePort[];
   /** Operator-supplied port count, overrides the inference from the highest
    *  observed port number. */
   portCountOverride?: number | null;
+  /** Real port inventory from SNMP. When provided, the panel renders the
+   *  authoritative chassis layout (every physical port, real up/down state)
+   *  rather than the LLDP-inferred mock. LLDP observations are overlaid as
+   *  highlights on matching ports. */
+  snmpPorts?: SnmpPort[] | null;
 };
 
 type SlotInfo = {
@@ -23,11 +29,28 @@ const STALE_THRESHOLD_MS = 5 * 60_000;
 const FRESH_THRESHOLD_MS = 90_000;
 const COMMON_PORT_COUNTS = [8, 16, 24, 28, 32, 48, 52];
 
-export function NetworkSwitchPanel({ ports, portCountOverride }: Props) {
+export function NetworkSwitchPanel({ ports, portCountOverride, snmpPorts }: Props) {
+  // If we have real SNMP port data, render the authoritative front panel.
+  // Falls through to the LLDP-inferred view when SNMP isn't configured.
+  if (snmpPorts && snmpPorts.length > 0) {
+    return <SnmpFrontPanel lldpPorts={ports} snmpPorts={snmpPorts} />;
+  }
+  return (
+    <LldpInferredPanel ports={ports} portCountOverride={portCountOverride ?? null} />
+  );
+}
+
+function LldpInferredPanel({
+  ports,
+  portCountOverride,
+}: {
+  ports: LldpDevicePort[];
+  portCountOverride: number | null;
+}) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const { slots, specialPorts, inferredCount, isOverridden } = useMemo(
-    () => buildLayout(ports, portCountOverride ?? null),
+    () => buildLayout(ports, portCountOverride),
     [ports, portCountOverride],
   );
   const selectedPort = ports.find((p) => p.portId === selectedId) ?? null;
@@ -37,6 +60,49 @@ export function NetworkSwitchPanel({ ports, portCountOverride }: Props) {
       <p className="rounded-lg border border-dashed border-white/10 bg-zinc-950/40 px-4 py-6 text-center text-[12px] text-zinc-500">
         No ports observed yet.
       </p>
+    );
+  }
+
+  // When a device advertises every port as a MAC address (Linux hosts /
+  // other Proxmox nodes running lldpd with the default port-id subtype),
+  // there are no numbered slots — the inferred chassis grid would just be
+  // an empty 8-port mock, which is misleading. Drop it and present the
+  // observed links as a clean list instead.
+  const hasNumberedPorts = slots.some((s) => s.port !== null);
+
+  if (!hasNumberedPorts) {
+    return (
+      <div className="space-y-4">
+        <div className="rounded-lg border border-white/[0.06] bg-zinc-950/40 px-4 py-3">
+          <div className="text-[11px] text-zinc-500">
+            This device advertises ports by MAC address, not switch-style port
+            names — typical of a Linux host or another Proxmox node. No physical
+            chassis to draw; the observed links are listed below. Enable SNMP
+            polling for a real port inventory if this is a managed switch.
+          </div>
+        </div>
+        <div className="space-y-1.5">
+          <div className="text-[10.5px] uppercase tracking-[0.14em] text-zinc-500">
+            Links observed ({specialPorts.length})
+          </div>
+          <div className="grid grid-cols-1 gap-1.5">
+            {specialPorts.map((p) => (
+              <LinkRow
+                key={p.portId}
+                port={p}
+                selected={selectedId === p.portId}
+                onClick={() =>
+                  setSelectedId(p.portId === selectedId ? null : p.portId)
+                }
+              />
+            ))}
+          </div>
+        </div>
+        {selectedPort ? (
+          <PortDetailPanel port={selectedPort} onClose={() => setSelectedId(null)} />
+        ) : null}
+        <Legend />
+      </div>
     );
   }
 
@@ -74,6 +140,80 @@ export function NetworkSwitchPanel({ ports, portCountOverride }: Props) {
 
       <Legend />
     </div>
+  );
+}
+
+/**
+ * A MAC-addressed link rendered as a readable row: which Proxmox node +
+ * interface it terminates at, VLAN, and freshness. Used for devices that
+ * have no numbered chassis (Linux hosts / other Proxmox nodes).
+ */
+function LinkRow({
+  port,
+  selected,
+  onClick,
+}: {
+  port: LldpDevicePort;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  const stale = isStale(port.lastSeenAt);
+  const fresh = isFresh(port.lastSeenAt);
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "group flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left transition-colors",
+        stale
+          ? "border-rose-500/25 bg-rose-500/[0.05] hover:bg-rose-500/[0.08]"
+          : "border-sky-500/25 bg-sky-500/[0.05] hover:bg-sky-500/[0.09]",
+        selected ? "ring-2 ring-sky-400 ring-offset-2 ring-offset-zinc-950" : "",
+      )}
+    >
+      <span
+        className={cn(
+          "relative inline-block h-2 w-2 flex-shrink-0 rounded-full",
+          stale ? "bg-rose-400" : "bg-sky-400",
+        )}
+      >
+        {!stale && fresh ? (
+          <span className="absolute inset-0 animate-ping rounded-full bg-sky-400/60" />
+        ) : null}
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Cable className="h-3 w-3 flex-shrink-0 text-zinc-500" />
+          <span className="font-mono text-[11.5px] text-zinc-200">
+            {port.portDescription?.trim() || port.portId}
+          </span>
+          {port.vlanId != null ? (
+            <span className="inline-flex items-center gap-1 rounded bg-sky-500/15 px-1.5 py-0.5 text-[10px] text-sky-200">
+              <Tag className="h-2.5 w-2.5" /> VLAN {port.vlanId}
+            </span>
+          ) : null}
+        </div>
+        <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10.5px] text-zinc-500">
+          <ArrowDownToLine className="h-3 w-3" />
+          <span>connects to</span>
+          <span className="font-mono text-zinc-300">
+            {port.connectedTo.agentHost}
+          </span>
+          <span className="text-zinc-600">·</span>
+          <span className="font-mono text-zinc-400">
+            {port.connectedTo.localInterface}
+          </span>
+        </div>
+      </div>
+      <span
+        className={cn(
+          "flex-shrink-0 text-[10px] tabular-nums",
+          stale ? "text-rose-300/80" : "text-zinc-500",
+        )}
+      >
+        {formatAge(Date.now() - Date.parse(port.lastSeenAt))}
+      </span>
+    </button>
   );
 }
 
@@ -461,4 +601,470 @@ function extractSlot(portId: string): { slot: number; isSfp: boolean } | null {
 
   const isSfp = /sfp|xe-|te-|fortygig|hundredgig|qsfp/i.test(trimmed);
   return { slot, isSfp };
+}
+
+// ---------------------------------------------------------------------------
+// SNMP-driven front panel (UniFi-style)
+// ---------------------------------------------------------------------------
+//
+// When the SNMP poll agent has run against this chassis, we have a real
+// IF-MIB inventory: every port, real up/down state, real port names,
+// operator-set aliases, speed. We render that as the authoritative chassis
+// layout — rather than the LLDP-inferred mock — and overlay LLDP-observed
+// ports as highlighted "your nodes plug in here" hints.
+
+type SnmpSlot = {
+  slot: number;
+  isSfp: boolean;
+  snmp: SnmpPort;
+  shortName: string;
+  lldp: LldpDevicePort | null;
+};
+
+const ETHERNET_TYPE_NUMBERS = new Set([6, 7, 117, 169]); // ethernetCsmacd + common variants
+
+function isPhysicalSnmpPort(p: SnmpPort): boolean {
+  if (p.type != null && ETHERNET_TYPE_NUMBERS.has(p.type)) return true;
+  if (p.type != null) return false; // Known non-ethernet → skip
+  // No type info — fall back to name heuristics. Reject obvious virtuals.
+  if (/^(vlan|vl|lo|loopback|null|tunnel|po|port-?channel|bdi|nve|svi)/i.test(p.name)) {
+    return false;
+  }
+  return /\d/.test(p.name);
+}
+
+function shortenPortName(name: string): string {
+  return name
+    .replace(/^TwentyFiveGigabitEthernet/i, "Twe")
+    .replace(/^HundredGigabitEthernet/i, "Hu")
+    .replace(/^FortyGigabitEthernet/i, "Fo")
+    .replace(/^TenGigabitEthernet/i, "Te")
+    .replace(/^GigabitEthernet/i, "Gi")
+    .replace(/^FastEthernet/i, "Fa")
+    .replace(/^Ethernet/i, "Eth");
+}
+
+function slotFromSnmpName(name: string): { slot: number; isSfp: boolean } | null {
+  // Reuse the LLDP extractor — port names from SNMP and LLDP follow the
+  // same conventions (Gi1/0/1, Te1/0/49, swp14, etc.) so the regex matches
+  // identically.
+  return extractSlot(name);
+}
+
+/** Best-effort match of an LLDP port to an SNMP port. Compares by short name
+ *  (Gi1/0/1) then by trailing slot number. */
+function findLldpForSnmp(
+  snmp: SnmpPort,
+  lldpPorts: LldpDevicePort[],
+): LldpDevicePort | null {
+  if (!lldpPorts.length) return null;
+  const snmpShort = shortenPortName(snmp.name).toLowerCase();
+  const snmpSlot = slotFromSnmpName(snmp.name)?.slot ?? null;
+
+  for (const l of lldpPorts) {
+    const candidates = [l.portId, l.portDescription ?? ""]
+      .map((s) => s.trim())
+      .filter(Boolean);
+    for (const cand of candidates) {
+      const candShort = shortenPortName(cand).toLowerCase();
+      if (candShort === snmpShort) return l;
+      const candSlot = slotFromSnmpName(cand)?.slot ?? null;
+      if (candSlot != null && candSlot === snmpSlot && /eth|gi|te|fa|swp/i.test(cand)) {
+        return l;
+      }
+    }
+  }
+  return null;
+}
+
+function SnmpFrontPanel({
+  lldpPorts,
+  snmpPorts,
+}: {
+  lldpPorts: LldpDevicePort[];
+  snmpPorts: SnmpPort[];
+}) {
+  const [selectedSnmpIndex, setSelectedSnmpIndex] = useState<number | null>(null);
+
+  // Filter + classify. SFP-ness: anything >= 10 Gbps or with Te/Fo/Hu prefix.
+  const slots: SnmpSlot[] = useMemo(() => {
+    return snmpPorts
+      .filter(isPhysicalSnmpPort)
+      .map((p) => {
+        const slot = slotFromSnmpName(p.name);
+        const isSfp =
+          (slot?.isSfp ?? false) ||
+          /^(TenGigabit|FortyGigabit|HundredGigabit|TwentyFiveGigabit|XE|Te|Fo|Hu|Twe)/i.test(
+            p.name,
+          ) ||
+          (p.speedBps !== null && p.speedBps >= 10_000_000_000);
+        return {
+          slot: slot?.slot ?? p.index,
+          isSfp,
+          snmp: p,
+          shortName: shortenPortName(p.name),
+          lldp: findLldpForSnmp(p, lldpPorts),
+        } satisfies SnmpSlot;
+      })
+      .sort((a, b) => {
+        // SFPs cluster to the right; within each group sort by slot.
+        if (a.isSfp !== b.isSfp) return a.isSfp ? 1 : -1;
+        return a.slot - b.slot;
+      });
+  }, [snmpPorts, lldpPorts]);
+
+  const rjSlots = slots.filter((s) => !s.isSfp);
+  const sfpSlots = slots.filter((s) => s.isSfp);
+  const selected = slots.find((s) => s.snmp.index === selectedSnmpIndex) ?? null;
+
+  // Live counts for the chassis header strip
+  const upCount = slots.filter((s) => s.snmp.operStatus === "up").length;
+  const downCount = slots.filter(
+    (s) => s.snmp.operStatus === "down" && s.snmp.adminStatus === "up",
+  ).length;
+  const disabledCount = slots.filter(
+    (s) => s.snmp.adminStatus !== "up" && s.snmp.adminStatus !== "unknown",
+  ).length;
+  const observedCount = slots.filter((s) => s.lldp).length;
+
+  return (
+    <div className="space-y-4">
+      {/* Chassis */}
+      <div className="overflow-hidden rounded-xl border border-white/[0.08] bg-gradient-to-b from-zinc-900 to-[#0c0c0e] shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_8px_24px_-12px_rgba(0,0,0,0.6)]">
+        {/* Status strip */}
+        <div className="flex items-center justify-between border-b border-white/[0.04] bg-black/30 px-4 py-2 text-[10.5px] uppercase tracking-[0.14em] text-zinc-500">
+          <div className="flex items-center gap-3">
+            <span>
+              {slots.length}-port chassis
+            </span>
+            <span className="flex items-center gap-1">
+              <LedDot tone="up" />
+              <span className="text-emerald-300">{upCount}</span>
+              <span className="ml-0.5 text-zinc-500">up</span>
+            </span>
+            <span className="flex items-center gap-1">
+              <LedDot tone="down" />
+              <span className="text-rose-300">{downCount}</span>
+              <span className="ml-0.5 text-zinc-500">down</span>
+            </span>
+            {disabledCount > 0 ? (
+              <span className="flex items-center gap-1">
+                <LedDot tone="off" />
+                <span className="text-zinc-400">{disabledCount}</span>
+                <span className="ml-0.5 text-zinc-500">disabled</span>
+              </span>
+            ) : null}
+            {observedCount > 0 ? (
+              <span className="flex items-center gap-1">
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-sky-400 ring-2 ring-sky-400/30" />
+                <span className="text-sky-300">{observedCount}</span>
+                <span className="ml-0.5 text-zinc-500">LLDP</span>
+              </span>
+            ) : null}
+          </div>
+          <span>front panel</span>
+        </div>
+
+        {/* Ports */}
+        <div className="flex flex-wrap items-end gap-x-4 gap-y-3 px-5 py-5">
+          <SnmpRjGrid slots={rjSlots} selectedIndex={selectedSnmpIndex} onSelect={setSelectedSnmpIndex} />
+          {sfpSlots.length > 0 ? (
+            <div className="ml-2 flex items-end gap-1 border-l border-white/[0.06] pl-3">
+              {sfpSlots.map((s) => (
+                <SnmpPortChip
+                  key={s.snmp.index}
+                  slot={s}
+                  selected={selectedSnmpIndex === s.snmp.index}
+                  onSelect={setSelectedSnmpIndex}
+                />
+              ))}
+            </div>
+          ) : null}
+        </div>
+      </div>
+
+      {selected ? (
+        <SnmpPortDetailPanel slot={selected} onClose={() => setSelectedSnmpIndex(null)} />
+      ) : null}
+
+      <SnmpLegend />
+    </div>
+  );
+}
+
+function SnmpRjGrid({
+  slots,
+  selectedIndex,
+  onSelect,
+}: {
+  slots: SnmpSlot[];
+  selectedIndex: number | null;
+  onSelect: (index: number | null) => void;
+}) {
+  // Group in 8s (Unifi convention: 4 visual pair-columns per group).
+  const groups: SnmpSlot[][] = [];
+  for (let i = 0; i < slots.length; i += 8) {
+    groups.push(slots.slice(i, i + 8));
+  }
+
+  return (
+    <div className="flex items-end gap-3">
+      {groups.map((group, gi) => (
+        <div key={gi} className="grid grid-flow-col grid-rows-2 gap-1.5">
+          {group.map((s) => (
+            <SnmpPortChip
+              key={s.snmp.index}
+              slot={s}
+              selected={selectedIndex === s.snmp.index}
+              onSelect={onSelect}
+            />
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function SnmpPortChip({
+  slot,
+  selected,
+  onSelect,
+}: {
+  slot: SnmpSlot;
+  selected: boolean;
+  onSelect: (index: number | null) => void;
+}) {
+  const { snmp, isSfp, lldp } = slot;
+  const isUp = snmp.operStatus === "up";
+  const isAdminDown = snmp.adminStatus !== "up" && snmp.adminStatus !== "unknown";
+  const isLinkDown = !isUp && !isAdminDown;
+  const hasLldp = lldp !== null;
+
+  const tone = (() => {
+    if (isAdminDown) return "off"; // operator-disabled
+    if (isUp) return "up";
+    if (isLinkDown) return "down";
+    return "off";
+  })();
+
+  // Speed badge (Mbps) on hover — show at >=1G with a different LED accent.
+  const speedMbps = snmp.speedBps ? Math.round(snmp.speedBps / 1_000_000) : 0;
+
+  const titleParts: string[] = [`Port ${slot.slot}: ${snmp.name}`];
+  if (snmp.alias) titleParts.push(`alias=${snmp.alias}`);
+  titleParts.push(`oper=${snmp.operStatus}`);
+  titleParts.push(`admin=${snmp.adminStatus}`);
+  if (speedMbps) titleParts.push(`${speedMbps >= 1000 ? `${speedMbps / 1000}G` : `${speedMbps}M`}`);
+  if (lldp) titleParts.push(`LLDP→${lldp.connectedTo.agentHost}:${lldp.connectedTo.localInterface}`);
+
+  return (
+    <button
+      aria-label={titleParts.join(" · ")}
+      title={titleParts.join(" · ")}
+      type="button"
+      onClick={() => onSelect(selected ? null : snmp.index)}
+      className="group flex flex-col items-center gap-0.5"
+    >
+      <span
+        className={cn(
+          "relative block overflow-hidden rounded-[3px] border transition-all duration-150",
+          isSfp ? "h-9 w-5" : "h-7 w-7",
+          // Tone palette mimics UniFi's per-port LED behaviour.
+          tone === "up" && "border-emerald-400/40 bg-emerald-500/[0.12]",
+          tone === "down" && "border-rose-500/30 bg-rose-500/[0.08]",
+          tone === "off" && "border-white/[0.07] bg-white/[0.02]",
+          selected && "ring-2 ring-sky-400 ring-offset-2 ring-offset-zinc-900",
+          // Subtle outline ring when LLDP sees this port — "your nodes plug in here"
+          hasLldp && !selected && "ring-1 ring-sky-400/40",
+        )}
+      >
+        {/* Soft "LED" highlight on top half for up ports */}
+        {tone === "up" ? (
+          <span
+            className={cn(
+              "pointer-events-none absolute inset-x-0 top-0 h-1/2 rounded-t-[3px] bg-[radial-gradient(circle_at_50%_0%,rgba(74,222,128,0.55),transparent_75%)]",
+              hasLldp ? "animate-lldp-port-pulse" : "",
+            )}
+          />
+        ) : null}
+        {tone === "down" ? (
+          <span className="pointer-events-none absolute inset-x-0 top-0 h-1/2 rounded-t-[3px] bg-[radial-gradient(circle_at_50%_0%,rgba(244,63,94,0.35),transparent_75%)]" />
+        ) : null}
+        {/* RJ45 detail: subtle bottom notch */}
+        {!isSfp ? (
+          <span className="pointer-events-none absolute inset-x-1 bottom-0 h-[2px] rounded-b-[1px] bg-black/40" />
+        ) : null}
+        {/* SFP detail: latch line down the middle */}
+        {isSfp ? (
+          <span className="pointer-events-none absolute left-1/2 top-1 h-[7px] w-px -translate-x-1/2 bg-white/[0.08]" />
+        ) : null}
+      </span>
+      <span
+        className={cn(
+          "text-[9px] font-medium tabular-nums",
+          tone === "up" ? "text-zinc-200" : tone === "down" ? "text-rose-300/80" : "text-zinc-500",
+          selected && "text-sky-300",
+        )}
+      >
+        {slot.slot}
+      </span>
+    </button>
+  );
+}
+
+function SnmpPortDetailPanel({
+  slot,
+  onClose,
+}: {
+  slot: SnmpSlot;
+  onClose: () => void;
+}) {
+  const { snmp, lldp } = slot;
+  const speedLabel = (() => {
+    if (snmp.speedBps == null) return "—";
+    const mbps = snmp.speedBps / 1_000_000;
+    if (mbps >= 1000) return `${(mbps / 1000).toFixed(mbps % 1000 === 0 ? 0 : 1)} Gbps`;
+    return `${Math.round(mbps)} Mbps`;
+  })();
+  const isUp = snmp.operStatus === "up";
+  const isAdminDown = snmp.adminStatus !== "up" && snmp.adminStatus !== "unknown";
+
+  return (
+    <section
+      className={cn(
+        "rounded-xl border",
+        isUp
+          ? "border-emerald-500/20 bg-emerald-500/[0.04]"
+          : isAdminDown
+            ? "border-zinc-500/20 bg-zinc-500/[0.04]"
+            : "border-rose-500/20 bg-rose-500/[0.04]",
+      )}
+    >
+      <header
+        className={cn(
+          "flex items-center justify-between border-b px-4 py-2.5",
+          isUp
+            ? "border-emerald-500/15"
+            : isAdminDown
+              ? "border-zinc-500/15"
+              : "border-rose-500/15",
+        )}
+      >
+        <div className="flex items-center gap-2">
+          <Cable
+            className={cn(
+              "h-3.5 w-3.5",
+              isUp ? "text-emerald-300" : isAdminDown ? "text-zinc-300" : "text-rose-300",
+            )}
+          />
+          <h3 className="text-[12.5px] font-medium text-zinc-100">
+            {slot.shortName}
+          </h3>
+          <span className="text-[10.5px] text-zinc-500">{snmp.name}</span>
+          <span
+            className={cn(
+              "rounded px-1.5 py-0.5 text-[10px] font-medium",
+              isUp
+                ? "bg-emerald-500/15 text-emerald-200"
+                : isAdminDown
+                  ? "bg-zinc-500/15 text-zinc-200"
+                  : "bg-rose-500/15 text-rose-200",
+            )}
+          >
+            {isAdminDown ? "disabled" : isUp ? "link up" : "link down"}
+          </span>
+        </div>
+        <button
+          aria-label="Close port detail"
+          className="text-zinc-400 hover:text-zinc-200"
+          onClick={onClose}
+          type="button"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </header>
+      <dl className="grid grid-cols-1 gap-3 px-4 py-3 text-[12px] sm:grid-cols-3">
+        <div>
+          <dt className="text-[10.5px] uppercase tracking-[0.14em] text-zinc-500">
+            Operational
+          </dt>
+          <dd className="mt-0.5 text-zinc-200">{snmp.operStatus}</dd>
+        </div>
+        <div>
+          <dt className="text-[10.5px] uppercase tracking-[0.14em] text-zinc-500">
+            Admin
+          </dt>
+          <dd className="mt-0.5 text-zinc-200">{snmp.adminStatus}</dd>
+        </div>
+        <div>
+          <dt className="text-[10.5px] uppercase tracking-[0.14em] text-zinc-500">
+            Speed
+          </dt>
+          <dd className="mt-0.5 text-zinc-200">{speedLabel}</dd>
+        </div>
+        {snmp.alias ? (
+          <div className="sm:col-span-3">
+            <dt className="text-[10.5px] uppercase tracking-[0.14em] text-zinc-500">
+              Alias (ifAlias)
+            </dt>
+            <dd className="mt-0.5 text-zinc-200">{snmp.alias}</dd>
+          </div>
+        ) : null}
+        {lldp ? (
+          <div className="sm:col-span-3">
+            <dt className="text-[10.5px] uppercase tracking-[0.14em] text-sky-300/70">
+              LLDP neighbour from this site
+            </dt>
+            <dd className="mt-0.5 flex flex-wrap items-center gap-2">
+              <ArrowDownToLine className="h-3 w-3 text-sky-300" />
+              <span className="font-mono text-zinc-100">{lldp.connectedTo.agentHost}</span>
+              <span className="text-zinc-500">·</span>
+              <span className="font-mono text-zinc-300">{lldp.connectedTo.localInterface}</span>
+              {lldp.vlanId != null ? (
+                <span className="inline-flex items-center gap-1 rounded bg-sky-500/15 px-1.5 py-0.5 text-[10px] text-sky-200">
+                  <Tag className="h-2.5 w-2.5" /> VLAN {lldp.vlanId}
+                </span>
+              ) : null}
+            </dd>
+          </div>
+        ) : null}
+      </dl>
+    </section>
+  );
+}
+
+function LedDot({ tone }: { tone: "up" | "down" | "off" }) {
+  return (
+    <span
+      className={cn(
+        "inline-block h-1.5 w-1.5 rounded-full",
+        tone === "up" && "bg-emerald-400 shadow-[0_0_4px_rgba(74,222,128,0.7)]",
+        tone === "down" && "bg-rose-400 shadow-[0_0_4px_rgba(244,63,94,0.6)]",
+        tone === "off" && "bg-zinc-600",
+      )}
+    />
+  );
+}
+
+function SnmpLegend() {
+  return (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[10.5px] text-zinc-500">
+      <span className="inline-flex items-center gap-1.5">
+        <span className="inline-block h-3 w-3 rounded-[2px] border border-emerald-400/40 bg-emerald-500/[0.12]" />
+        link up
+      </span>
+      <span className="inline-flex items-center gap-1.5">
+        <span className="inline-block h-3 w-3 rounded-[2px] border border-rose-500/30 bg-rose-500/[0.08]" />
+        link down
+      </span>
+      <span className="inline-flex items-center gap-1.5">
+        <span className="inline-block h-3 w-3 rounded-[2px] border border-white/[0.07] bg-white/[0.02]" />
+        admin disabled
+      </span>
+      <span className="inline-flex items-center gap-1.5">
+        <span className="inline-block h-3 w-3 rounded-[2px] border border-emerald-400/40 bg-emerald-500/[0.12] ring-1 ring-sky-400/40" />
+        LLDP neighbour active
+      </span>
+    </div>
+  );
 }

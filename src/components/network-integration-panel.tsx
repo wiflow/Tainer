@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
-import { AlertTriangle, KeyRound, Trash2, XCircle } from "lucide-react";
+import { AlertTriangle, Globe, KeyRound, Radio, Trash2, XCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { CopyableText } from "@/components/copyable-text";
@@ -10,18 +10,23 @@ import {
   clearLldpSnapshotsAction,
   issueLldpTokenAction,
   revokeLldpTokenAction,
+  saveAgentEndpointAction,
+  saveSnmpConfigAction,
 } from "@/app/network-actions";
 import {
   initialLldpIssueTokenActionState,
 } from "@/app/network-action-states";
 import { initialBasicActionState } from "@/lib/action-states";
 import type { LldpToken } from "@/lib/lldp-types";
+import type { SnmpSitePublicConfig } from "@/lib/lldp-snmp-config";
 
 type Props = {
   siteSlug: string;
   tokens: LldpToken[];
   agentHosts: string[];
   ingestUrl: string;
+  snmpIngestUrl: string;
+  snmpConfig: SnmpSitePublicConfig;
   canManage: boolean;
 };
 
@@ -30,6 +35,8 @@ export function NetworkIntegrationPanel({
   tokens,
   agentHosts,
   ingestUrl,
+  snmpIngestUrl,
+  snmpConfig,
   canManage,
 }: Props) {
   const [issueState, issueAction, issuePending] = useActionState(
@@ -40,22 +47,49 @@ export function NetworkIntegrationPanel({
   // Hold the just-issued plaintext locally until the operator dismisses it.
   // The server action's success state would otherwise vanish on the next
   // revalidation.
-  const [lastIssued, setLastIssued] = useState<{ plaintext: string; label: string } | null>(null);
+  const [lastIssued, setLastIssued] = useState<{
+    plaintext: string;
+    label: string;
+    snmpCommunity: string;
+  } | null>(null);
   useEffect(() => {
     if (issueState.status === "success" && issueState.plaintext) {
-      setLastIssued({ plaintext: issueState.plaintext, label: issueState.label });
+      setLastIssued({
+        plaintext: issueState.plaintext,
+        label: issueState.label,
+        snmpCommunity: issueState.snmpCommunity,
+      });
     }
   }, [issueState]);
+
+  // Effective base (scheme+host[:port]) currently baked into snippets, derived
+  // from the resolved ingest URL the server handed us.
+  const effectiveBase = ingestUrl.replace(/\/api\/internal\/lldp-ingest$/, "");
 
   return (
     <div className="flex flex-col gap-6">
       {lastIssued ? (
         <NewTokenPanel
           ingestUrl={ingestUrl}
+          snmpIngestUrl={snmpIngestUrl}
+          snmpConfig={snmpConfig}
+          snmpCommunity={lastIssued.snmpCommunity}
           plaintext={lastIssued.plaintext}
           label={lastIssued.label}
           onDismiss={() => setLastIssued(null)}
         />
+      ) : null}
+
+      {canManage ? (
+        <AgentEndpointSection
+          siteSlug={siteSlug}
+          effectiveBase={effectiveBase}
+          override={snmpConfig.agentBaseUrl}
+        />
+      ) : null}
+
+      {canManage ? (
+        <SnmpConfigSection siteSlug={siteSlug} config={snmpConfig} />
       ) : null}
 
       <section className="rounded-xl border border-white/[0.06] bg-zinc-950/40">
@@ -221,14 +255,27 @@ function NewTokenPanel({
   plaintext,
   label,
   ingestUrl,
+  snmpIngestUrl,
+  snmpConfig,
+  snmpCommunity,
   onDismiss,
 }: {
   plaintext: string;
   label: string;
   ingestUrl: string;
+  snmpIngestUrl: string;
+  snmpConfig: SnmpSitePublicConfig;
+  snmpCommunity: string;
   onDismiss: () => void;
 }) {
-  const snippet = buildSetupSnippet({ plaintext, ingestUrl });
+  const snippet = buildSetupSnippet({
+    plaintext,
+    ingestUrl,
+    snmpIngestUrl,
+    snmpCommunity,
+    snmpEnabled: snmpConfig.hasCommunity,
+    snmpPollSeconds: snmpConfig.pollIntervalSeconds,
+  });
   return (
     <section className="rounded-xl border border-emerald-500/20 bg-emerald-500/[0.04]">
       <header className="flex items-start justify-between border-b border-emerald-500/15 px-4 py-3">
@@ -323,18 +370,55 @@ function DangerZone({ siteSlug }: { siteSlug: string }) {
 function buildSetupSnippet({
   plaintext,
   ingestUrl,
+  snmpIngestUrl,
+  snmpCommunity,
+  snmpEnabled,
+  snmpPollSeconds,
 }: {
   plaintext: string;
   ingestUrl: string;
+  snmpIngestUrl: string;
+  snmpCommunity: string;
+  snmpEnabled: boolean;
+  snmpPollSeconds: number;
 }): string {
+  // The snippet always installs the LLDP agent. The SNMP poller is installed
+  // unconditionally too — even if the operator hasn't set a community string
+  // yet, the agent gracefully no-ops when SNMP_COMMUNITY is empty. That way
+  // they can set the community later without rerunning the install on every
+  // node.
+  const pollSeconds = Math.max(60, Math.min(3600, Math.floor(snmpPollSeconds || 300)));
+  const snmpCommentBlock = snmpEnabled
+    ? `# SNMP polling is enabled for this site. The agent polls each LLDP-discovered
+# neighbour's MgmtIP via SNMPv2c every ${pollSeconds}s and posts the IF-MIB
+# inventory to Tainer. The community string is set in /etc/tainer-snmp.env
+# below — keep that file 0600.`
+    : `# SNMP polling is NOT YET ENABLED for this site. The agent ships disabled.
+# Once an admin sets the SNMP community in the Tainer integrations panel,
+# edit /etc/tainer-snmp.env on each node (or rerun this snippet) and the
+# poller will start populating the full port inventory.`;
+
   return `#!/bin/sh
 # Run as root on a Proxmox node.
+#
+# Note: curl runs with -k (skip TLS verification) because Tainer uses a
+# self-signed Caddy cert by default. The agent still authenticates itself
+# with the per-node bearer token below — TLS verification here would only
+# matter if you've installed a public CA cert on Tainer. If you have,
+# drop the -k from the ExecStart lines.
+#
+${snmpCommentBlock}
+set -eu
 
-apt-get install -y lldpd curl
+apt-get install -y lldpd curl jq snmp
+
+# --- LLDP push agent ---------------------------------------------------------
 
 cat > /etc/tainer-lldp.env <<EOF
 TAINER_LLDP_TOKEN=${plaintext}
 TAINER_LLDP_INGEST=${ingestUrl}
+TAINER_SNMP_INGEST=${snmpIngestUrl}
+SNMP_COMMUNITY=${snmpEnabled && snmpCommunity ? snmpCommunity : ""}
 EOF
 chmod 600 /etc/tainer-lldp.env
 
@@ -346,7 +430,7 @@ Requires=lldpd.service
 [Service]
 Type=oneshot
 EnvironmentFile=/etc/tainer-lldp.env
-ExecStart=/bin/sh -c '/usr/sbin/lldpcli show neighbors -f json0 | curl -fsS -H "Authorization: Bearer $TAINER_LLDP_TOKEN" -H "Content-Type: application/json" -H "X-Lldp-Agent: $(hostname)" --data-binary @- "$TAINER_LLDP_INGEST"'
+ExecStart=/bin/sh -c '/usr/sbin/lldpcli show neighbors -f json0 | curl -fsS -k -H "Authorization: Bearer $TAINER_LLDP_TOKEN" -H "Content-Type: application/json" -H "X-Lldp-Agent: $(hostname)" --data-binary @- "$TAINER_LLDP_INGEST"'
 EOF
 
 cat > /etc/systemd/system/tainer-lldp.timer <<'EOF'
@@ -359,8 +443,341 @@ OnUnitActiveSec=60s
 WantedBy=timers.target
 EOF
 
+# --- SNMP poll agent ---------------------------------------------------------
+#
+# Discovers neighbours via lldpcli, then snmpwalks each one's MgmtIP for the
+# IF-MIB scalars we care about. Sends a base64-encoded walk blob per device
+# to Tainer's SNMP ingest, which parses + stores it. No-ops cleanly when the
+# community string is empty.
+
+cat > /usr/local/sbin/tainer-snmp-poll.sh <<'POLL_EOF'
+#!/bin/sh
+# Tainer SNMP poll agent.
+set -eu
+. /etc/tainer-lldp.env
+
+[ -n "\${TAINER_LLDP_TOKEN:-}" ] || exit 0
+[ -n "\${TAINER_SNMP_INGEST:-}" ] || exit 0
+[ -n "\${SNMP_COMMUNITY:-}" ] || exit 0
+
+MGMT_IPS=\$(/usr/sbin/lldpcli show neighbors -f json0 2>/dev/null \\
+  | jq -r '.. | objects | select(has("mgmt-ip")) | .["mgmt-ip"][]?.value // empty' \\
+  | sort -u)
+
+[ -n "\$MGMT_IPS" ] || exit 0
+
+# We walk a focused set of IF-MIB scalars rather than the whole MIB tree.
+# Each tool call shaves ~3-5x the bandwidth of a full ifTable walk and
+# avoids pulling in counters we won't use.
+OIDS="sysName sysDescr ifDescr ifAlias ifOperStatus ifAdminStatus ifSpeed ifHighSpeed ifType ifMtu"
+
+snapshots=""
+first=1
+for ip in \$MGMT_IPS; do
+  walk=""
+  for oid in \$OIDS; do
+    out=\$(snmpwalk -v2c -c "\$SNMP_COMMUNITY" -Oqs -t 3 -r 1 "\$ip" "\$oid" 2>/dev/null || true)
+    [ -n "\$out" ] && walk="\${walk}\${out}
+"
+  done
+  if [ -n "\$walk" ]; then
+    encoded=\$(printf %s "\$walk" | base64 -w0)
+    [ "\$first" -eq 0 ] && snapshots="\${snapshots},"
+    snapshots="\${snapshots}{\\"mgmtIp\\":\\"\$ip\\",\\"walkBase64\\":\\"\$encoded\\"}"
+    first=0
+  fi
+done
+
+[ -n "\$snapshots" ] || exit 0
+
+printf '{"agent":"%s","snapshots":[%s]}\\n' "\$(hostname)" "\$snapshots" \\
+  | curl -fsS -k \\
+      -H "Authorization: Bearer \$TAINER_LLDP_TOKEN" \\
+      -H "Content-Type: application/json" \\
+      -H "X-Lldp-Agent: \$(hostname)" \\
+      --data-binary @- \\
+      "\$TAINER_SNMP_INGEST"
+POLL_EOF
+chmod 0755 /usr/local/sbin/tainer-snmp-poll.sh
+
+cat > /etc/systemd/system/tainer-snmp.service <<'EOF'
+[Unit]
+Description=Tainer SNMP poll agent (IF-MIB walk of LLDP neighbours)
+After=lldpd.service network-online.target
+Requires=lldpd.service
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/tainer-snmp-poll.sh
+EOF
+
+cat > /etc/systemd/system/tainer-snmp.timer <<EOF
+[Unit]
+Description=Tainer SNMP poll every ${pollSeconds}s
+[Timer]
+OnBootSec=45s
+OnUnitActiveSec=${pollSeconds}s
+[Install]
+WantedBy=timers.target
+EOF
+
 systemctl daemon-reload
-systemctl enable --now tainer-lldp.timer`;
+systemctl enable --now tainer-lldp.timer
+systemctl enable --now tainer-snmp.timer`;
+}
+
+// --- Agent ingest endpoint override -----------------------------------------
+
+function AgentEndpointSection({
+  siteSlug,
+  effectiveBase,
+  override,
+}: {
+  siteSlug: string;
+  effectiveBase: string;
+  override: string | null;
+}) {
+  const [state, action, pending] = useActionState(
+    saveAgentEndpointAction,
+    initialBasicActionState,
+  );
+  const [value, setValue] = useState("");
+
+  const source = override
+    ? "per-site override"
+    : "APP_URL / TAINER_AGENT_BASE_URL";
+
+  return (
+    <section className="rounded-xl border border-white/[0.06] bg-zinc-950/40">
+      <header className="border-b border-white/[0.04] px-4 py-3">
+        <div className="flex items-center gap-2">
+          <Globe className="h-3.5 w-3.5 text-zinc-400" />
+          <h3 className="text-[13px] font-medium text-zinc-100">Agent ingest URL</h3>
+        </div>
+        <p className="mt-1 text-[11px] text-zinc-500">
+          The base URL Proxmox nodes POST LLDP + SNMP data to. By default Tainer
+          uses its public origin (<code className="font-mono">APP_URL</code>) — but
+          nodes often can&apos;t resolve that (LAN box reached by IP, split DNS).
+          Set an override that&apos;s reachable <em>from the nodes</em>. Tainer
+          appends <code className="font-mono">/api/internal/…</code> itself.
+        </p>
+      </header>
+
+      <div className="space-y-3 px-4 py-3">
+        <div className="rounded-lg border border-white/[0.05] bg-black/30 px-3 py-2">
+          <div className="text-[10.5px] uppercase tracking-[0.14em] text-zinc-500">
+            Currently baked into new snippets
+          </div>
+          <div className="mt-1 font-mono text-[12px] text-zinc-200 break-all">
+            {effectiveBase}
+          </div>
+          <div className="mt-0.5 text-[10.5px] text-zinc-500">
+            source: {source}
+          </div>
+        </div>
+
+        <form action={action} className="flex flex-wrap items-end gap-2">
+          <input name="siteSlug" type="hidden" value={siteSlug} />
+          <div className="flex-1 min-w-[240px]">
+            <label
+              className="mb-1 block text-[10.5px] uppercase tracking-[0.14em] text-zinc-500"
+              htmlFor="agent-base-url"
+            >
+              Override (scheme + host, no path)
+            </label>
+            <Input
+              autoComplete="off"
+              className="font-mono"
+              id="agent-base-url"
+              name="agentBaseUrl"
+              placeholder={override ?? "https://192.168.100.50"}
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+            />
+          </div>
+          <div className="flex items-end gap-2">
+            {override ? (
+              <Button
+                disabled={pending}
+                formAction={(formData: FormData) => {
+                  formData.set("clear", "1");
+                  return action(formData);
+                }}
+                size="sm"
+                type="submit"
+                variant="ghost"
+              >
+                <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                Clear
+              </Button>
+            ) : null}
+            <Button disabled={pending} size="sm" type="submit" variant="primary">
+              <Globe className="mr-1.5 h-3.5 w-3.5" />
+              {pending ? "Saving…" : override ? "Update" : "Set override"}
+            </Button>
+          </div>
+        </form>
+
+        {state.status === "success" ? (
+          <p className="text-[11px] text-emerald-300">{state.message}</p>
+        ) : null}
+        {state.status === "error" ? (
+          <p className="text-[11px] text-rose-300">{state.message}</p>
+        ) : null}
+
+        <p className="text-[10.5px] text-zinc-600">
+          Changing this only affects <em>newly generated</em> snippets. Existing
+          nodes keep their baked-in URL until you re-issue a token or edit{" "}
+          <code className="font-mono">/etc/tainer-lldp.env</code> on the node.
+        </p>
+      </div>
+    </section>
+  );
+}
+
+// --- SNMP community config form ---------------------------------------------
+
+function SnmpConfigSection({
+  siteSlug,
+  config,
+}: {
+  siteSlug: string;
+  config: SnmpSitePublicConfig;
+}) {
+  const [state, action, pending] = useActionState(
+    saveSnmpConfigAction,
+    initialBasicActionState,
+  );
+  const [showCommunity, setShowCommunity] = useState(false);
+  const [community, setCommunity] = useState("");
+
+  return (
+    <section className="rounded-xl border border-white/[0.06] bg-zinc-950/40">
+      <header className="border-b border-white/[0.04] px-4 py-3">
+        <div className="flex items-center gap-2">
+          <Radio className="h-3.5 w-3.5 text-zinc-400" />
+          <h3 className="text-[13px] font-medium text-zinc-100">
+            SNMP polling
+          </h3>
+          {config.hasCommunity ? (
+            <span className="rounded-full border border-emerald-500/30 bg-emerald-500/[0.06] px-1.5 py-0.5 text-[10px] text-emerald-300">
+              enabled
+            </span>
+          ) : (
+            <span className="rounded-full border border-white/[0.08] bg-white/[0.03] px-1.5 py-0.5 text-[10px] text-zinc-400">
+              disabled
+            </span>
+          )}
+        </div>
+        <p className="mt-1 text-[11px] text-zinc-500">
+          Each agent polls every LLDP-discovered neighbour&apos;s management IP via
+          SNMPv2c on a timer, then posts the IF-MIB port inventory back to Tainer.
+          That&apos;s how you get the full 48-port front panel instead of just the
+          ports your Proxmox nodes plug into. The community string is stored
+          encrypted (AES-256-GCM under <code className="font-mono">AUTH_SECRET</code>);
+          Tainer never echoes it back to the UI.
+        </p>
+      </header>
+
+      <form action={action} className="space-y-3 px-4 py-3">
+        <input name="siteSlug" type="hidden" value={siteSlug} />
+
+        <div>
+          <label
+            className="mb-1 block text-[10.5px] uppercase tracking-[0.14em] text-zinc-500"
+            htmlFor="snmp-community"
+          >
+            Community string (read-only)
+          </label>
+          <div className="flex items-stretch gap-2">
+            <Input
+              autoComplete="off"
+              className="font-mono"
+              id="snmp-community"
+              name="community"
+              placeholder={
+                config.hasCommunity
+                  ? "•••••••• (set — type to replace)"
+                  : "e.g. Tainer-RO"
+              }
+              type={showCommunity ? "text" : "password"}
+              value={community}
+              onChange={(e) => setCommunity(e.target.value)}
+            />
+            <Button
+              onClick={() => setShowCommunity((v) => !v)}
+              size="sm"
+              type="button"
+              variant="ghost"
+            >
+              {showCommunity ? "Hide" : "Show"}
+            </Button>
+          </div>
+          <p className="mt-1 text-[10.5px] text-zinc-500">
+            Use a non-default value (not <code className="font-mono">public</code>).
+            Configure your switches with{" "}
+            <code className="font-mono">snmp-server community &lt;string&gt; RO</code>{" "}
+            (Cisco), or the equivalent for your vendor, and use that value here.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-end gap-3">
+          <div>
+            <label
+              className="mb-1 block text-[10.5px] uppercase tracking-[0.14em] text-zinc-500"
+              htmlFor="snmp-interval"
+            >
+              Poll interval (seconds)
+            </label>
+            <Input
+              className="w-32"
+              defaultValue={config.pollIntervalSeconds}
+              id="snmp-interval"
+              max={3600}
+              min={60}
+              name="pollIntervalSeconds"
+              type="number"
+            />
+          </div>
+
+          <div className="flex flex-1 items-end justify-end gap-2">
+            {config.hasCommunity ? (
+              <Button
+                disabled={pending}
+                formAction={(formData: FormData) => {
+                  formData.set("clear", "1");
+                  return action(formData);
+                }}
+                size="sm"
+                type="submit"
+                variant="ghost"
+              >
+                <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                Clear
+              </Button>
+            ) : null}
+            <Button disabled={pending} size="sm" type="submit" variant="primary">
+              <KeyRound className="mr-1.5 h-3.5 w-3.5" />
+              {pending ? "Saving…" : config.hasCommunity ? "Update" : "Enable"}
+            </Button>
+          </div>
+        </div>
+
+        {state.status === "success" ? (
+          <p className="text-[11px] text-emerald-300">{state.message}</p>
+        ) : null}
+        {state.status === "error" ? (
+          <p className="text-[11px] text-rose-300">{state.message}</p>
+        ) : null}
+
+        {config.updatedAt ? (
+          <p className="text-[10.5px] text-zinc-600">
+            Last updated {new Date(config.updatedAt).toLocaleString()}
+            {config.updatedBy ? ` by ${config.updatedBy}` : ""}
+          </p>
+        ) : null}
+      </form>
+    </section>
+  );
 }
 
 function formatAge(ms: number): string {

@@ -15,6 +15,11 @@ import {
   revokeLldpToken,
 } from "@/lib/lldp-credentials";
 import { clearLldpSnapshotsForSite } from "@/lib/lldp-snapshots";
+import {
+  getSnmpCommunityForSite,
+  saveAgentBaseUrlForSite,
+  saveSnmpConfigForSite,
+} from "@/lib/lldp-snmp-config";
 import { resolveSiteConfigBySlug } from "@/lib/site-resolver";
 
 import type { LldpIssueTokenActionState } from "@/app/network-action-states";
@@ -37,6 +42,7 @@ export async function issueLldpTokenAction(
         status: "error",
         plaintext: "",
         label: "",
+        snmpCommunity: "",
       };
     }
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
@@ -49,6 +55,13 @@ export async function issueLldpTokenAction(
       label,
       actorEmail: session.user.email,
     });
+
+    // Pull the SNMP community plaintext so the install snippet can bake it
+    // into /etc/tainer-lldp.env without the operator copy-pasting separately.
+    // Returns null when SNMP isn't configured for this site — empty string
+    // in the snippet means "SNMP polling disabled" and the poll script
+    // no-ops gracefully.
+    const snmpCommunity = (await getSnmpCommunityForSite(siteConfig.siteId)) ?? "";
 
     recordAdminAudit({
       action: "lldp-token-issued",
@@ -65,6 +78,7 @@ export async function issueLldpTokenAction(
       status: "success",
       plaintext,
       label: token.label,
+      snmpCommunity,
     };
   } catch (error) {
     return {
@@ -73,6 +87,7 @@ export async function issueLldpTokenAction(
       status: "error",
       plaintext: "",
       label: "",
+      snmpCommunity: "",
     };
   }
 }
@@ -276,6 +291,118 @@ export async function clearLldpSnapshotsAction(
   } catch (error) {
     return {
       message: errorMessage(error, "Failed to clear snapshots."),
+      requestId: randomUUID(),
+      status: "error",
+    };
+  }
+}
+
+export async function saveSnmpConfigAction(
+  _previousState: BasicActionState,
+  formData: FormData,
+): Promise<BasicActionState> {
+  try {
+    const session = await requireSession();
+    const siteSlug = String(formData.get("siteSlug") ?? "");
+    if (!siteSlug) {
+      return {
+        message: "Missing site context.",
+        requestId: randomUUID(),
+        status: "error",
+      };
+    }
+    const siteConfig = await resolveSiteConfigBySlug(siteSlug);
+    requireSitePermission(session, siteConfig.siteId, "manage-security");
+
+    const rawCommunity = formData.get("community");
+    const clear = formData.get("clear") === "1";
+    const community = clear || rawCommunity === null ? null : String(rawCommunity);
+    const intervalRaw = String(formData.get("pollIntervalSeconds") ?? "").trim();
+    const pollIntervalSeconds = intervalRaw ? Number(intervalRaw) : undefined;
+
+    const result = await saveSnmpConfigForSite({
+      siteId: siteConfig.siteId,
+      community,
+      pollIntervalSeconds,
+      actor: { email: session.user.email, name: session.user.name },
+    });
+
+    const cleared = clear || !community?.trim();
+    recordAdminAudit({
+      action: cleared ? "lldp-token-revoked" : "lldp-token-issued",
+      actorEmail: session.user.email,
+      actorName: session.user.name,
+      message: cleared
+        ? `Cleared SNMP community for site ${siteSlug}.`
+        : `Updated SNMP community for site ${siteSlug} (poll every ${result.pollIntervalSeconds}s).`,
+    }).catch(() => {});
+
+    revalidatePath(`/sites/${siteSlug}/network`);
+
+    return {
+      message: cleared
+        ? "SNMP polling disabled. Agents will stop polling at their next interval."
+        : `SNMP community saved. Agents will pick it up at their next polling interval (${result.pollIntervalSeconds}s).`,
+      requestId: randomUUID(),
+      status: "success",
+    };
+  } catch (error) {
+    return {
+      message: errorMessage(error, "Failed to save SNMP config."),
+      requestId: randomUUID(),
+      status: "error",
+    };
+  }
+}
+
+export async function saveAgentEndpointAction(
+  _previousState: BasicActionState,
+  formData: FormData,
+): Promise<BasicActionState> {
+  try {
+    const session = await requireSession();
+    const siteSlug = String(formData.get("siteSlug") ?? "");
+    if (!siteSlug) {
+      return {
+        message: "Missing site context.",
+        requestId: randomUUID(),
+        status: "error",
+      };
+    }
+    const siteConfig = await resolveSiteConfigBySlug(siteSlug);
+    requireSitePermission(session, siteConfig.siteId, "manage-security");
+
+    const rawUrl = formData.get("agentBaseUrl");
+    const clear = formData.get("clear") === "1";
+    const agentBaseUrl = clear || rawUrl === null ? null : String(rawUrl);
+
+    const result = await saveAgentBaseUrlForSite({
+      siteId: siteConfig.siteId,
+      agentBaseUrl,
+      actor: { email: session.user.email, name: session.user.name },
+    });
+
+    recordAdminAudit({
+      action: "integration-updated",
+      actorEmail: session.user.email,
+      actorName: session.user.name,
+      message: result.agentBaseUrl
+        ? `Set agent ingest URL for site ${siteSlug} to ${result.agentBaseUrl}.`
+        : `Cleared agent ingest URL override for site ${siteSlug} (back to APP_URL/env).`,
+    }).catch(() => {});
+
+    revalidatePath(`/sites/${siteSlug}/network`);
+
+    return {
+      message: result.agentBaseUrl
+        ? `Agent ingest URL set to ${result.agentBaseUrl}. Re-issue a token (or edit /etc/tainer-lldp.env) on each node to pick it up.`
+        : "Agent ingest URL override cleared — falls back to APP_URL / TAINER_AGENT_BASE_URL.",
+      requestId: randomUUID(),
+      status: "success",
+    };
+  } catch (error) {
+    return {
+      message: errorMessage(error, "Failed to save agent ingest URL."),
       requestId: randomUUID(),
       status: "error",
     };
