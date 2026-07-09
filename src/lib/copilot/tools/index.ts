@@ -21,5 +21,6 @@ import "@/lib/copilot/tools/observability";
 import "@/lib/copilot/tools/firewall";
 import "@/lib/copilot/tools/vms";
 import "@/lib/copilot/tools/admin";
+import "@/lib/copilot/tools/images";
 
 export { listTools, getTool, listToolsForModel } from "@/lib/copilot/registry";

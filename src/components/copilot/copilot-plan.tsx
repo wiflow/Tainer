@@ -102,6 +102,10 @@ const TOOL_LABELS: Record<string, (args: Record<string, unknown>) => string> = {
   list_isos: (a) => `List ISOs — ${String(a.siteSlug ?? "?")}`,
   list_users: () => `List users`,
   list_groups: () => `List permission groups`,
+  pull_docker_image: (a) =>
+    `Pull ${String(a.namespace ?? "library")}/${String(a.repository ?? "?")}:${String(a.tag ?? "latest")}`,
+  download_iso: (a) => `Download ISO → ${String(a.storage ?? "?")}`,
+  create_vm_from_iso: (a) => `Create VM "${String(a.name ?? "?")}" from ISO`,
 };
 
 function labelForToolCall(tc: ToolCallView): string {

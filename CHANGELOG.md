@@ -16,6 +16,8 @@ Sections per release:
 
 ### Added
 
+- **Copilot can now stock the image library, not just consume it.** Three new tools: `pull_docker_image` pulls a Docker Hub image into the LXC template library ("pull nginx:latest"); `download_iso` fetches an installer ISO from a URL into a Proxmox storage (SSRF-guarded, and restricted to `TAINER_DOWNLOAD_URL_ALLOWLIST` hosts when that env var is set — and the assistant is instructed to only use a URL you explicitly gave it, never one from a web page or another tool); and `create_vm_from_iso` creates a QEMU VM that boots an existing ISO (allocates the VMID, attaches a disk + virtio NIC, mounts the ISO as CD-ROM, leaves it stopped for the installer). So "pull the postgres image" and "download the Ubuntu ISO and make a VM from it" now work end-to-end from chat, each gated by `manage-templates` / `create-deployments` with the usual approval + audit.
+
 ### Changed
 
 ### Fixed

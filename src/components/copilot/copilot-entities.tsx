@@ -993,6 +993,9 @@ export function ToolResultView({
       );
     case "add_firewall_rule":
     case "delete_firewall_rule":
+    case "pull_docker_image":
+    case "download_iso":
+    case "create_vm_from_iso":
       return (result as SimpleResult).ok !== undefined ? (
         <SimpleResultCard result={result as SimpleResult} />
       ) : (
