@@ -20,7 +20,7 @@ registerTool({
   category: "Templates",
   klass: "write",
   description:
-    "Pull an image from Docker Hub and convert it into an LXC-usable template in the library (e.g. 'pull nginx:latest', 'grab library/postgres:16'). Namespace defaults to 'library' for official images. This downloads and syncs the image — it can take a while for large images. Requires manage-templates and a configured DOCKER_LIBRARY_PATH.",
+    "Pull an image from Docker Hub and convert it into an LXC-usable template in the library (e.g. 'pull nginx:latest', 'grab library/postgres:16'). Namespace defaults to 'library' for official images. This downloads and syncs the image — it can take a while for large images. Requires manage-templates and the Docker library path configured (Settings → Docker image library, or the DOCKER_LIBRARY_PATH env var). If it reports the library isn't configured, tell the admin to set it in Settings.",
   input_schema: siteSlugSchema({
     repository: { type: "string", description: "Image name, e.g. 'nginx', 'postgres'." },
     namespace: {

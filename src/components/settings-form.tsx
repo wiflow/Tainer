@@ -3,7 +3,11 @@
 import { useActionState } from "react";
 import { Save } from "lucide-react";
 
-import { updateBackupDefaultsAction, updateRootfsDefaultsAction } from "@/app/settings-actions";
+import {
+  updateBackupDefaultsAction,
+  updateDockerLibraryAction,
+  updateRootfsDefaultsAction,
+} from "@/app/settings-actions";
 import { useActionTaskFeedback } from "@/components/task-toast-provider";
 import { Button } from "@/components/ui/button";
 import { SectionPanel } from "@/components/ui/section-panel";
@@ -128,6 +132,76 @@ export function SettingsForm({
         </div>
       </SectionPanel>
     </div>
+  );
+}
+
+export function DockerLibraryForm({
+  dockerLibraryPath,
+  envFallback,
+  updatedAt,
+}: {
+  dockerLibraryPath: string;
+  envFallback: string;
+  updatedAt: string | null;
+}) {
+  const siteSlug = useSiteBasePath().replace(/^\/sites\//, "");
+  const [state, formAction, isPending] = useActionState(
+    updateDockerLibraryAction,
+    initialActionState,
+  );
+
+  useActionTaskFeedback(state, {
+    errorTitle: "Docker library update failed",
+    successTitle: "Docker library saved",
+  });
+
+  const inputClassName =
+    "mt-1.5 w-full rounded-md border border-white/10 bg-zinc-900 px-3 py-2 text-[13px] text-zinc-200 outline-none transition-colors focus:border-zinc-500 focus:bg-zinc-900";
+
+  const effective = dockerLibraryPath || envFallback;
+
+  return (
+    <SectionPanel
+      title="Docker image library"
+      description="Where pulled Docker Hub images are stored to be used as LXC templates. Must be a writable path inside the container."
+    >
+      <Form action={formAction} className="space-y-5">
+        <input name="siteSlug" type="hidden" value={siteSlug} />
+        <label className="block rounded-md border border-white/5 bg-[#111113] px-4 py-3">
+          <span className="text-[13px] font-medium text-zinc-200">Library path</span>
+          <input
+            className={inputClassName}
+            defaultValue={dockerLibraryPath}
+            name="dockerLibraryPath"
+            placeholder="/app/data/docker-library"
+            spellCheck={false}
+          />
+          <p className="mt-2 text-[11px] text-zinc-500">
+            Tip: <code className="text-zinc-300">/app/data/docker-library</code> lives on the
+            already-mounted data volume, so it works with no redeploy — the directory is created on
+            the first pull. Leave blank to fall back to the{" "}
+            <code className="text-zinc-300">DOCKER_LIBRARY_PATH</code> environment variable.
+          </p>
+        </label>
+
+        <div className="flex items-center justify-between rounded-md border border-white/5 bg-[#111113] px-4 py-3 text-[12px] text-zinc-500">
+          <span>Effective path</span>
+          <span className="text-zinc-300">{effective || "Not configured"}</span>
+        </div>
+
+        <div className="flex items-center justify-between rounded-md border border-white/5 bg-[#111113] px-4 py-3 text-[12px] text-zinc-500">
+          <span>Last updated</span>
+          <span>{updatedAt ? new Date(updatedAt).toLocaleString() : "Using environment default"}</span>
+        </div>
+
+        <div className="flex gap-2 border-t border-white/5 pt-4">
+          <Button disabled={isPending} type="submit">
+            <Save className="h-3.5 w-3.5" />
+            {isPending ? "Saving..." : "Save library path"}
+          </Button>
+        </div>
+      </Form>
+    </SectionPanel>
   );
 }
 

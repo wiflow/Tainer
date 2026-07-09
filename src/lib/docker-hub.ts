@@ -14,6 +14,7 @@ import {
 } from "node:fs/promises";
 import path from "node:path";
 
+import { getAppSettings } from "@/lib/app-settings";
 import { formatBytes } from "@/lib/utils";
 
 const DOCKER_HUB_API_URL = "https://hub.docker.com";
@@ -245,11 +246,19 @@ let libraryInventoryCache:
 let libraryInventoryInflight: Promise<DockerLibraryInventory> | null = null;
 let libraryInventoryInflightPath = "";
 
-function getConfig(): DockerHubConfig {
+async function getConfig(): Promise<DockerHubConfig> {
+  // Prefer the admin-set library path from app settings; fall back to the
+  // DOCKER_LIBRARY_PATH env var so existing env-based deployments keep working.
+  let settingsPath = "";
+  try {
+    settingsPath = (await getAppSettings()).dockerLibraryPath;
+  } catch {
+    settingsPath = "";
+  }
   return {
     defaultNamespace: process.env.DOCKER_HUB_DEFAULT_NAMESPACE?.trim() || "library",
     defaultPlatform: process.env.DOCKER_HUB_DEFAULT_PLATFORM?.trim() || "linux/amd64",
-    libraryPath: process.env.DOCKER_LIBRARY_PATH?.trim() || "",
+    libraryPath: settingsPath || process.env.DOCKER_LIBRARY_PATH?.trim() || "",
     token: process.env.DOCKER_HUB_TOKEN?.trim() || "",
     username: process.env.DOCKER_HUB_USERNAME?.trim() || "",
   };
@@ -467,7 +476,7 @@ async function dockerHubRequest<T>(endpoint: string): Promise<T> {
 }
 
 async function getRegistryToken(repositoryPath: string) {
-  const config = getConfig();
+  const config = await getConfig();
   const url = new URL(DOCKER_AUTH_URL);
 
   url.searchParams.set("service", "registry.docker.io");
@@ -737,7 +746,7 @@ export function invalidateDockerLibraryInventory() {
 }
 
 async function scanInstalledArtifacts(): Promise<DockerLibraryInventory> {
-  const config = getConfig();
+  const config = await getConfig();
   const issues: DockerHubIssue[] = [];
 
   if (!config.libraryPath) {
@@ -748,7 +757,7 @@ async function scanInstalledArtifacts(): Promise<DockerLibraryInventory> {
         {
           endpoint: "Docker library path",
           message:
-            "DOCKER_LIBRARY_PATH is not configured yet. Set it to the mounted Samba share path on the app host to enable downloads and inventory.",
+            "The Docker image library path is not configured yet. Set it in Settings → Docker image library (e.g. /app/data/docker-library, which works with no redeploy), or via the DOCKER_LIBRARY_PATH env var.",
           requiredPrivileges: [],
         },
       ],
@@ -880,7 +889,7 @@ async function scanInstalledArtifacts(): Promise<DockerLibraryInventory> {
 }
 
 async function listInstalledArtifacts(): Promise<DockerLibraryInventory> {
-  const { libraryPath } = getConfig();
+  const { libraryPath } = await getConfig();
   const pathKey = libraryPath || "__unconfigured__";
 
   if (
@@ -969,7 +978,7 @@ export async function getDockerHubOverview(input?: {
   namespace?: string;
   page?: string;
 }): Promise<DockerHubOverview> {
-  const config = getConfig();
+  const config = await getConfig();
   const issues: DockerHubIssue[] = [];
   const namespace = sanitizeQueryValue(input?.namespace || config.defaultNamespace);
   const nameFilter = sanitizeQueryValue(input?.name || "");
@@ -1029,7 +1038,7 @@ export async function getDockerHubRepositoryDetail(
 ): Promise<DockerHubRepositoryDetail> {
   namespace = validateDockerName(namespace, "namespace");
   repository = validateDockerName(repository, "repository");
-  const config = getConfig();
+  const config = await getConfig();
   const issues: DockerHubIssue[] = [];
   const inventory = await listInstalledArtifacts();
 
@@ -1079,7 +1088,7 @@ export async function fetchImageEnvVars(input: {
   repository: string;
   tag: string;
 }): Promise<string[]> {
-  const config = getConfig();
+  const config = await getConfig();
   const namespace = validateDockerName(input.namespace, "namespace");
   const repository = validateDockerName(input.repository, "repository");
   const tag = sanitizeQueryValue(input.tag);
@@ -1118,7 +1127,7 @@ export async function syncDockerImage(input: {
   repository: string;
   tag: string;
 }): Promise<SyncResult> {
-  const config = getConfig();
+  const config = await getConfig();
 
   if (!config.libraryPath) {
     throw new Error(

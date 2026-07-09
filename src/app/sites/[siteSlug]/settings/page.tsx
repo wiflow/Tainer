@@ -4,7 +4,7 @@ import { unstable_cache } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { ProxmoxIssues } from "@/components/proxmox-issues";
-import { BackupSettingsForm, SettingsForm } from "@/components/settings-form";
+import { BackupSettingsForm, DockerLibraryForm, SettingsForm } from "@/components/settings-form";
 import { SshKeySettingsForm } from "@/components/ssh-key-settings-form";
 import { SectionPanel } from "@/components/ui/section-panel";
 import { MetricCard } from "@/components/ui/metric-card";
@@ -96,6 +96,12 @@ export default async function SettingsPage({
         backupPools={backupStorageResult.pools}
         defaultBackupSlaHours={settings.defaultBackupSlaHours}
         defaultBackupStorage={settings.defaultBackupStorage}
+        updatedAt={settings.updatedAt}
+      />
+
+      <DockerLibraryForm
+        dockerLibraryPath={settings.dockerLibraryPath}
+        envFallback={process.env.DOCKER_LIBRARY_PATH?.trim() ?? ""}
         updatedAt={settings.updatedAt}
       />
 

@@ -9,6 +9,13 @@ export type AppSettings = {
   defaultBackupSlaHours: number;
   defaultBackupStorage: string;
   defaultRootfsStorage: string;
+  /**
+   * Filesystem path (inside the container) for the local Docker image library.
+   * When empty, falls back to the DOCKER_LIBRARY_PATH env var. Must be a
+   * writable, container-visible directory — e.g. `/app/data/docker-library`,
+   * which lives on the already-mounted data volume.
+   */
+  dockerLibraryPath: string;
   updatedAt: string | null;
 };
 
@@ -23,6 +30,7 @@ function defaultSettings(): AppSettings {
     defaultBackupSlaHours: DEFAULT_BACKUP_SLA_HOURS,
     defaultBackupStorage: "",
     defaultRootfsStorage: process.env.PROXMOX_DEFAULT_ROOTFS_STORAGE?.trim() || "",
+    dockerLibraryPath: "",
     updatedAt: null,
   };
 }
@@ -46,6 +54,10 @@ export async function getAppSettings(): Promise<AppSettings> {
         typeof parsed.defaultRootfsStorage === "string"
           ? parsed.defaultRootfsStorage.trim()
           : fallback.defaultRootfsStorage,
+      dockerLibraryPath:
+        typeof parsed.dockerLibraryPath === "string"
+          ? parsed.dockerLibraryPath.trim()
+          : fallback.dockerLibraryPath,
       updatedAt:
         typeof parsed.updatedAt === "string" ? parsed.updatedAt : fallback.updatedAt,
     };
@@ -57,7 +69,12 @@ export async function getAppSettings(): Promise<AppSettings> {
 let settingsMutationQueue = Promise.resolve();
 
 export async function saveAppSettings(
-  input: Partial<Pick<AppSettings, "defaultBackupSlaHours" | "defaultBackupStorage" | "defaultRootfsStorage">>,
+  input: Partial<
+    Pick<
+      AppSettings,
+      "defaultBackupSlaHours" | "defaultBackupStorage" | "defaultRootfsStorage" | "dockerLibraryPath"
+    >
+  >,
 ): Promise<AppSettings> {
   // Serialize writes to prevent concurrent mutations from racing.
   const prev = settingsMutationQueue;
@@ -81,6 +98,10 @@ export async function saveAppSettings(
         input.defaultRootfsStorage != null
           ? input.defaultRootfsStorage.trim()
           : current.defaultRootfsStorage,
+      dockerLibraryPath:
+        input.dockerLibraryPath != null
+          ? input.dockerLibraryPath.trim()
+          : current.dockerLibraryPath,
       updatedAt: new Date().toISOString(),
     };
 

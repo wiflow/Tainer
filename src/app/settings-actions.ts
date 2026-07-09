@@ -90,6 +90,66 @@ export async function updateRootfsDefaultsAction(
   }
 }
 
+export async function updateDockerLibraryAction(
+  _previousState: ProxmoxActionState,
+  formData: FormData,
+): Promise<ProxmoxActionState> {
+  try {
+    const session = await requireSession();
+    const siteSlug = String(formData.get("siteSlug") ?? "");
+    if (!siteSlug) {
+      return { message: "Missing site context.", requestId: randomUUID(), status: "error", task: null };
+    }
+    const siteConfig = await resolveSiteConfigBySlug(siteSlug);
+    requireSitePermission(session, siteConfig.siteId, "manage-settings");
+
+    return await withSiteConfig(siteConfig, async () => {
+      const dockerLibraryPath = String(formData.get("dockerLibraryPath") ?? "").trim();
+
+      // Empty clears the override (falls back to the DOCKER_LIBRARY_PATH env
+      // var). A non-empty value must be an absolute, container-visible path.
+      if (dockerLibraryPath && !dockerLibraryPath.startsWith("/")) {
+        return {
+          message: "The library path must be absolute (start with '/'), e.g. /app/data/docker-library.",
+          requestId: randomUUID(),
+          status: "error",
+          task: null,
+        };
+      }
+
+      await saveAppSettings({ dockerLibraryPath });
+
+      recordAdminAudit({
+        action: "settings-updated",
+        actorEmail: session.user.email,
+        actorName: session.user.name,
+        message: dockerLibraryPath
+          ? `Set Docker library path to ${dockerLibraryPath}`
+          : "Cleared Docker library path (falling back to env)",
+      }).catch(() => {});
+
+      revalidatePath(`/sites/${siteSlug}/settings`);
+      revalidatePath(`/sites/${siteSlug}/images`);
+
+      return {
+        message: dockerLibraryPath
+          ? `Docker library path set to ${dockerLibraryPath}.`
+          : "Docker library path cleared (using environment default).",
+        requestId: randomUUID(),
+        status: "success",
+        task: null,
+      };
+    });
+  } catch (error) {
+    return {
+      message: error instanceof Error ? error.message : "Failed to save Docker library path.",
+      requestId: randomUUID(),
+      status: "error",
+      task: null,
+    };
+  }
+}
+
 export async function updateBackupDefaultsAction(
   _previousState: ProxmoxActionState,
   formData: FormData,
