@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { ProxmoxIssues } from "@/components/proxmox-issues";
 import { BackupSettingsForm, DockerLibraryForm, SettingsForm } from "@/components/settings-form";
 import { SshKeySettingsForm } from "@/components/ssh-key-settings-form";
+import { ApiTokenPanel } from "@/components/api-token-panel";
 import { StateBackupPanel } from "@/components/state-backup-panel";
 import { SectionPanel } from "@/components/ui/section-panel";
 import { MetricCard } from "@/components/ui/metric-card";
@@ -15,6 +16,8 @@ import { getRootfsTargets, listBackupStoragePools, withSiteConfig } from "@/lib/
 import { ensureSiteConfig } from "@/lib/site-context";
 import { resolveSiteConfigBySlug } from "@/lib/site-resolver";
 import { getSshKeyInfo } from "@/lib/ssh-keys";
+import { listApiTokens } from "@/lib/api-tokens";
+import { listEnabledSites } from "@/lib/site-store";
 import {
   getStateBackupConfig,
   hasStateBackupPassphrase,
@@ -62,6 +65,7 @@ export default async function SettingsPage({
   // last-run status are always current (local fs reads, no Proxmox cost).
   const stateBackupConfig = await getStateBackupConfig();
   const stateBackups = await listStateBackups(stateBackupConfig);
+  const [apiTokens, enabledSites] = await Promise.all([listApiTokens(), listEnabledSites()]);
   const defaultRootfsStorage = resolveDefaultRootfsStorage(
     rootfsResult.targets,
     settings.defaultRootfsStorage,
@@ -129,6 +133,13 @@ export default async function SettingsPage({
         }}
         backups={stateBackups}
         defaultDestination={resolveDestinationDir(stateBackupConfig)}
+      />
+
+      <ApiTokenPanel
+        tokens={apiTokens}
+        sites={enabledSites.map((site) => ({ id: site.id, name: site.name }))}
+        appOrigin={process.env.APP_URL?.trim() || "https://your-tainer-host"}
+        now={Date.now()}
       />
 
       <SectionPanel
