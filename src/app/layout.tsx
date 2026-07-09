@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 
 import { AppSidebar } from "@/components/app-sidebar";
 import { CommandPalette } from "@/components/command-palette";
+import { CopilotSidebar } from "@/components/copilot/copilot-sidebar";
 import { TaskToastProvider } from "@/components/task-toast-provider";
 import { getCurrentSession, getUserCount } from "@/lib/auth";
 import { listEnabledSites } from "@/lib/site-store";
@@ -130,6 +131,13 @@ export default async function RootLayout({
             Skip to main content
           </a>
           <CommandPalette currentUser={session.user} />
+          <CopilotSidebar
+            sites={sites.map((s) => ({
+              slug: s.slug,
+              name: s.name,
+              countryCode: s.countryCode ?? null,
+            }))}
+          />
           <AppSidebar
             buildTag={getBuildTag()}
             currentUser={session.user}

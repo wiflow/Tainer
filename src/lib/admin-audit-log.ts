@@ -51,7 +51,13 @@ export type AdminAuditAction =
   | "lldp-ingest-rejected"
   | "lldp-annotation-updated"
   | "lldp-annotation-removed"
-  | "login-lockout-cleared";
+  | "login-lockout-cleared"
+  | "copilot-tool-approved"
+  | "copilot-tool-denied"
+  | "copilot-tool-executed"
+  | "copilot-tool-failed"
+  | "copilot-budget-exceeded"
+  | "copilot-settings-updated";
 
 export type AdminAuditEntry = {
   action: AdminAuditAction;

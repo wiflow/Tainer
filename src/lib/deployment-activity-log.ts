@@ -15,6 +15,7 @@ export type DeploymentActivityAction =
   | "deleted"
   | "env-updated"
   | "resources-updated"
+  | "network-updated"
   | "migrated"
   | "backup-created"
   | "backup-restored"

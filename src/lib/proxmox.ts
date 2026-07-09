@@ -2043,6 +2043,104 @@ async function fetchNodeRRDData(
   );
 }
 
+type ProxmoxGuestRrdPoint = {
+  time?: number;
+  cpu?: number;
+  mem?: number;
+  maxmem?: number;
+  disk?: number;
+  maxdisk?: number;
+  netin?: number;
+  netout?: number;
+  diskread?: number;
+  diskwrite?: number;
+};
+
+export type GuestMetricSeries = {
+  timeframe: string;
+  points: number;
+  /** Millisecond timestamps aligned with the percent series. */
+  categories: number[];
+  cpuPercent: { avg: number; peak: number; series: number[] };
+  memPercent: { avg: number; peak: number; series: number[] };
+  netInKBps: { avg: number; peak: number };
+  netOutKBps: { avg: number; peak: number };
+  issue: string | null;
+};
+
+/**
+ * Per-guest RRD time-series (CPU %, memory %, network throughput) for a
+ * single container/VM, summarised into avg + peak plus a compact percent
+ * series the copilot can reason about ("web01's memory trended up to 84%").
+ */
+export async function getGuestRrdData(
+  node: string,
+  vmid: number,
+  type: "lxc" | "qemu",
+  timeframe: "hour" | "day" | "week" | "month" | "year" = "day",
+): Promise<GuestMetricSeries> {
+  const safeNode = validateNodeName(node);
+  const safeVmid = validatePositiveInteger(vmid, "VMID");
+  const kind = type === "qemu" ? "qemu" : "lxc";
+  const result = await safeRequest<ProxmoxGuestRrdPoint[]>(
+    `/nodes/${safeNode}/${kind}/${safeVmid}/rrddata?timeframe=${timeframe}&cf=AVERAGE`,
+  );
+
+  const empty: GuestMetricSeries = {
+    timeframe,
+    points: 0,
+    categories: [],
+    cpuPercent: { avg: 0, peak: 0, series: [] },
+    memPercent: { avg: 0, peak: 0, series: [] },
+    netInKBps: { avg: 0, peak: 0 },
+    netOutKBps: { avg: 0, peak: 0 },
+    issue: result.issue?.message ?? null,
+  };
+  const data = result.data ?? [];
+  if (data.length === 0) return empty;
+
+  const round = (n: number, d = 1) => {
+    const f = 10 ** d;
+    return Math.round(n * f) / f;
+  };
+  const summarise = (values: number[]) => {
+    const valid = values.filter((v) => Number.isFinite(v));
+    if (valid.length === 0) return { avg: 0, peak: 0 };
+    return {
+      avg: round(valid.reduce((a, b) => a + b, 0) / valid.length),
+      peak: round(Math.max(...valid)),
+    };
+  };
+
+  const categories: number[] = [];
+  const cpuSeries: number[] = [];
+  const memSeries: number[] = [];
+  const netIn: number[] = [];
+  const netOut: number[] = [];
+
+  for (const p of data) {
+    if (!p.time) continue;
+    categories.push(p.time * 1000);
+    cpuSeries.push(round((p.cpu ?? 0) * 100));
+    memSeries.push(
+      p.maxmem && p.maxmem > 0 && p.mem != null ? round((p.mem / p.maxmem) * 100) : 0,
+    );
+    netIn.push((p.netin ?? 0) / 1024);
+    netOut.push((p.netout ?? 0) / 1024);
+  }
+
+  return {
+    timeframe,
+    points: categories.length,
+    categories,
+    cpuPercent: { ...summarise(cpuSeries), series: cpuSeries },
+    memPercent: { ...summarise(memSeries), series: memSeries },
+    netInKBps: summarise(netIn),
+    netOutKBps: summarise(netOut),
+    issue: result.issue?.message ?? null,
+  };
+}
+
 export async function getClusterRRDData(
   timeframe: "hour" | "day" | "week" | "month" | "year" = "day",
 ): Promise<RRDChartData> {

@@ -31,6 +31,7 @@ import {
   Settings2,
   ShieldAlert,
   ShieldCheck,
+  Sparkles,
   Tags,
   Users,
   WifiOff,
@@ -286,6 +287,12 @@ export function AppSidebar({
             href="/"
             icon={MapIcon}
             label="Overview"
+          />
+          <NavLink
+            active={pathname === "/settings/copilot"}
+            href="/settings/copilot"
+            icon={Sparkles}
+            label="Copilot"
           />
         </nav>
 
