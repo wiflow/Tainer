@@ -3,8 +3,17 @@ import "server-only";
 import type { LiveNode, LiveNodeMetrics } from "@/lib/proxmox";
 import { getBestNode } from "@/lib/proxmox";
 import type { LoadBalancerStatus } from "./types";
-import { getLoadBalancerStatus, getNodeScoresForSite } from "./observer";
+import { getLoadBalancerStatus, getNodeScoresForSite, getSiteLbSettings } from "./observer";
 import { selectNodeP2C } from "./p2c-selector";
+
+/** Nodes an admin has excluded or marked for maintenance — never placement targets. */
+function placementExclusions(siteId: string, extra?: Set<string>): Set<string> {
+  const settings = getSiteLbSettings(siteId);
+  const excluded = new Set(extra);
+  for (const node of settings?.excludedNodes ?? []) excluded.add(node);
+  for (const node of settings?.maintenanceNodes ?? []) excluded.add(node);
+  return excluded;
+}
 
 export type { LoadBalancerSettings, LoadBalancerStatus, NodeScore } from "./types";
 export { getLoadBalancerSettings, saveLoadBalancerSettings } from "./settings";
@@ -29,7 +38,7 @@ export function selectBestNode(
   const scores = getNodeScoresForSite(siteId);
 
   if (scores.length > 0) {
-    const result = selectNodeP2C(scores, excludeNodes);
+    const result = selectNodeP2C(scores, placementExclusions(siteId, excludeNodes));
     if (result) return result;
   }
 
@@ -49,5 +58,5 @@ export function getStatus(siteId: string): LoadBalancerStatus {
 export function getSuggestedNode(siteId: string): string | null {
   const scores = getNodeScoresForSite(siteId);
   if (scores.length === 0) return null;
-  return selectNodeP2C(scores);
+  return selectNodeP2C(scores, placementExclusions(siteId));
 }

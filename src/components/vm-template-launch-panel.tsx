@@ -24,6 +24,7 @@ export function VmTemplateLaunchPanel({
   nextId,
   nodeMetrics,
   nodes,
+  suggestedNode,
   template,
 }: {
   diskTargets: LiveStoragePool[];
@@ -31,6 +32,7 @@ export function VmTemplateLaunchPanel({
   nextId: string | null;
   nodeMetrics: LiveNodeMetrics[];
   nodes: LiveNode[];
+  suggestedNode?: string | null;
   template: VmTemplate;
 }) {
   const siteSlug = useSiteBasePath().replace(/^\/sites\//, "");
@@ -69,6 +71,7 @@ export function VmTemplateLaunchPanel({
                 metrics={nodeMetrics}
                 name="node"
                 nodes={nodes}
+                suggestedNode={suggestedNode}
               />
             </label>
             <label className="rounded-md border border-white/5 bg-[#111113] px-4 py-3">

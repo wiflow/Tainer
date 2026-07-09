@@ -191,6 +191,151 @@ function SettingsForm({
               type="checkbox"
             />
           </label>
+          <label className="flex items-start justify-between gap-4 rounded-md border border-white/5 bg-[#111113] px-4 py-3">
+            <div>
+              <p className="text-[13px] font-medium text-zinc-200">Dry-Run Mode</p>
+              <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">
+                Record what the balancer <em>would</em> migrate as “recommended” events in the activity
+                log without moving anything. Watch the recommendations for a few days before turning
+                this off.
+              </p>
+            </div>
+            <input
+              className="mt-1 h-4 w-4 rounded border-white/10 bg-zinc-900 text-sky-400"
+              defaultChecked={settings.migrationDryRun}
+              name="migrationDryRun"
+              type="checkbox"
+            />
+          </label>
+        </div>
+
+        {/* Predictive balancing */}
+        <div className="space-y-3">
+          <h3 className="text-[13px] font-medium text-zinc-300">Predictive Balancing</h3>
+          <label className="flex items-start justify-between gap-4 rounded-md border border-white/5 bg-[#111113] px-4 py-3">
+            <div>
+              <p className="text-[13px] font-medium text-zinc-200">Act on Forecasts</p>
+              <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">
+                Move workloads <em>before</em> a node overloads, when its score trend confidently
+                projects it crossing the migration threshold within the horizon. Low-confidence or
+                flat trends never act. Requires auto-migration; respects dry-run.
+              </p>
+            </div>
+            <input
+              className="mt-1 h-4 w-4 rounded border-white/10 bg-zinc-900 text-sky-400"
+              defaultChecked={settings.predictiveEnabled}
+              name="predictiveEnabled"
+              type="checkbox"
+            />
+          </label>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-[11px] font-medium text-zinc-400">Forecast Horizon (minutes)</label>
+              <input
+                className={fieldClassName}
+                defaultValue={settings.predictiveHorizonMinutes}
+                name="predictiveHorizonMinutes"
+                type="number"
+                min="5"
+                max="120"
+              />
+            </div>
+            <div>
+              <label className="text-[11px] font-medium text-zinc-400">Min Confidence % (R²)</label>
+              <input
+                className={fieldClassName}
+                defaultValue={settings.predictiveMinConfidencePercent}
+                name="predictiveMinConfidencePercent"
+                type="number"
+                min="10"
+                max="99"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Container safety */}
+        <div className="space-y-3">
+          <h3 className="text-[13px] font-medium text-zinc-300">Container Migrations</h3>
+          <p className="text-[11px] leading-relaxed text-zinc-500">
+            Proxmox cannot live-migrate LXC containers — every automatic move is a restart migration
+            (stop, transfer, start) with brief downtime. Containers are therefore excluded from
+            balancing unless you opt in here. VMs always live-migrate without downtime.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="text-[11px] font-medium text-zinc-400">Allow Container Moves</label>
+              <select
+                className={fieldClassName}
+                defaultValue={settings.containerMigrations}
+                name="containerMigrations"
+              >
+                <option value="never">Never (recommended)</option>
+                <option value="windows-only">Only inside downtime windows</option>
+                <option value="always">Always (accept downtime)</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-[11px] font-medium text-zinc-400">
+                Downtime Windows (server time, e.g. 22:00-06:00, 12:00-13:00)
+              </label>
+              <input
+                className={fieldClassName}
+                defaultValue={settings.containerMigrationWindows
+                  .map((w) => `${w.start}-${w.end}`)
+                  .join(", ")}
+                name="containerMigrationWindows"
+                placeholder="22:00-06:00"
+                type="text"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Node management */}
+        <div className="space-y-3">
+          <h3 className="text-[13px] font-medium text-zinc-300">Node Management</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label className="text-[11px] font-medium text-zinc-400">Maintenance Nodes (drain)</label>
+              <input
+                className={fieldClassName}
+                defaultValue={settings.maintenanceNodes.join(", ")}
+                name="maintenanceNodes"
+                placeholder="pve2, pve3"
+                type="text"
+              />
+              <p className="mt-1 text-[10px] leading-relaxed text-zinc-500">
+                Guests are evacuated one at a time (containers restart!) and nothing new is placed here.
+              </p>
+            </div>
+            <div>
+              <label className="text-[11px] font-medium text-zinc-400">Excluded Nodes</label>
+              <input
+                className={fieldClassName}
+                defaultValue={settings.excludedNodes.join(", ")}
+                name="excludedNodes"
+                placeholder="pve4"
+                type="text"
+              />
+              <p className="mt-1 text-[10px] leading-relaxed text-zinc-500">
+                Never used as a migration or placement target.
+              </p>
+            </div>
+            <div>
+              <label className="text-[11px] font-medium text-zinc-400">Excluded VMIDs</label>
+              <input
+                className={fieldClassName}
+                defaultValue={settings.excludedVmids.join(", ")}
+                name="excludedVmids"
+                placeholder="101, 20005"
+                type="text"
+              />
+              <p className="mt-1 text-[10px] leading-relaxed text-zinc-500">
+                Never migrated automatically. Guest tags plb_ignore and plb_pin_&lt;node&gt; work too.
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* Weights */}
@@ -284,7 +429,7 @@ function SettingsForm({
         {/* Migration thresholds */}
         <div className="space-y-3">
           <h3 className="text-[13px] font-medium text-zinc-300">Migration Thresholds</h3>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div>
               <label className="text-[11px] font-medium text-zinc-400">Threshold % Above Avg</label>
               <input
@@ -317,6 +462,31 @@ function SettingsForm({
                 min="30"
                 max="3600"
               />
+            </div>
+            <div>
+              <label className="text-[11px] font-medium text-zinc-400">Max Concurrent Migrations</label>
+              <input
+                className={fieldClassName}
+                defaultValue={settings.maxConcurrentMigrations}
+                name="maxConcurrentMigrations"
+                type="number"
+                min="1"
+                max="10"
+              />
+            </div>
+            <div>
+              <label className="text-[11px] font-medium text-zinc-400">Min Improvement %</label>
+              <input
+                className={fieldClassName}
+                defaultValue={settings.minTargetImprovementPercent}
+                name="minTargetImprovementPercent"
+                type="number"
+                min="5"
+                max="80"
+              />
+              <p className="mt-1 text-[10px] leading-relaxed text-zinc-500">
+                Target must beat the source score by at least this much or the move is skipped.
+              </p>
             </div>
           </div>
         </div>
@@ -367,6 +537,31 @@ function SettingsForm({
                 type="number"
                 min="50"
                 max="10000"
+              />
+            </div>
+            <div>
+              <label className="text-[11px] font-medium text-zinc-400">PSI Pressure Penalty</label>
+              <input
+                className={fieldClassName}
+                defaultValue={settings.psiPenalty}
+                name="psiPenalty"
+                type="number"
+                min="0"
+                max="200"
+              />
+              <p className="mt-1 text-[10px] leading-relaxed text-zinc-500">
+                Per stalled resource (CPU/memory/IO). Requires Proxmox VE 9+; 0 disables.
+              </p>
+            </div>
+            <div>
+              <label className="text-[11px] font-medium text-zinc-400">PSI Threshold % (avg10)</label>
+              <input
+                className={fieldClassName}
+                defaultValue={settings.psiThresholdPercent}
+                name="psiThresholdPercent"
+                type="number"
+                min="1"
+                max="100"
               />
             </div>
           </div>

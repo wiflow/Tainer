@@ -9,6 +9,9 @@ import { redirect } from "next/navigation";
 
 import { LoadBalancerDashboard } from "@/components/load-balancer-dashboard";
 import { LoadBalancerEventViewer } from "@/components/load-balancer-event-viewer";
+import { LoadBalancerExplainer } from "@/components/load-balancer-explainer";
+import { RebalancePlanPanel } from "@/components/rebalance-plan-panel";
+import { getRebalancePlan } from "@/lib/load-balancer/plan-store";
 import { MetricCard } from "@/components/ui/metric-card";
 import { getCurrentSession } from "@/lib/auth";
 import { ensureSiteConfig } from "@/lib/site-context";
@@ -39,12 +42,13 @@ export default async function LoadBalancerPage({
   }
 
   const siteConfig = await resolveSiteConfigBySlug(siteSlug);
-  const [settings, status, events] = await Promise.all([
+  const [settings, status, events, plan] = await Promise.all([
     withSiteConfig(siteConfig, () => getLoadBalancerSettings()),
     Promise.resolve(getLoadBalancerStatus(siteConfig.siteId)),
     // listLbEvents reads the per-site JSON store; cap at 1000 for the UI
     // so the page payload stays small. The file holds up to 10,000.
     withSiteConfig(siteConfig, () => listLbEvents(1000)),
+    withSiteConfig(siteConfig, () => getRebalancePlan()),
   ]);
 
   const hottestNode = status.nodeScores.length > 0
@@ -90,11 +94,15 @@ export default async function LoadBalancerPage({
         />
       </div>
 
+      <RebalancePlanPanel plan={plan} siteSlug={siteSlug} />
+
       <LoadBalancerDashboard
         settings={settings}
         status={status}
         siteSlug={siteSlug}
       />
+
+      <LoadBalancerExplainer />
 
       <div className="space-y-3">
         <div className="flex items-center gap-2">

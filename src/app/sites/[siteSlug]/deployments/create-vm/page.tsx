@@ -4,6 +4,7 @@ import { ArrowLeft, Monitor } from "lucide-react";
 import { VmCreateWizard } from "@/components/vm-create-wizard";
 import { ProxmoxIssues } from "@/components/proxmox-issues";
 import { buttonVariants } from "@/components/ui/button";
+import { getSuggestedNode } from "@/lib/load-balancer";
 import { getDiskStorageTargets, getNextId, getNodes, listIsoImages, withSiteConfig } from "@/lib/proxmox";
 import { ensureSiteConfig } from "@/lib/site-context";
 import { cn } from "@/lib/utils";
@@ -70,6 +71,7 @@ export default async function CreateVmPage({
         nextId={nextId}
         nodeMetrics={metrics}
         nodes={nodes}
+        suggestedNode={getSuggestedNode(siteConfig.siteId)}
       />
     </div>
   );

@@ -24,6 +24,7 @@ export function VmCreateWizard({
   nextId,
   nodeMetrics,
   nodes,
+  suggestedNode,
 }: {
   defaultNode: string;
   diskTargets: LiveStoragePool[];
@@ -31,6 +32,7 @@ export function VmCreateWizard({
   nextId: string | null;
   nodeMetrics: LiveNodeMetrics[];
   nodes: LiveNode[];
+  suggestedNode?: string | null;
 }) {
   const siteSlug = useSiteBasePath().replace(/^\/sites\//, "");
   const [state, formAction, isPending] = useActionState(
@@ -66,6 +68,7 @@ export function VmCreateWizard({
                   metrics={nodeMetrics}
                   name="node"
                   nodes={nodes}
+                  suggestedNode={suggestedNode}
                 />
               </label>
               <label className="rounded-md border border-white/5 bg-[#111113] px-4 py-3">

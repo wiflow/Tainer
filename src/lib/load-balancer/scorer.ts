@@ -23,12 +23,52 @@ const FALLBACK_PERCENT = 50;
  *
  * Lower score = better node.
  */
+export type PsiScoringOptions = {
+  /** Penalty added per pressured resource (0 disables PSI scoring). */
+  psiPenalty: number;
+  /** avg10 "some" stall percentage above which a resource counts as pressured. */
+  psiThresholdPercent: number;
+};
+
+/**
+ * PSI (Pressure Stall Information) penalties, PVE 9+. Utilization misses
+ * contention — a node can sit at 60% CPU while tasks stall waiting for it.
+ * PSI measures the stalling directly, so each pressured resource (CPU,
+ * memory, IO) adds a penalty. Nodes that don't report PSI are unaffected.
+ */
+function computePsiPenalties(
+  metrics: LiveNodeMetrics,
+  options: PsiScoringOptions,
+): NodePenalty[] {
+  const pressure = metrics.pressure;
+  if (!pressure || options.psiPenalty <= 0) return [];
+
+  const penalties: NodePenalty[] = [];
+  const checks: Array<{ label: string; value: number | null }> = [
+    { label: "cpu", value: pressure.cpuSomeAvg10 },
+    { label: "memory", value: pressure.memorySomeAvg10 },
+    { label: "io", value: pressure.ioSomeAvg10 },
+  ];
+
+  for (const check of checks) {
+    if (check.value !== null && check.value > options.psiThresholdPercent) {
+      penalties.push({
+        reason: `PSI ${check.label} stall ${check.value.toFixed(1)}% > ${options.psiThresholdPercent}% (avg10)`,
+        value: options.psiPenalty,
+      });
+    }
+  }
+
+  return penalties;
+}
+
 export function computeNodeScores(
   metrics: LiveNodeMetrics[],
   ewmaStates: Map<string, EwmaState>,
   penaltyData: Map<string, NodePenalty[]>,
   weights: ScoreWeights,
   latencyMaxMs: number,
+  psiOptions?: PsiScoringOptions,
 ): NodeScore[] {
   const now = Date.now();
 
@@ -52,6 +92,7 @@ export function computeNodeScores(
   // Second pass: compute final scores
   return metrics.map((m) => {
     const penalties = [...(penaltyData.get(m.node) ?? [])];
+    if (psiOptions) penalties.push(...computePsiPenalties(m, psiOptions));
 
     // CPU
     let cpuPercent: number;

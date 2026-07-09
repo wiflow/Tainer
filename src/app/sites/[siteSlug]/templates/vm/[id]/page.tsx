@@ -6,6 +6,7 @@ import { VmTemplateLaunchPanel } from "@/components/vm-template-launch-panel";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getSuggestedNode } from "@/lib/load-balancer";
 import { getDiskStorageTargets, getNextId, getNodes, listIsoImages, withSiteConfig } from "@/lib/proxmox";
 import { ensureSiteConfig } from "@/lib/site-context";
 import { getVmTemplate } from "@/lib/vm-templates";
@@ -123,6 +124,7 @@ export default async function VmTemplateDetailPage({ params }: VmTemplatePagePro
         nextId={nextId}
         nodeMetrics={metrics}
         nodes={nodes}
+        suggestedNode={getSuggestedNode(siteConfig.siteId)}
         template={template}
       />
     </div>

@@ -21,7 +21,10 @@ import { createStoreMutator, writeJsonFileAtomically } from "@/lib/store-utils";
 
 export type LbEventCategory =
   | "migration-triggered"
+  | "migration-recommended"
   | "migration-failed"
+  | "drain-warning"
+  | "rebalance-plan"
   | "circuit-breaker-opened"
   | "circuit-breaker-closed"
   | "tick-error"

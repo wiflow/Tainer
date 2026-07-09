@@ -29,7 +29,10 @@ const LEVEL_BADGE_VARIANT: Record<LbEventLevel, "info" | "warning" | "destructiv
 
 const CATEGORY_LABEL: Record<LbEventCategory, string> = {
   "migration-triggered": "migration",
+  "migration-recommended": "dry-run",
   "migration-failed": "migration failed",
+  "drain-warning": "drain warning",
+  "rebalance-plan": "rebalance plan",
   "circuit-breaker-opened": "breaker open",
   "circuit-breaker-closed": "breaker closed",
   "tick-error": "tick error",

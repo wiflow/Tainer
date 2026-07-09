@@ -239,6 +239,17 @@ type ProxmoxQemuStatusResponse = {
   vmid?: number;
 };
 
+type ProxmoxPsiWindow = {
+  avg10?: number | string;
+  avg60?: number | string;
+  avg300?: number | string;
+};
+
+type ProxmoxPsiEntry = {
+  some?: ProxmoxPsiWindow;
+  full?: ProxmoxPsiWindow;
+};
+
 type ProxmoxNodeStatusResponse = {
   cpu?: number;
   loadavg?: Array<number | string>;
@@ -247,6 +258,12 @@ type ProxmoxNodeStatusResponse = {
     free?: number;
     total?: number;
     used?: number;
+  };
+  /** PSI (Pressure Stall Information) — exposed by Proxmox VE 9+. */
+  pressure?: {
+    cpu?: ProxmoxPsiEntry;
+    io?: ProxmoxPsiEntry;
+    memory?: ProxmoxPsiEntry;
   };
   rootfs?: {
     avail?: number;
@@ -362,12 +379,28 @@ export type LiveStoragePool = {
   usedBytes: number | null;
 };
 
+/**
+ * 10-second-average PSI stall percentages for a node (PVE 9+). "some" =
+ * share of time at least one task stalled on the resource; "full" = share
+ * of time ALL non-idle tasks stalled (memory/io only). Null when the node
+ * doesn't report PSI (PVE 8 or older kernels).
+ */
+export type NodePressure = {
+  cpuSomeAvg10: number | null;
+  memorySomeAvg10: number | null;
+  memoryFullAvg10: number | null;
+  ioSomeAvg10: number | null;
+  ioFullAvg10: number | null;
+};
+
 export type LiveNodeMetrics = {
   cpuRatio: number | null;
   loadAverage: number[];
   memoryTotalBytes: number | null;
   memoryUsedBytes: number | null;
   node: string;
+  /** Only populated by getNodesWithPerNodeLatency (load-balancer path). */
+  pressure?: NodePressure | null;
   rootfsTotalBytes: number | null;
   rootfsUsedBytes: number | null;
   swapTotalBytes: number | null;
@@ -5253,6 +5286,13 @@ export type GuestPenaltyData = {
   type: "lxc" | "qemu";
   failcnt?: number;
   cpuSteal?: number;
+  /**
+   * Guest-actual memory usage from the balloon driver (QEMU only,
+   * ballooninfo.total_mem - free_mem). Host-reported `mem` counts the full
+   * ballooned allocation, which can be several times what the guest really
+   * uses — balancing on it moves the wrong guests.
+   */
+  guestMemUsedBytes?: number;
 };
 
 export async function fetchGuestPenaltyData(
@@ -5270,12 +5310,24 @@ export async function fetchGuestPenaltyData(
         if (!result.data) return null;
 
         const data = result.data;
+
+        let guestMemUsedBytes: number | undefined;
+        if (g.type === "qemu" && data.ballooninfo && typeof data.ballooninfo === "object") {
+          const balloon = data.ballooninfo as Record<string, unknown>;
+          const totalMem = typeof balloon.total_mem === "number" ? balloon.total_mem : null;
+          const freeMem = typeof balloon.free_mem === "number" ? balloon.free_mem : null;
+          if (totalMem !== null && freeMem !== null && totalMem > 0 && freeMem <= totalMem) {
+            guestMemUsedBytes = totalMem - freeMem;
+          }
+        }
+
         const entry: GuestPenaltyData = {
           vmid: g.vmid,
           node: g.node,
           type: g.type,
           failcnt: typeof data.failcnt === "number" ? data.failcnt : undefined,
           cpuSteal: typeof data.steal === "number" ? data.steal : undefined,
+          guestMemUsedBytes,
         };
         return entry;
       } catch {
@@ -5285,6 +5337,29 @@ export async function fetchGuestPenaltyData(
   );
 
   return results.filter((r): r is GuestPenaltyData => r !== null);
+}
+
+function parsePsiAvg10(window: ProxmoxPsiWindow | undefined): number | null {
+  if (!window) return null;
+  const raw = window.avg10;
+  const value = typeof raw === "string" ? Number(raw) : raw;
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) return null;
+  return value;
+}
+
+function parseNodePressure(
+  pressure: ProxmoxNodeStatusResponse["pressure"],
+): NodePressure | null {
+  if (!pressure) return null;
+  const parsed: NodePressure = {
+    cpuSomeAvg10: parsePsiAvg10(pressure.cpu?.some),
+    memorySomeAvg10: parsePsiAvg10(pressure.memory?.some),
+    memoryFullAvg10: parsePsiAvg10(pressure.memory?.full),
+    ioSomeAvg10: parsePsiAvg10(pressure.io?.some),
+    ioFullAvg10: parsePsiAvg10(pressure.io?.full),
+  };
+  const hasAny = Object.values(parsed).some((v) => v !== null);
+  return hasAny ? parsed : null;
 }
 
 export type NodeMetricsWithLatency = LiveNodeMetrics & {
@@ -5320,6 +5395,7 @@ export async function getNodesWithPerNodeLatency(): Promise<{
       memoryTotalBytes: normalizeMaybeNumber(status.memory?.total),
       memoryUsedBytes: normalizeMaybeNumber(status.memory?.used),
       node: node.name,
+      pressure: parseNodePressure(status.pressure),
       rootfsTotalBytes: normalizeMaybeNumber(status.rootfs?.total),
       rootfsUsedBytes: normalizeMaybeNumber(status.rootfs?.used),
       swapTotalBytes: normalizeMaybeNumber(status.swap?.total),

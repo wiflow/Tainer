@@ -14,6 +14,7 @@ import { getDeploymentTemplate } from "@/lib/deployment-templates";
 import { cn } from "@/lib/utils";
 import { getImageEnv } from "@/lib/image-env-cache";
 import { getIpPoolCatalog } from "@/lib/ip-pools";
+import { getSuggestedNode } from "@/lib/load-balancer";
 import { getNodes, getRootfsTargets, getTemplateDetail, withSiteConfig } from "@/lib/proxmox";
 import { ensureSiteConfig } from "@/lib/site-context";
 
@@ -108,6 +109,7 @@ async function renderBaseImageDetail(slug: string, siteSlug: string, siteConfig:
         nodeMetrics={nodeMetrics}
         nodes={nodes}
         rootfsTargets={rootfsTargets}
+        suggestedNode={getSuggestedNode(siteConfig.siteId)}
         template={template}
       />
     </div>
@@ -191,6 +193,7 @@ export default async function TemplateDetailPage({ params }: TemplatePageProps) 
           nodeMetrics={nodeMetrics}
           nodes={nodes}
           rootfsTargets={rootfsTargets}
+          suggestedNode={getSuggestedNode(siteConfig.siteId)}
           template={deploymentTemplate}
         />
 

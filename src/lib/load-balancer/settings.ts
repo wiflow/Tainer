@@ -4,21 +4,46 @@ import { readFile } from "node:fs/promises";
 
 import { resolveSiteDataFilePathFromContext } from "@/lib/site-data";
 import { writeJsonFileAtomically } from "@/lib/store-utils";
-import type { LoadBalancerSettings, ScoreWeights } from "./types";
+import type {
+  ContainerMigrationMode,
+  LoadBalancerSettings,
+  MigrationWindow,
+  ScoreWeights,
+} from "./types";
 
 const SETTINGS_FILE = "lb-settings.json";
 
 export const DEFAULT_LB_SETTINGS: LoadBalancerSettings = {
   enabled: false,
   pollIntervalSeconds: 10,
-  weights: { cpu: 0.4, memory: 0.3, latency: 0.2, disk: 0.1 },
+  // Memory-primary weighting: memory is the truly finite resource — CPU
+  // contention degrades gracefully, memory exhaustion OOM-kills. Proxmox's
+  // own TOPSIS scheduler weights memory 5:1 over CPU for the same reason.
+  weights: { cpu: 0.25, memory: 0.5, latency: 0.1, disk: 0.15 },
   migrationEnabled: false,
+  // Dry-run by default: a freshly enabled auto-migration records what it
+  // WOULD move as "migration-recommended" events without touching guests.
+  // Operators flip this off once the recommendations look sane.
+  migrationDryRun: true,
+  // Containers restart-migrate in Proxmox (stop → transfer → start = real
+  // downtime), so they are exempt from automatic balancing unless the
+  // operator explicitly opts in.
+  containerMigrations: "never",
+  containerMigrationWindows: [],
+  maxConcurrentMigrations: 1,
+  maintenanceNodes: [],
   migrationThresholdPercent: 50,
   migrationConsecutivePolls: 3,
   migrationCooldownSeconds: 300,
+  minTargetImprovementPercent: 20,
   cpuStealPenalty: 50,
   cpuStealThresholdPercent: 10,
   failcntPenalty: 50,
+  psiPenalty: 40,
+  psiThresholdPercent: 10,
+  predictiveEnabled: false,
+  predictiveHorizonMinutes: 30,
+  predictiveMinConfidencePercent: 70,
   ewmaAlpha: 0.3,
   latencyMaxMs: 500,
   // Lowered from 30s -> 10s. Anything over 10s on a load-balancer tick means
@@ -106,6 +131,33 @@ function normalizeNumberArray(value: unknown): number[] {
     .map((v) => Math.round(v));
 }
 
+const TIME_OF_DAY_REGEX = /^([01]?\d|2[0-3]):[0-5]\d$/;
+
+function normalizeMigrationWindows(value: unknown): MigrationWindow[] {
+  if (!Array.isArray(value)) return [];
+  const windows: MigrationWindow[] = [];
+  for (const entry of value) {
+    if (!entry || typeof entry !== "object") continue;
+    const { start, end } = entry as Partial<MigrationWindow>;
+    if (
+      typeof start !== "string" ||
+      typeof end !== "string" ||
+      !TIME_OF_DAY_REGEX.test(start) ||
+      !TIME_OF_DAY_REGEX.test(end) ||
+      start === end
+    ) {
+      continue;
+    }
+    windows.push({ start, end });
+  }
+  return windows.slice(0, 8);
+}
+
+function normalizeContainerMigrationMode(value: unknown): ContainerMigrationMode {
+  if (value === "never" || value === "windows-only" || value === "always") return value;
+  return DEFAULT_LB_SETTINGS.containerMigrations;
+}
+
 function normalizeSettings(parsed: Partial<LoadBalancerSettings>): LoadBalancerSettings {
   return {
     enabled: typeof parsed.enabled === "boolean" ? parsed.enabled : DEFAULT_LB_SETTINGS.enabled,
@@ -120,6 +172,19 @@ function normalizeSettings(parsed: Partial<LoadBalancerSettings>): LoadBalancerS
       typeof parsed.migrationEnabled === "boolean"
         ? parsed.migrationEnabled
         : DEFAULT_LB_SETTINGS.migrationEnabled,
+    migrationDryRun:
+      typeof parsed.migrationDryRun === "boolean"
+        ? parsed.migrationDryRun
+        : DEFAULT_LB_SETTINGS.migrationDryRun,
+    containerMigrations: normalizeContainerMigrationMode(parsed.containerMigrations),
+    containerMigrationWindows: normalizeMigrationWindows(parsed.containerMigrationWindows),
+    maxConcurrentMigrations: clampInteger(
+      parsed.maxConcurrentMigrations,
+      DEFAULT_LB_SETTINGS.maxConcurrentMigrations,
+      1,
+      10,
+    ),
+    maintenanceNodes: normalizeStringArray(parsed.maintenanceNodes),
     migrationThresholdPercent: clampInteger(
       parsed.migrationThresholdPercent,
       DEFAULT_LB_SETTINGS.migrationThresholdPercent,
@@ -138,6 +203,12 @@ function normalizeSettings(parsed: Partial<LoadBalancerSettings>): LoadBalancerS
       30,
       3600,
     ),
+    minTargetImprovementPercent: clampInteger(
+      parsed.minTargetImprovementPercent,
+      DEFAULT_LB_SETTINGS.minTargetImprovementPercent,
+      5,
+      80,
+    ),
     cpuStealPenalty: clampInteger(
       parsed.cpuStealPenalty,
       DEFAULT_LB_SETTINGS.cpuStealPenalty,
@@ -155,6 +226,34 @@ function normalizeSettings(parsed: Partial<LoadBalancerSettings>): LoadBalancerS
       DEFAULT_LB_SETTINGS.failcntPenalty,
       0,
       200,
+    ),
+    psiPenalty: clampInteger(
+      parsed.psiPenalty,
+      DEFAULT_LB_SETTINGS.psiPenalty,
+      0,
+      200,
+    ),
+    psiThresholdPercent: clampInteger(
+      parsed.psiThresholdPercent,
+      DEFAULT_LB_SETTINGS.psiThresholdPercent,
+      1,
+      100,
+    ),
+    predictiveEnabled:
+      typeof parsed.predictiveEnabled === "boolean"
+        ? parsed.predictiveEnabled
+        : DEFAULT_LB_SETTINGS.predictiveEnabled,
+    predictiveHorizonMinutes: clampInteger(
+      parsed.predictiveHorizonMinutes,
+      DEFAULT_LB_SETTINGS.predictiveHorizonMinutes,
+      5,
+      120,
+    ),
+    predictiveMinConfidencePercent: clampInteger(
+      parsed.predictiveMinConfidencePercent,
+      DEFAULT_LB_SETTINGS.predictiveMinConfidencePercent,
+      10,
+      99,
     ),
     ewmaAlpha: clampNumber(
       parsed.ewmaAlpha,
