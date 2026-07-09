@@ -5103,6 +5103,148 @@ export async function deleteClusterFirewallRule(pos: number): Promise<unknown> {
   });
 }
 
+/**
+ * Cheap change-detection fingerprint for the live-events watcher: node
+ * statuses plus every guest's status, one list call per node and nothing
+ * per-guest. Any lifecycle change (start/stop/migrate/create/delete)
+ * changes the string.
+ */
+export async function getClusterStatusFingerprint(): Promise<string> {
+  const { nodes } = await getLiveNodeIndex();
+  const parts: string[] = nodes
+    .map((node) => `node/${node.name}:${node.status}`)
+    .sort();
+
+  const lists = await Promise.all(
+    nodes.map(async (node) => {
+      const [lxc, qemu] = await Promise.all([
+        safeRequest<ProxmoxLxcListResponse[]>(`/nodes/${node.name}/lxc`),
+        safeRequest<ProxmoxQemuListResponse[]>(`/nodes/${node.name}/qemu`),
+      ]);
+      const entries: string[] = [];
+      for (const ct of lxc.data ?? []) {
+        entries.push(`ct/${node.name}/${ct.vmid}:${ct.status ?? "?"}`);
+      }
+      for (const vm of qemu.data ?? []) {
+        entries.push(`vm/${node.name}/${vm.vmid}:${vm.status ?? "?"}`);
+      }
+      return entries;
+    }),
+  );
+  parts.push(...lists.flat().sort());
+  return parts.join("|");
+}
+
+// --- Guest-level firewall (per container/VM) ---
+
+export type GuestFirewallRule = {
+  pos: number;
+  type: string | null;
+  action: string | null;
+  proto: string | null;
+  dport: string | null;
+  sport: string | null;
+  source: string | null;
+  dest: string | null;
+  enable: number | null;
+  comment: string | null;
+};
+
+export type GuestFirewallOptions = {
+  enable: boolean;
+  policyIn: string;
+  policyOut: string;
+  dhcp: boolean;
+};
+
+function guestFirewallBase(node: string, vmid: number, type: "lxc" | "qemu") {
+  const safeNode = validateNodeName(node);
+  const safeVmid = validatePositiveInteger(vmid, "VMID");
+  return `/nodes/${safeNode}/${type === "qemu" ? "qemu" : "lxc"}/${safeVmid}/firewall`;
+}
+
+export async function listGuestFirewallRules(
+  node: string,
+  vmid: number,
+  type: "lxc" | "qemu",
+): Promise<GuestFirewallRule[]> {
+  const raw =
+    (await proxmoxRequest<Array<Record<string, unknown>>>(
+      `${guestFirewallBase(node, vmid, type)}/rules`,
+    )) ?? [];
+  return raw.map((r, i) => ({
+    pos: typeof r.pos === "number" ? r.pos : i,
+    type: typeof r.type === "string" ? r.type : null,
+    action: typeof r.action === "string" ? r.action : null,
+    proto: typeof r.proto === "string" ? r.proto : null,
+    dport: r.dport != null ? String(r.dport) : null,
+    sport: r.sport != null ? String(r.sport) : null,
+    source: typeof r.source === "string" ? r.source : null,
+    dest: typeof r.dest === "string" ? r.dest : null,
+    enable: typeof r.enable === "number" ? r.enable : null,
+    comment: typeof r.comment === "string" ? r.comment : null,
+  }));
+}
+
+export async function getGuestFirewallOptions(
+  node: string,
+  vmid: number,
+  type: "lxc" | "qemu",
+): Promise<GuestFirewallOptions> {
+  const raw =
+    (await proxmoxRequest<Record<string, unknown>>(
+      `${guestFirewallBase(node, vmid, type)}/options`,
+    )) ?? {};
+  return {
+    enable: raw.enable === 1,
+    policyIn: typeof raw.policy_in === "string" ? raw.policy_in : "DROP",
+    policyOut: typeof raw.policy_out === "string" ? raw.policy_out : "ACCEPT",
+    dhcp: raw.dhcp === 1,
+  };
+}
+
+export async function setGuestFirewallEnabled(
+  node: string,
+  vmid: number,
+  type: "lxc" | "qemu",
+  enable: boolean,
+): Promise<unknown> {
+  const params = new URLSearchParams();
+  params.set("enable", enable ? "1" : "0");
+  return proxmoxRequest<unknown>(`${guestFirewallBase(node, vmid, type)}/options`, {
+    method: "PUT",
+    params,
+  });
+}
+
+export async function createGuestFirewallRule(
+  node: string,
+  vmid: number,
+  type: "lxc" | "qemu",
+  rule: Record<string, unknown>,
+): Promise<unknown> {
+  const params = new URLSearchParams();
+  appendParams(params, rule, { skipKeys: FIREWALL_RULE_NON_PARAM_KEYS });
+  return proxmoxRequest<unknown>(`${guestFirewallBase(node, vmid, type)}/rules`, {
+    method: "POST",
+    params,
+  });
+}
+
+export async function deleteGuestFirewallRule(
+  node: string,
+  vmid: number,
+  type: "lxc" | "qemu",
+  pos: number,
+): Promise<unknown> {
+  if (!Number.isInteger(pos) || pos < 0) {
+    throw new Error("Invalid firewall rule position.");
+  }
+  return proxmoxRequest<unknown>(`${guestFirewallBase(node, vmid, type)}/rules/${pos}`, {
+    method: "DELETE",
+  });
+}
+
 // --- Load Balancer helpers ---
 
 export type GuestPenaltyData = {

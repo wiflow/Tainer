@@ -22,7 +22,8 @@ export type DeploymentActivityAction =
   | "port-scanned"
   | "snapshot-created"
   | "snapshot-deleted"
-  | "snapshot-rollback";
+  | "snapshot-rollback"
+  | "firewall-updated";
 
 export type DeploymentActivityEntry = {
   action: DeploymentActivityAction;
