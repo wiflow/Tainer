@@ -66,6 +66,12 @@ const ACTION_META: Record<AdminAuditAction, { category: string; level: Level }> 
   "lldp-annotation-updated": { category: "network", level: "info" },
   "lldp-annotation-removed": { category: "network", level: "info" },
   "login-lockout-cleared": { category: "logins", level: "warning" },
+  "copilot-tool-approved": { category: "copilot", level: "info" },
+  "copilot-tool-denied": { category: "copilot", level: "info" },
+  "copilot-tool-executed": { category: "copilot", level: "info" },
+  "copilot-tool-failed": { category: "copilot", level: "warning" },
+  "copilot-budget-exceeded": { category: "copilot", level: "warning" },
+  "copilot-settings-updated": { category: "copilot", level: "info" },
 };
 
 function actionMeta(action: string): { category: string; level: Level } {
