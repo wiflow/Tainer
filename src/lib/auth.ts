@@ -10,7 +10,7 @@ import {
 } from "node:crypto";
 import { promisify } from "node:util";
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import QRCode from "qrcode";
 import nodemailer from "nodemailer";
 
@@ -874,11 +874,33 @@ export async function getUserCount() {
   return store.users.length;
 }
 
+/**
+ * Bearer-token fallback for automation clients (scripts, Terraform, CI).
+ * Only consulted when no session cookie is present; the resulting session
+ * is role "operator" with exactly the token's granted site permissions, so
+ * admin-only surfaces and ungranted capabilities refuse it. Tokens are not
+ * ambient authority — browsers never attach the header on their own, so
+ * this adds no CSRF surface.
+ */
+async function getApiTokenSession(): Promise<AuthSession | null> {
+  try {
+    const headerStore = await headers();
+    const authorization = headerStore.get("authorization");
+    if (!authorization?.startsWith("Bearer tnr_")) return null;
+    const { getSessionForBearerToken } = await import("@/lib/api-tokens");
+    return await getSessionForBearerToken(authorization);
+  } catch {
+    // headers() unavailable (static render) or store read failure — treat
+    // as unauthenticated rather than erroring the caller.
+    return null;
+  }
+}
+
 export async function getCurrentSession(): Promise<AuthSession | null> {
   const sessionId = await readSessionIdFromCookies();
 
   if (!sessionId) {
-    return null;
+    return getApiTokenSession();
   }
 
   const { ensureUserGroupsMigrated } = await import("@/lib/user-groups");

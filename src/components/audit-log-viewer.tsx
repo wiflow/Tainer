@@ -74,6 +74,8 @@ const ACTION_META: Record<AdminAuditAction, { category: string; level: Level }> 
   "copilot-settings-updated": { category: "copilot", level: "info" },
   "state-backup-created": { category: "settings", level: "info" },
   "state-backup-settings-updated": { category: "settings", level: "warning" },
+  "api-token-created": { category: "sessions", level: "warning" },
+  "api-token-revoked": { category: "sessions", level: "warning" },
 };
 
 function actionMeta(action: string): { category: string; level: Level } {

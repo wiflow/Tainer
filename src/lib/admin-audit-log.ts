@@ -59,7 +59,9 @@ export type AdminAuditAction =
   | "copilot-budget-exceeded"
   | "copilot-settings-updated"
   | "state-backup-created"
-  | "state-backup-settings-updated";
+  | "state-backup-settings-updated"
+  | "api-token-created"
+  | "api-token-revoked";
 
 export type AdminAuditEntry = {
   action: AdminAuditAction;
