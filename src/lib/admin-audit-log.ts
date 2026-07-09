@@ -57,7 +57,9 @@ export type AdminAuditAction =
   | "copilot-tool-executed"
   | "copilot-tool-failed"
   | "copilot-budget-exceeded"
-  | "copilot-settings-updated";
+  | "copilot-settings-updated"
+  | "state-backup-created"
+  | "state-backup-settings-updated";
 
 export type AdminAuditEntry = {
   action: AdminAuditAction;

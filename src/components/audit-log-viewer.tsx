@@ -72,6 +72,8 @@ const ACTION_META: Record<AdminAuditAction, { category: string; level: Level }> 
   "copilot-tool-failed": { category: "copilot", level: "warning" },
   "copilot-budget-exceeded": { category: "copilot", level: "warning" },
   "copilot-settings-updated": { category: "copilot", level: "info" },
+  "state-backup-created": { category: "settings", level: "info" },
+  "state-backup-settings-updated": { category: "settings", level: "warning" },
 };
 
 function actionMeta(action: string): { category: string; level: Level } {

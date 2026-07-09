@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { ProxmoxIssues } from "@/components/proxmox-issues";
 import { BackupSettingsForm, DockerLibraryForm, SettingsForm } from "@/components/settings-form";
 import { SshKeySettingsForm } from "@/components/ssh-key-settings-form";
+import { StateBackupPanel } from "@/components/state-backup-panel";
 import { SectionPanel } from "@/components/ui/section-panel";
 import { MetricCard } from "@/components/ui/metric-card";
 import { getAppSettings, resolveDefaultRootfsStorage } from "@/lib/app-settings";
@@ -14,6 +15,12 @@ import { getRootfsTargets, listBackupStoragePools, withSiteConfig } from "@/lib/
 import { ensureSiteConfig } from "@/lib/site-context";
 import { resolveSiteConfigBySlug } from "@/lib/site-resolver";
 import { getSshKeyInfo } from "@/lib/ssh-keys";
+import {
+  getStateBackupConfig,
+  hasStateBackupPassphrase,
+  listStateBackups,
+  resolveDestinationDir,
+} from "@/lib/state-backup";
 
 // Avoid `force-dynamic` here — it silently disables the unstable_cache below.
 const getSettingsPageData = unstable_cache(
@@ -51,6 +58,10 @@ export default async function SettingsPage({
 
   const [settings, rootfsResult, backupStorageResult] = await getSettingsPageData(siteSlug);
   const sshKeyInfo = await getSshKeyInfo();
+  // Instance-wide, not per-site — deliberately uncached so the file list and
+  // last-run status are always current (local fs reads, no Proxmox cost).
+  const stateBackupConfig = await getStateBackupConfig();
+  const stateBackups = await listStateBackups(stateBackupConfig);
   const defaultRootfsStorage = resolveDefaultRootfsStorage(
     rootfsResult.targets,
     settings.defaultRootfsStorage,
@@ -106,6 +117,19 @@ export default async function SettingsPage({
       />
 
       <SshKeySettingsForm keyInfo={sshKeyInfo} />
+
+      <StateBackupPanel
+        config={{
+          enabled: stateBackupConfig.enabled,
+          scheduleHourUtc: stateBackupConfig.scheduleHourUtc,
+          retention: stateBackupConfig.retention,
+          destinationDir: stateBackupConfig.destinationDir,
+          hasPassphrase: hasStateBackupPassphrase(stateBackupConfig),
+          lastRun: stateBackupConfig.lastRun,
+        }}
+        backups={stateBackups}
+        defaultDestination={resolveDestinationDir(stateBackupConfig)}
+      />
 
       <SectionPanel
         title="Looking for IP pools?"

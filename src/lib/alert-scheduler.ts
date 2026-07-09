@@ -4,6 +4,7 @@ import { runBackupTick } from "@/lib/backup-engine";
 import { runConfigSnapshotTickAllSites } from "@/lib/config-snapshot-runner";
 import { getHeartbeatSettings } from "@/lib/heartbeat-settings";
 import { runHeartbeatCheck, shouldRunHeartbeat } from "@/lib/heartbeat-engine";
+import { runStateBackupTick } from "@/lib/state-backup";
 
 type SchedulerState = {
   backupLastResult: string | null;
@@ -113,7 +114,24 @@ async function tick() {
     }
   };
 
-  await Promise.all([runAlerts(), runBackups(), runConfigSnapshots(), runHeartbeat()]);
+  const runStateBackup = async () => {
+    try {
+      const result = await runStateBackupTick();
+      if (result.error) collectedErrors.push(`State backup: ${result.error}`);
+    } catch (error) {
+      collectedErrors.push(
+        error instanceof Error ? error.message : "State backup tick failed",
+      );
+    }
+  };
+
+  await Promise.all([
+    runAlerts(),
+    runBackups(),
+    runConfigSnapshots(),
+    runHeartbeat(),
+    runStateBackup(),
+  ]);
 
   state.lastError = collectedErrors.length > 0 ? collectedErrors.join("; ") : null;
 }
