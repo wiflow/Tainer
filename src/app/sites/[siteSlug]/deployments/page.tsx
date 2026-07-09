@@ -68,7 +68,7 @@ export default async function DeploymentsPage({
     <div className="space-y-4">
       {/* Proxmox guest status changes outside the app (and lags behind
           lifecycle tasks) — keep the list from going stale between actions. */}
-      <AutoRefresh intervalMs={15_000} />
+      <AutoRefresh intervalMs={15_000} eventsSite={siteSlug} />
       <ProxmoxIssues
         description="Deployment inventory and controls need VM.Audit plus lifecycle permissions. Empty results can still mean either no guests or a token that cannot see them yet."
         issues={issues}

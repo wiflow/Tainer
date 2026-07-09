@@ -56,7 +56,7 @@ export default async function HomePage({
     <div className="flex flex-col space-y-4">
       {/* Matches the cache's 30s revalidate above — each refresh gets data
           at most one revalidation window old without extra Proxmox load. */}
-      <AutoRefresh intervalMs={30_000} />
+      <AutoRefresh intervalMs={30_000} eventsSite={siteSlug} />
       {/* ── Top Metric Cards (Mapped to Tainer Data) ── */}
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard
