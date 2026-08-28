@@ -21,7 +21,7 @@ import {
   triggerBackup,
   type LiveDeployment,
 } from "@/lib/proxmox";
-import { scheduleArchiveOffload } from "@/lib/storage-box";
+import { reconcileOffloads, scheduleArchiveOffload } from "@/lib/storage-box";
 import { extractManagedTagSlugs } from "@/lib/tag-utils";
 
 // In-flight state is stored on globalThis so it survives Next.js HMR without losing progress
@@ -302,6 +302,11 @@ export async function runBackupTick(): Promise<{
   try {
     const policies = await listBackupPolicies();
     const now = Date.now();
+
+    // Hourly, rate-limited internally: backfill offloads lost to restarts.
+    void reconcileOffloads(policies).catch((err) =>
+      console.error("[backup-engine] Offload reconciliation error:", err),
+    );
 
     const duePolicies = policies.filter((p) => {
       if (!p.enabled) return false;

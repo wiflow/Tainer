@@ -57,11 +57,14 @@ export function BackupListTable({
   defaultNode,
   defaultStorage,
   isAdmin,
+  offsiteArchives = {},
 }: {
   archives: ProxmoxBackupArchive[];
   defaultNode: string;
   defaultStorage: string;
   isAdmin: boolean;
+  /** Archive filename → verified flag, from the Storage Box off-site index. */
+  offsiteArchives?: Record<string, boolean>;
 }) {
   if (archives.length === 0) {
     return (
@@ -94,7 +97,20 @@ export function BackupListTable({
               <td className="px-4 py-3 text-zinc-400">
                 {formatDate(archive.ctimeIso)}
               </td>
-              <td className="px-4 py-3 text-zinc-400">{archive.storage}</td>
+              <td className="px-4 py-3 text-zinc-400">
+                <span className="flex items-center gap-1.5">
+                  {archive.storage}
+                  {(() => {
+                    const name = archive.volid.split("/").pop() ?? "";
+                    if (!(name in offsiteArchives)) return null;
+                    return offsiteArchives[name] ? (
+                      <Badge variant="success">off-site ✓</Badge>
+                    ) : (
+                      <Badge variant="warning">off-site ?</Badge>
+                    );
+                  })()}
+                </span>
+              </td>
               <td className="px-4 py-3 text-zinc-400">{formatBytes(archive.sizeBytes)}</td>
               <td className="px-4 py-3 text-zinc-400">{archive.format}</td>
               <td className="max-w-[200px] truncate px-4 py-3 text-zinc-500">

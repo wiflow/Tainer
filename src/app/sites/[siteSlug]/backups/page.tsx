@@ -25,7 +25,7 @@ import { listBackupPolicies } from "@/lib/backup-policies";
 import { listBackupRuns } from "@/lib/backup-run-log";
 import { listContainerTags } from "@/lib/container-groups";
 import { getBackupOverview, getProxmoxDefaults, getRootfsTargets, getStorageConfig, withSiteConfig } from "@/lib/proxmox";
-import { getStorageBoxSummary, listOffloadLog } from "@/lib/storage-box";
+import { getOffsiteIndex, getStorageBoxSummary, listOffloadLog } from "@/lib/storage-box";
 import { StorageBoxCard } from "@/components/storage-box-card";
 import { ensureSiteConfig } from "@/lib/site-context";
 import { resolveSiteConfigBySlug } from "@/lib/site-resolver";
@@ -70,14 +70,18 @@ export default async function BackupsPage({
   // Storage Box state is read fresh (not through the cached loader): connect /
   // test actions must reflect immediately.
   const storageBoxSiteConfig = await resolveSiteConfigBySlug(siteSlug);
-  const [storageBoxSummary, offloadLog, storageConfigs] = await withSiteConfig(
+  const [storageBoxSummary, offloadLog, storageConfigs, offsiteIndex] = await withSiteConfig(
     storageBoxSiteConfig,
     () =>
       Promise.all([
         getStorageBoxSummary(),
         listOffloadLog(20),
         getStorageConfig().catch(() => [] as unknown[]),
+        getOffsiteIndex().catch(() => ({})),
       ]),
+  );
+  const offsiteArchives = Object.fromEntries(
+    Object.entries(offsiteIndex).map(([name, entry]) => [name, entry.verified]),
   );
   const dirStorages = (storageConfigs as { storage?: string; path?: string; content?: string }[])
     .filter((s) => s?.storage && s.path && (s.content ?? "").includes("backup"))
@@ -233,6 +237,7 @@ export default async function BackupsPage({
           defaultNode={defaults.defaultNode}
           defaultStorage={restoreTargetStorage}
           isAdmin={isAdmin}
+          offsiteArchives={offsiteArchives}
         />
       </SectionPanel>
 

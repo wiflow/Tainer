@@ -1,11 +1,16 @@
 import "server-only";
 
-import { createHash, generateKeyPairSync, randomUUID } from "node:crypto";
+import { createHash, generateKeyPairSync, randomBytes, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 
 import { decryptText, encryptText } from "@/lib/crypto";
 import { runNodeRootCommand } from "@/lib/proxmox-host";
-import { getActiveSiteConfig, getStorageConfig, listBackupsForVm } from "@/lib/proxmox";
+import {
+  getActiveSiteConfig,
+  getDeploymentIndex,
+  getStorageConfig,
+  listBackupsForVm,
+} from "@/lib/proxmox";
 import { resolveSiteDataFilePathFromContext } from "@/lib/site-data";
 import { runSshCommand } from "@/lib/ssh-command";
 import { createStoreMutator, writeJsonFileAtomically } from "@/lib/store-utils";
@@ -44,6 +49,12 @@ export type StorageBoxConfig = {
   privateKeyEncrypted: string | null;
   keyInstalled: boolean;
   cifsStorageId: string | null;
+  /** rsync --bwlimit in KiB/s; 0 = unlimited. */
+  bandwidthLimitKbps: number;
+  /** Encrypt archives with AES-256 before they leave the node. */
+  encryptEnabled: boolean;
+  /** Random passphrase for openssl enc, sealed. */
+  encryptionKeyEncrypted: string | null;
   /** Hetzner Console API token (Bearer), sealed. Enables box management. */
   hetznerTokenEncrypted: string | null;
   /** The box's numeric id on api.hetzner.com, matched by hostname. */
@@ -69,11 +80,16 @@ export type StorageBoxSummary = {
   basePath: string;
   keyInstalled: boolean;
   cifsStorageId: string | null;
+  bandwidthLimitKbps: number;
+  encryptEnabled: boolean;
   hetznerConnected: boolean;
   hetznerBoxId: number | null;
   lastTestedAt: string | null;
   lastTestOk: boolean | null;
   lastTestMessage: string;
+  /** Process-local transfer state for the UI. */
+  queueDepth: number;
+  currentTransfer: string | null;
 };
 
 export type OffloadLogEntry = {
@@ -169,9 +185,12 @@ export async function getStorageBoxSummary(): Promise<StorageBoxSummary> {
   const config = await getStorageBoxConfig();
   if (!config) {
     return {
+      bandwidthLimitKbps: 0,
       basePath: "tainer-offsite",
       cifsStorageId: null,
       configured: false,
+      currentTransfer: null,
+      encryptEnabled: false,
       hetznerBoxId: null,
       hetznerConnected: false,
       host: "",
@@ -179,13 +198,17 @@ export async function getStorageBoxSummary(): Promise<StorageBoxSummary> {
       lastTestMessage: "",
       lastTestOk: null,
       lastTestedAt: null,
+      queueDepth: 0,
       username: "",
     };
   }
   return {
+    bandwidthLimitKbps: config.bandwidthLimitKbps ?? 0,
     basePath: config.basePath,
     cifsStorageId: config.cifsStorageId,
     configured: true,
+    currentTransfer: getCurrentTransferLabel(),
+    encryptEnabled: config.encryptEnabled ?? false,
     hetznerBoxId: config.hetznerBoxId ?? null,
     hetznerConnected: Boolean(config.hetznerTokenEncrypted),
     host: config.host,
@@ -193,6 +216,7 @@ export async function getStorageBoxSummary(): Promise<StorageBoxSummary> {
     lastTestMessage: config.lastTestMessage,
     lastTestOk: config.lastTestOk,
     lastTestedAt: config.lastTestedAt,
+    queueDepth: getOffloadQueueDepth(),
     username: config.username,
   };
 }
@@ -235,6 +259,48 @@ async function appendLogEntry(entry: Omit<OffloadLogEntry, "id" | "at">) {
       store.entries.length = OFFLOAD_LOG_LIMIT;
     }
   });
+}
+
+/* ── Off-site index ───────────────────────────────────────────────────────── */
+
+export type OffsiteIndexEntry = {
+  vmid: number;
+  offloadedAt: string;
+  /** sha256 comparison between node and box succeeded. */
+  verified: boolean;
+  encrypted: boolean;
+  sizeBytes: number | null;
+};
+
+type OffsiteIndexStore = {
+  /** Keyed by the plain archive name (no .enc suffix). */
+  archives: Record<string, OffsiteIndexEntry>;
+};
+
+async function readIndex(): Promise<OffsiteIndexStore> {
+  try {
+    const raw = await readFile(
+      await resolveSiteDataFilePathFromContext("storage-box-index.json"),
+      "utf8",
+    );
+    const parsed = JSON.parse(raw) as Partial<OffsiteIndexStore>;
+    return { archives: parsed.archives ?? {} };
+  } catch {
+    return { archives: {} };
+  }
+}
+
+async function writeIndex(store: OffsiteIndexStore) {
+  const filePath = await resolveSiteDataFilePathFromContext("storage-box-index.json");
+  await writeJsonFileAtomically(filePath, store);
+}
+
+const mutateIndex = createStoreMutator("storage-box-index", readIndex, writeIndex);
+
+/** Archive-name → entry map for off-site badges in backup lists. */
+export async function getOffsiteIndex(): Promise<Record<string, OffsiteIndexEntry>> {
+  const store = await readIndex();
+  return store.archives;
 }
 
 /* ── Box SSH plumbing ─────────────────────────────────────────────────────── */
@@ -339,10 +405,13 @@ export async function connectStorageBox(input: {
   username: string;
   password: string;
   basePath: string;
+  bandwidthLimitKbps: number;
+  encryptEnabled: boolean;
 }): Promise<StorageBoxSummary> {
   const host = validateHost(input.host);
   const username = validateUsername(input.username);
   const basePath = validateBasePath(input.basePath);
+  const bandwidthLimitKbps = Math.max(0, Math.round(input.bandwidthLimitKbps || 0));
   const password = input.password;
   if (!password) throw new Error("The Storage Box password is required to connect.");
 
@@ -379,9 +448,14 @@ export async function connectStorageBox(input: {
   const timestamp = new Date().toISOString();
   const usage = parseDfOutput(dfOutput);
   const config: StorageBoxConfig = {
+    bandwidthLimitKbps,
     basePath,
     cifsStorageId: null,
     createdAt: timestamp,
+    encryptEnabled: input.encryptEnabled,
+    encryptionKeyEncrypted: input.encryptEnabled
+      ? await encryptText(randomBytes(32).toString("hex"))
+      : null,
     hetznerBoxId: null,
     hetznerTokenEncrypted: null,
     host,
@@ -405,6 +479,9 @@ export async function connectStorageBox(input: {
           ...config,
           cifsStorageId: existing.cifsStorageId,
           createdAt: existing.createdAt,
+          // Keep the original encryption key: replacing it would orphan every
+          // already-encrypted remote archive.
+          encryptionKeyEncrypted: existing.encryptionKeyEncrypted ?? config.encryptionKeyEncrypted,
           hetznerBoxId: existing.hetznerBoxId ?? null,
           hetznerTokenEncrypted: existing.hetznerTokenEncrypted ?? null,
         }
@@ -584,6 +661,8 @@ export async function listRemoteArchives(): Promise<RemoteArchive[]> {
 const globalForOffload = globalThis as typeof globalThis & {
   __tainerOffloadQueue?: Promise<void>;
   __tainerOffloadActive?: number;
+  __tainerCurrentTransfer?: string | null;
+  __tainerLastReconcileAt?: number;
 };
 
 /**
@@ -608,10 +687,14 @@ export function getOffloadQueueDepth(): number {
   return globalForOffload.__tainerOffloadActive ?? 0;
 }
 
+export function getCurrentTransferLabel(): string | null {
+  return globalForOffload.__tainerCurrentTransfer ?? null;
+}
+
 /**
  * Copy the newest archive of a VM on the given storage to the Storage Box,
- * then prune remote copies beyond `remoteRetentionCount` (0 keeps all).
- * Fire-and-forget: the transfer runs on the offload queue.
+ * verify it by sha256, then prune remote copies beyond `remoteRetentionCount`
+ * (0 keeps all). Fire-and-forget: the transfer runs on the offload queue.
  */
 export async function scheduleArchiveOffload(input: {
   node: string;
@@ -620,6 +703,7 @@ export async function scheduleArchiveOffload(input: {
   policyId: string;
   policyName: string;
   remoteRetentionCount: number;
+  trigger?: "backup" | "reconcile";
 }): Promise<void> {
   const config = await getStorageBoxConfig();
   if (!config) return;
@@ -641,7 +725,11 @@ export async function scheduleArchiveOffload(input: {
       archiveName = newest.volid.split("/").pop() ?? newest.volid;
       validateRemoteSegment(archiveName, "archive name");
 
-      // Resolve the archive's absolute path on the node.
+      // Reconcile may race a fresh backup: skip if this exact archive is
+      // already indexed as verified.
+      const index = await readIndex();
+      if (index.archives[archiveName]?.verified) return;
+
       const localPath = (
         await runNodeRootCommand(input.node, `pvesm path ${shellSingleQuote(newest.volid)}`)
       ).trim();
@@ -652,24 +740,40 @@ export async function scheduleArchiveOffload(input: {
       const credentials = await resolveBoxCredentials();
       await ensureRemoteDirectory(credentials, remoteDir);
 
-      await transferFromNode({
+      globalForOffload.__tainerCurrentTransfer = archiveName;
+      const encrypted = config.encryptEnabled && Boolean(config.encryptionKeyEncrypted);
+      const remoteName = encrypted ? `${archiveName}.enc` : archiveName;
+
+      const verified = await transferFromNode({
+        bandwidthLimitKbps: config.bandwidthLimitKbps ?? 0,
         credentials,
         direction: "push",
+        encryptionKey: encrypted ? await decryptText(config.encryptionKeyEncrypted as string) : null,
         localPath,
         node: input.node,
-        remotePath: `${remoteDir}/${archiveName}`,
+        remotePath: `${remoteDir}/${remoteName}`,
+      });
+
+      await mutateIndex((store) => {
+        store.archives[archiveName] = {
+          encrypted,
+          offloadedAt: new Date().toISOString(),
+          sizeBytes: newest.sizeBytes ?? null,
+          verified,
+          vmid: input.vmid,
+        };
       });
 
       await appendLogEntry({
         archive: archiveName,
         durationSeconds: Math.round((Date.now() - startedAt) / 1000),
         kind: "offload",
-        message: `Offloaded to ${config.host}:${remoteDir}`,
+        message: `${input.trigger === "reconcile" ? "Backfilled" : "Offloaded"} to ${config.host}:${remoteDir}${encrypted ? " (encrypted)" : ""} — sha256 ${verified ? "verified" : "NOT verified"}`,
         policyId: input.policyId,
         policyName: input.policyName,
-        remotePath: `${remoteDir}/${archiveName}`,
+        remotePath: `${remoteDir}/${remoteName}`,
         sizeBytes: newest.sizeBytes ?? null,
-        status: "success",
+        status: verified ? "success" : "error",
         vmid: input.vmid,
       });
 
@@ -689,6 +793,8 @@ export async function scheduleArchiveOffload(input: {
         status: "error",
         vmid: input.vmid,
       }).catch(() => {});
+    } finally {
+      globalForOffload.__tainerCurrentTransfer = null;
     }
   });
 }
@@ -700,17 +806,22 @@ async function pruneRemoteArchives(
   vmid: number,
 ) {
   // vzdump file names embed the timestamp, so lexicographic order is
-  // chronological within one VMID directory.
+  // chronological within one VMID directory (the .enc suffix doesn't
+  // change relative order between distinct timestamps).
   const names = (await runBoxCommand(credentials, `ls ${shellSingleQuote(remoteDir)}`))
     .split(/\s+/)
     .map((s) => s.trim())
-    .filter((s) => ARCHIVE_NAME_PATTERN.test(s))
+    .filter((s) => ARCHIVE_NAME_PATTERN.test(s.replace(/\.enc$/, "")))
     .sort()
     .reverse();
 
   for (const name of names.slice(keepCount)) {
     try {
       await runBoxCommand(credentials, `rm ${shellSingleQuote(`${remoteDir}/${name}`)}`);
+      const plainName = name.replace(/\.enc$/, "");
+      await mutateIndex((store) => {
+        delete store.archives[plainName];
+      });
       await appendLogEntry({
         archive: name,
         durationSeconds: null,
@@ -729,18 +840,32 @@ async function pruneRemoteArchives(
   }
 }
 
+const KEY_BOUNDARY = "-----TAINER-KEY-BOUNDARY-----";
+
 /**
- * Run rsync on the Proxmox node, pushing to or pulling from the box with
- * the transfer key. The key is written to a root-only temp file for the
- * duration of the command and removed afterwards.
+ * Run the transfer on the Proxmox node with the transfer key (and, when
+ * encrypting, the sealed data key), both delivered over stdin and written to
+ * root-only temp files for the duration of the command.
+ *
+ * Push, plaintext:  rsync (+bwlimit), then sha256 on both ends.
+ * Push, encrypted:  openssl | tee(sha256 of the encrypted stream) | ssh dd,
+ *                   then compare with the box's sha256sum. No rsync resume
+ *                   in this mode — the whole stream restarts on failure.
+ * Pull, plaintext:  rsync back.
+ * Pull, encrypted:  ssh dd | openssl -d into the target path.
+ *
+ * Returns whether the sha256 comparison succeeded (pulls return true — a
+ * corrupt pull fails vzdump restore loudly anyway).
  */
 async function transferFromNode(input: {
+  bandwidthLimitKbps: number;
   credentials: BoxCredentials;
   direction: "push" | "pull";
+  encryptionKey: string | null;
   localPath: string;
   node: string;
   remotePath: string;
-}) {
+}): Promise<boolean> {
   const { credentials } = input;
   if (!credentials.privateKey) {
     throw new Error(
@@ -748,23 +873,126 @@ async function transferFromNode(input: {
     );
   }
 
-  const keyPath = `/root/.tainer-offsite-${createHash("sha256").update(input.remotePath).digest("hex").slice(0, 8)}.key`;
+  const suffix = createHash("sha256").update(input.remotePath).digest("hex").slice(0, 8);
+  const keyPath = `/root/.tainer-offsite-${suffix}.key`;
+  const encKeyPath = `/root/.tainer-offsite-${suffix}.enckey`;
+  const combinedPath = `/root/.tainer-offsite-${suffix}.stdin`;
+
   const sshOptions = `-p ${STORAGE_BOX_SSH_PORT} -i ${keyPath} -o StrictHostKeyChecking=accept-new -o BatchMode=yes -o IdentitiesOnly=yes`;
-  const remote = `${credentials.username}@${credentials.host}:${input.remotePath}`;
-  const source = input.direction === "push" ? shellSingleQuote(input.localPath) : shellSingleQuote(remote);
-  const target = input.direction === "push" ? shellSingleQuote(remote) : shellSingleQuote(input.localPath);
+  const bwlimit = input.bandwidthLimitKbps > 0 ? ` --bwlimit=${input.bandwidthLimitKbps}` : "";
+  const destination = `${credentials.username}@${credentials.host}`;
+  const remoteSpec = `${destination}:${input.remotePath}`;
+  const q = shellSingleQuote;
 
-  const remoteCommand = [
-    `install -m 600 /dev/stdin ${keyPath}`,
-    `rsync --inplace --timeout=120 -e ${shellSingleQuote(`ssh ${sshOptions}`)} ${source} ${target}; rc=$?`,
-    `rm -f ${keyPath}`,
-    `exit $rc`,
+  // Split the stdin bundle into the ssh key and (optionally) the data key.
+  const stdinBundle = input.encryptionKey
+    ? `${credentials.privateKey.trim()}\n${KEY_BOUNDARY}\n${input.encryptionKey}\n`
+    : `${credentials.privateKey.trim()}\n`;
+  const splitPrelude = [
+    `install -m 600 /dev/stdin ${combinedPath}`,
+    `awk -v a=${keyPath} -v b=${encKeyPath} '/^${KEY_BOUNDARY}$/{s=1;next} s{print >> b} !s{print >> a}' ${combinedPath}`,
+    `chmod 600 ${keyPath}; touch ${encKeyPath}; chmod 600 ${encKeyPath}`,
   ].join(" && ");
+  const cleanup = `rm -f ${keyPath} ${encKeyPath} ${combinedPath} /tmp/tainer-hash-${suffix}`;
 
-  await runNodeRootCommand(input.node, remoteCommand, {
-    input: credentials.privateKey,
-    timeoutMs: TRANSFER_TIMEOUT_MS,
-  });
+  let payload: string;
+  let checksummed = false;
+
+  if (input.direction === "push" && input.encryptionKey) {
+    checksummed = true;
+    payload = [
+      "set -o pipefail",
+      `openssl enc -aes-256-cbc -pbkdf2 -iter 100000 -salt -pass file:${encKeyPath} < ${q(input.localPath)} | tee >(sha256sum | cut -d\" \" -f1 > /tmp/tainer-hash-${suffix}) | ssh ${sshOptions} ${q(destination)} ${q(`dd of=${input.remotePath} bs=1M`)}`,
+      `local_hash=$(cat /tmp/tainer-hash-${suffix})`,
+      `remote_hash=$(ssh ${sshOptions} ${q(destination)} ${q(`sha256sum ${input.remotePath}`)} | cut -d" " -f1)`,
+      `[ -n "$local_hash" ] && [ "$local_hash" = "$remote_hash" ]`,
+    ].join(" && ");
+  } else if (input.direction === "push") {
+    checksummed = true;
+    payload = [
+      `rsync --inplace --timeout=120${bwlimit} -e ${q(`ssh ${sshOptions}`)} ${q(input.localPath)} ${q(remoteSpec)}`,
+      `local_hash=$(sha256sum ${q(input.localPath)} | cut -d" " -f1)`,
+      `remote_hash=$(ssh ${sshOptions} ${q(destination)} ${q(`sha256sum ${input.remotePath}`)} | cut -d" " -f1)`,
+      `[ -n "$local_hash" ] && [ "$local_hash" = "$remote_hash" ]`,
+    ].join(" && ");
+  } else if (input.encryptionKey) {
+    payload = [
+      "set -o pipefail",
+      `ssh ${sshOptions} ${q(destination)} ${q(`dd if=${input.remotePath} bs=1M`)} | openssl enc -d -aes-256-cbc -pbkdf2 -iter 100000 -pass file:${encKeyPath} > ${q(input.localPath)}`,
+    ].join(" && ");
+  } else {
+    payload = `rsync --inplace --timeout=120${bwlimit} -e ${q(`ssh ${sshOptions}`)} ${q(remoteSpec)} ${q(input.localPath)}`;
+  }
+
+  // bash for pipefail + process substitution; keys always removed.
+  const remoteCommand = `${splitPrelude} && bash -c ${q(payload)}; rc=$?; ${cleanup}; exit $rc`;
+
+  try {
+    await runNodeRootCommand(input.node, remoteCommand, {
+      input: stdinBundle,
+      timeoutMs: TRANSFER_TIMEOUT_MS,
+    });
+    return checksummed;
+  } catch (err) {
+    if (checksummed && err instanceof Error && !err.message.trim()) {
+      throw new Error("Transfer completed but the sha256 comparison failed.");
+    }
+    throw err;
+  }
+}
+
+/* ── Reconciliation ───────────────────────────────────────────────────────── */
+
+const RECONCILE_INTERVAL_MS = 60 * 60 * 1000;
+
+/**
+ * Backfill offloads lost to restarts: for every offload-enabled policy, the
+ * newest local archive per VMID must be verified in the off-site index.
+ * Rate-limited per process; called from the backup engine tick.
+ */
+export async function reconcileOffloads(
+  policies: { id: string; name: string; storage: string; offloadEnabled: boolean; offloadRetentionCount: number }[],
+): Promise<void> {
+  const offloadPolicies = policies.filter((p) => p.offloadEnabled && p.storage);
+  if (offloadPolicies.length === 0) return;
+
+  const config = await getStorageBoxConfig();
+  if (!config) return;
+
+  const now = Date.now();
+  if (now - (globalForOffload.__tainerLastReconcileAt ?? 0) < RECONCILE_INTERVAL_MS) return;
+  globalForOffload.__tainerLastReconcileAt = now;
+
+  try {
+    const index = await readIndex();
+    const { deployments } = await getDeploymentIndex();
+
+    for (const policy of offloadPolicies) {
+      for (const deployment of deployments) {
+        const { archives } = await listBackupsForVm(deployment.node, deployment.vmid);
+        const newest = archives
+          .filter((a) => a.storage === policy.storage)
+          .sort((a, b) => b.ctime - a.ctime)[0];
+        if (!newest) continue;
+
+        const archiveName = newest.volid.split("/").pop() ?? "";
+        if (!archiveName || index.archives[archiveName]?.verified) continue;
+
+        console.log(`[storage-box] Reconcile: backfilling ${archiveName}`);
+        await scheduleArchiveOffload({
+          node: deployment.node,
+          policyId: policy.id,
+          policyName: policy.name,
+          remoteRetentionCount: policy.offloadRetentionCount,
+          storage: policy.storage,
+          trigger: "reconcile",
+          vmid: deployment.vmid,
+        });
+      }
+    }
+  } catch (err) {
+    console.error("[storage-box] Reconciliation failed:", err);
+  }
 }
 
 /* ── Retrieve (box → node) ────────────────────────────────────────────────── */
@@ -801,15 +1029,26 @@ export async function retrieveArchive(input: {
   const localPath = `${target.path.replace(/\/+$/, "")}/dump/${archiveName}`;
   const credentials = await resolveBoxCredentials();
 
+  // Encrypted uploads live remotely as <name>.enc; the pull decrypts back to
+  // the plain vzdump archive Proxmox expects.
+  const index = await readIndex();
+  const encrypted = index.archives[archiveName]?.encrypted ?? false;
+  if (encrypted && !config.encryptionKeyEncrypted) {
+    throw new Error("This archive is encrypted but the encryption key is missing from the config.");
+  }
+  const remoteName = encrypted ? `${archiveName}.enc` : archiveName;
+
   const startedAt = Date.now();
   try {
     await runNodeRootCommand(input.node, `mkdir -p ${shellSingleQuote(`${target.path.replace(/\/+$/, "")}/dump`)}`);
     await transferFromNode({
+      bandwidthLimitKbps: config.bandwidthLimitKbps ?? 0,
       credentials,
       direction: "pull",
+      encryptionKey: encrypted ? await decryptText(config.encryptionKeyEncrypted as string) : null,
       localPath,
       node: input.node,
-      remotePath: `${remoteDir}/${archiveName}`,
+      remotePath: `${remoteDir}/${remoteName}`,
     });
     await appendLogEntry({
       archive: archiveName,

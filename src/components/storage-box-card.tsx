@@ -161,6 +161,25 @@ export function StorageBoxCard({
               <label className="text-[12px] font-medium text-zinc-300">Base directory</label>
               <Input className="mt-1" defaultValue="tainer-offsite" name="basePath" />
             </div>
+            <div>
+              <label className="text-[12px] font-medium text-zinc-300">
+                Bandwidth limit (KiB/s, 0 = unlimited)
+              </label>
+              <Input className="mt-1" defaultValue="0" min="0" name="bandwidthLimitKbps" type="number" />
+            </div>
+            <label className="flex items-center gap-2 cursor-pointer sm:col-span-2">
+              <input
+                className="h-4 w-4 border-white/10 bg-zinc-900 text-sky-400"
+                name="encryptEnabled"
+                type="checkbox"
+              />
+              <span className="text-[12.5px] text-zinc-200">
+                Encrypt archives before upload (AES-256)
+              </span>
+              <span className="text-[11px] text-zinc-500">
+                — Hetzner never sees plaintext; failed transfers restart from zero instead of resuming.
+              </span>
+            </label>
             <div className="sm:col-span-2">
               <Button disabled={isConnecting} size="sm" type="submit">
                 {isConnecting ? (
@@ -191,7 +210,16 @@ export function StorageBoxCard({
           ) : (
             <Badge variant="warning">password auth</Badge>
           )}
+          {summary.encryptEnabled && <Badge variant="info">encrypted</Badge>}
           {summary.lastTestOk === false && <Badge variant="destructive">unreachable</Badge>}
+          {summary.currentTransfer ? (
+            <Badge variant="review">
+              <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+              transferring {summary.currentTransfer}
+            </Badge>
+          ) : summary.queueDepth > 0 ? (
+            <Badge variant="review">{summary.queueDepth} queued</Badge>
+          ) : null}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-5">
@@ -212,6 +240,12 @@ export function StorageBoxCard({
             <span className="text-zinc-500">Status</span>
             <span className={summary.lastTestOk === false ? "text-rose-300" : "text-zinc-200"}>
               {summary.lastTestMessage || "—"}
+            </span>
+          </div>
+          <div className="flex justify-between gap-3">
+            <span className="text-zinc-500">Bandwidth limit</span>
+            <span className="text-zinc-200 tabular-nums">
+              {summary.bandwidthLimitKbps > 0 ? `${summary.bandwidthLimitKbps} KiB/s` : "unlimited"}
             </span>
           </div>
         </div>

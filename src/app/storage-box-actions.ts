@@ -55,7 +55,9 @@ export async function connectStorageBoxAction(
 
     return await withBackupPermission(siteSlug, async () => {
       const summary = await connectStorageBox({
+        bandwidthLimitKbps: Math.max(0, Math.round(Number(formData.get("bandwidthLimitKbps") || "0"))),
         basePath: String(formData.get("basePath") ?? ""),
+        encryptEnabled: formData.get("encryptEnabled") === "on",
         host: String(formData.get("host") ?? ""),
         password: String(formData.get("password") ?? ""),
         username: String(formData.get("username") ?? ""),

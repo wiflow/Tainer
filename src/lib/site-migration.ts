@@ -20,6 +20,7 @@ const SITE_SCOPED_FILES = [
   "backup-run-log.json",
   "storage-box.json",
   "storage-box-offload-log.json",
+  "storage-box-index.json",
   "alert-policies.json",
   "alert-runtime-state.json",
   "notification-log.json",
