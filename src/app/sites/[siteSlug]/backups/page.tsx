@@ -116,7 +116,7 @@ export default async function BackupsPage({
           </CardContent>
         </Card>
 
-        {isAdmin && (
+        {isAdmin && storageBoxSummary.configured && (
           <StorageBoxCard
             dirStorages={dirStorages}
             nodes={[]}
@@ -191,8 +191,8 @@ export default async function BackupsPage({
         title="API access notes"
       />
 
-      {/* Off-site backup (Hetzner Storage Box) */}
-      {isAdmin && (
+      {/* Off-site backup — only once configured under /integrations */}
+      {isAdmin && storageBoxSummary.configured && (
         <StorageBoxCard
           dirStorages={dirStorages}
           nodes={[...new Set(overview.backupStoragePools.map((p) => p.node))]}

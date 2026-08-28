@@ -43,12 +43,14 @@ export function StorageBoxCard({
   dirStorages,
   nodes,
   offloadLog,
+  showRetrieve = true,
   siteSlug,
   summary,
 }: {
   dirStorages: string[];
   nodes: string[];
   offloadLog: OffloadLogEntry[];
+  showRetrieve?: boolean;
   siteSlug: string;
   summary: StorageBoxSummary;
 }) {
@@ -308,7 +310,7 @@ export function StorageBoxCard({
         </div>
 
         {/* Retrieve */}
-        {retrievableArchives.length > 0 && (
+        {showRetrieve && retrievableArchives.length > 0 && (
           <div className="rounded-lg border border-zinc-800 p-3">
             <p className="text-[12.5px] font-medium text-zinc-200 flex items-center gap-1.5">
               <ArchiveRestore className="h-3.5 w-3.5" />

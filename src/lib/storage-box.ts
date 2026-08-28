@@ -44,6 +44,10 @@ export type StorageBoxConfig = {
   privateKeyEncrypted: string | null;
   keyInstalled: boolean;
   cifsStorageId: string | null;
+  /** Hetzner Console API token (Bearer), sealed. Enables box management. */
+  hetznerTokenEncrypted: string | null;
+  /** The box's numeric id on api.hetzner.com, matched by hostname. */
+  hetznerBoxId: number | null;
   lastTestedAt: string | null;
   lastTestOk: boolean | null;
   lastTestMessage: string;
@@ -65,6 +69,8 @@ export type StorageBoxSummary = {
   basePath: string;
   keyInstalled: boolean;
   cifsStorageId: string | null;
+  hetznerConnected: boolean;
+  hetznerBoxId: number | null;
   lastTestedAt: string | null;
   lastTestOk: boolean | null;
   lastTestMessage: string;
@@ -166,6 +172,8 @@ export async function getStorageBoxSummary(): Promise<StorageBoxSummary> {
       basePath: "tainer-offsite",
       cifsStorageId: null,
       configured: false,
+      hetznerBoxId: null,
+      hetznerConnected: false,
       host: "",
       keyInstalled: false,
       lastTestMessage: "",
@@ -178,6 +186,8 @@ export async function getStorageBoxSummary(): Promise<StorageBoxSummary> {
     basePath: config.basePath,
     cifsStorageId: config.cifsStorageId,
     configured: true,
+    hetznerBoxId: config.hetznerBoxId ?? null,
+    hetznerConnected: Boolean(config.hetznerTokenEncrypted),
     host: config.host,
     keyInstalled: config.keyInstalled,
     lastTestMessage: config.lastTestMessage,
@@ -372,6 +382,8 @@ export async function connectStorageBox(input: {
     basePath,
     cifsStorageId: null,
     createdAt: timestamp,
+    hetznerBoxId: null,
+    hetznerTokenEncrypted: null,
     host,
     keyInstalled,
     lastTestMessage: usage.totalBytes
@@ -389,11 +401,82 @@ export async function connectStorageBox(input: {
   await mutateStore((store) => {
     const existing = store.config;
     store.config = existing
-      ? { ...config, cifsStorageId: existing.cifsStorageId, createdAt: existing.createdAt }
+      ? {
+          ...config,
+          cifsStorageId: existing.cifsStorageId,
+          createdAt: existing.createdAt,
+          hetznerBoxId: existing.hetznerBoxId ?? null,
+          hetznerTokenEncrypted: existing.hetznerTokenEncrypted ?? null,
+        }
       : config;
   });
 
   return getStorageBoxSummary();
+}
+
+/* ── Hetzner Console API token ────────────────────────────────────────────── */
+
+/**
+ * Seal a Hetzner Console API token and match the connected box by hostname.
+ * The token enables management (services, snapshots, usage) via
+ * api.hetzner.com — see hetzner-storage-api.ts.
+ */
+export async function setHetznerApiToken(token: string): Promise<{ boxId: number; boxName: string }> {
+  const config = await getStorageBoxConfig();
+  if (!config) throw new Error("Connect the Storage Box first.");
+  if (!token.trim()) throw new Error("An API token is required.");
+
+  const { listHetznerStorageBoxes } = await import("@/lib/hetzner-storage-api");
+  const boxes = await listHetznerStorageBoxes(token.trim());
+  if (boxes.length === 0) {
+    throw new Error("The token is valid but no Storage Boxes are visible to it.");
+  }
+
+  // Match by hostname: the box `server` is uXXXXX.your-storagebox.de and
+  // sub-account hosts share the main account's prefix.
+  const hostPrefix = config.host.split(".")[0].split("-")[0].toLowerCase();
+  const match =
+    boxes.find((box) => (box.server ?? "").toLowerCase() === config.host) ??
+    boxes.find((box) => (box.server ?? "").toLowerCase().startsWith(`${hostPrefix}.`)) ??
+    boxes.find((box) => (box.username ?? "").toLowerCase() === hostPrefix) ??
+    (boxes.length === 1 ? boxes[0] : undefined);
+
+  if (!match) {
+    throw new Error(
+      `None of the ${boxes.length} Storage Boxes on this token match ${config.host}.`,
+    );
+  }
+
+  const sealed = await encryptText(token.trim());
+  await mutateStore((store) => {
+    if (store.config) {
+      store.config.hetznerTokenEncrypted = sealed;
+      store.config.hetznerBoxId = match.id;
+      store.config.updatedAt = new Date().toISOString();
+    }
+  });
+
+  return { boxId: match.id, boxName: match.name };
+}
+
+export async function clearHetznerApiToken(): Promise<void> {
+  await mutateStore((store) => {
+    if (store.config) {
+      store.config.hetznerTokenEncrypted = null;
+      store.config.hetznerBoxId = null;
+      store.config.updatedAt = new Date().toISOString();
+    }
+  });
+}
+
+/** Decrypted token + box id, or null when the API is not connected. */
+export async function getHetznerApiContext(): Promise<{ token: string; boxId: number } | null> {
+  const config = await getStorageBoxConfig();
+  if (!config?.hetznerTokenEncrypted || !config.hetznerBoxId) return null;
+  return {
+    boxId: config.hetznerBoxId,
+    token: await decryptText(config.hetznerTokenEncrypted),
+  };
 }
 
 export async function disconnectStorageBox(): Promise<void> {
