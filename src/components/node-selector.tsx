@@ -61,7 +61,9 @@ export function NodeSelector({
 }) {
   const greedyBest = useMemo(() => computeBestNode(nodes, metrics), [nodes, metrics]);
   const bestNode = suggestedNode ?? greedyBest;
-  const [value, setValue] = useState(defaultNode || "__auto__");
+  // Always start on automatic placement — a configured default node only
+  // serves as the fallback when no live node metrics are available.
+  const [value, setValue] = useState("__auto__");
   const [resolvedAuto, setResolvedAuto] = useState<string | null>(null);
 
   useEffect(() => {
