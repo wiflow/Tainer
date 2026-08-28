@@ -9,6 +9,7 @@ import { requireSession, requireSitePermission } from "@/lib/auth";
 import { getDeploymentIndex, withSiteConfig } from "@/lib/proxmox";
 import { resolveSiteConfigBySlug } from "@/lib/site-resolver";
 import { recordLbEvent } from "@/lib/load-balancer/event-log";
+import { LB_PRESET_STOPS } from "@/lib/load-balancer/presets";
 import {
   getNodeScoresForSite,
   getSiteMetricsSnapshot,
@@ -394,6 +395,62 @@ export async function updateLoadBalancerSettingsAction(
   } catch (error) {
     return {
       message: error instanceof Error ? error.message : "Failed to save settings.",
+      requestId: randomUUID(),
+      status: "error",
+    };
+  }
+}
+
+export async function applyLbPresetAction(
+  _previousState: BasicActionState,
+  formData: FormData,
+): Promise<BasicActionState> {
+  try {
+    const siteSlug = String(formData.get("siteSlug") ?? "");
+    if (!siteSlug) {
+      return { message: "Missing site context.", requestId: randomUUID(), status: "error" };
+    }
+
+    const presetIndex = Number(formData.get("preset") ?? "");
+    const preset = LB_PRESET_STOPS[presetIndex];
+    if (!preset) {
+      return { message: "Unknown preset.", requestId: randomUUID(), status: "error" };
+    }
+
+    const siteConfig = await resolveSiteConfigBySlug(siteSlug);
+    const session = await requireSession();
+    requireSitePermission(session, siteConfig.siteId, "manage-settings");
+
+    return await withSiteConfig(siteConfig, async () => {
+      // Merge-only: the preset touches its bundle of migration knobs and the
+      // enabled flag; every Advanced-mode setting outside it survives.
+      await saveLoadBalancerSettings({
+        ...preset.overrides,
+        enabled: toBoolean(formData, "enabled"),
+      });
+
+      await recordLbEvent({
+        category: "settings-changed",
+        level: "info",
+        siteId: siteConfig.siteId,
+        siteName: siteConfig.siteName,
+        node: null,
+        vmid: null,
+        message: `Load balancer preset "${preset.label}" applied by ${session.user.email}`,
+        details: { preset: preset.key, changedBy: session.user.email },
+      }).catch(() => {});
+
+      revalidatePath(`/sites/${siteSlug}/load-balancer`);
+
+      return {
+        message: `"${preset.label}" applied.`,
+        requestId: randomUUID(),
+        status: "success",
+      };
+    });
+  } catch (error) {
+    return {
+      message: error instanceof Error ? error.message : "Failed to apply the preset.",
       requestId: randomUUID(),
       status: "error",
     };

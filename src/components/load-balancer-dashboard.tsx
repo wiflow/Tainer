@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import {
   CircleAlert,
   Save,
@@ -9,13 +9,15 @@ import {
   ShieldOff,
 } from "lucide-react";
 
-import { updateLoadBalancerSettingsAction } from "@/app/lb-actions";
+import { applyLbPresetAction, updateLoadBalancerSettingsAction } from "@/app/lb-actions";
 import { useActionFlashFeedback } from "@/components/task-toast-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
+import { PillTabs } from "@/components/ui/pill-tabs";
 import { SectionPanel } from "@/components/ui/section-panel";
 import { initialBasicActionState } from "@/lib/action-states";
+import { detectLbPresetIndex, LB_PRESET_STOPS } from "@/lib/load-balancer/presets";
 import type { LoadBalancerSettings, LoadBalancerStatus, NodeScore } from "@/lib/load-balancer/types";
 import { cn } from "@/lib/utils";
 
@@ -606,12 +608,123 @@ export function LoadBalancerDashboard({
           (load-balancer-event-viewer) which records every migration,
           failure, and tick error persistently across restarts. */}
 
-      <SectionPanel
-        title="Settings"
-        description="Configure scoring weights, polling intervals, migration thresholds, and penalties."
-      >
-        <SettingsForm settings={settings} siteSlug={siteSlug} />
-      </SectionPanel>
+      <SettingsTabs settings={settings} siteSlug={siteSlug} />
     </div>
+  );
+}
+
+function SettingsTabs({
+  settings,
+  siteSlug,
+}: {
+  settings: LoadBalancerSettings;
+  siteSlug: string;
+}) {
+  // Simple by default; land on Advanced only when the current settings
+  // don't match any preset (someone already tuned the knobs by hand).
+  const presetIndex = detectLbPresetIndex(settings);
+  const [tab, setTab] = useState<"simple" | "advanced">("simple");
+
+  return (
+    <SectionPanel
+      title="Settings"
+      description={
+        tab === "simple"
+          ? "One dial: how eagerly the balancer moves guests. Everything else keeps sensible defaults."
+          : "Configure scoring weights, polling intervals, migration thresholds, and penalties."
+      }
+      headerRight={
+        <PillTabs
+          items={[
+            { active: tab === "simple", label: "Simple", onClick: () => setTab("simple") },
+            { active: tab === "advanced", label: "Advanced", onClick: () => setTab("advanced") },
+          ]}
+        />
+      }
+    >
+      {tab === "simple" ? (
+        <SimpleSettingsForm presetIndex={presetIndex} settings={settings} siteSlug={siteSlug} />
+      ) : (
+        <SettingsForm settings={settings} siteSlug={siteSlug} />
+      )}
+    </SectionPanel>
+  );
+}
+
+function SimpleSettingsForm({
+  presetIndex,
+  settings,
+  siteSlug,
+}: {
+  presetIndex: number | null;
+  settings: LoadBalancerSettings;
+  siteSlug: string;
+}) {
+  const [state, action, isPending] = useActionState(applyLbPresetAction, initialBasicActionState);
+  useActionFlashFeedback(state, {
+    errorTitle: "Preset apply failed",
+    successTitle: "Load balancer updated",
+  });
+
+  // Default to Balanced when the current settings are custom.
+  const [level, setLevel] = useState(presetIndex ?? 2);
+  const stop = LB_PRESET_STOPS[level];
+  const isCustom = presetIndex === null;
+
+  return (
+    <form action={action} className="space-y-4 p-4">
+      <input name="siteSlug" type="hidden" value={siteSlug} />
+      <input name="preset" type="hidden" value={level} />
+
+      <label className="flex items-center gap-2 cursor-pointer">
+        <input
+          className="h-4 w-4 border-white/10 bg-zinc-900 text-sky-400"
+          defaultChecked={settings.enabled}
+          name="enabled"
+          type="checkbox"
+        />
+        <span className="text-[13px] font-medium text-zinc-200">Load balancer enabled</span>
+      </label>
+
+      <div className="max-w-xl">
+        <div className="flex items-baseline justify-between">
+          <span className="text-[13px] font-medium text-zinc-200">Aggressiveness</span>
+          <span className="text-[12px] text-sky-300">{stop.label}</span>
+        </div>
+        <input
+          className="mt-2 w-full accent-sky-400"
+          max={LB_PRESET_STOPS.length - 1}
+          min={0}
+          onChange={(e) => setLevel(Number(e.target.value))}
+          step={1}
+          type="range"
+          value={level}
+        />
+        <div className="mt-1 flex justify-between text-[10.5px] text-zinc-500">
+          {LB_PRESET_STOPS.map((s, i) => (
+            <button
+              className={i === level ? "text-sky-300" : "hover:text-zinc-300"}
+              key={s.key}
+              onClick={() => setLevel(i)}
+              type="button"
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+        <p className="mt-2 text-[12px] text-zinc-400">{stop.description}</p>
+        {isCustom && (
+          <p className="mt-1.5 text-[11px] text-amber-200/80">
+            The current settings were hand-tuned in Advanced mode. Applying a preset replaces the
+            migration thresholds and cooldowns, but keeps weights, penalties, container policy and
+            exclusions as they are.
+          </p>
+        )}
+      </div>
+
+      <Button disabled={isPending} size="sm" type="submit">
+        {isPending ? "Applying..." : `Apply ${stop.label}`}
+      </Button>
+    </form>
   );
 }

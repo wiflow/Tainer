@@ -2,6 +2,7 @@
 
 import {
   Bot,
+  Cloud,
   Container,
   Database,
   GitMerge,
@@ -11,6 +12,8 @@ import {
 import { useState, type ReactNode } from "react";
 
 import { IpamForm } from "@/app/integrations/ipam-form";
+import { HetznerBoxPanel } from "@/components/hetzner-box-panel";
+import { StorageBoxCard } from "@/components/storage-box-card";
 import {
   Dialog,
   DialogContent,
@@ -19,7 +22,19 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import type { HetznerSnapshot, HetznerStorageBox } from "@/lib/hetzner-storage-api";
 import type { PhpIpamIntegrationPublic } from "@/lib/integrations";
+import type { OffloadLogEntry, StorageBoxSummary } from "@/lib/storage-box";
+
+export type StorageBoxSiteState = {
+  siteSlug: string;
+  siteName: string;
+  summary: StorageBoxSummary;
+  offloadLog: OffloadLogEntry[];
+  hetznerBox: HetznerStorageBox | null;
+  hetznerSnapshots: HetznerSnapshot[];
+  hetznerError: string | null;
+};
 
 // Card-grid catalogue of third-party integrations Tainer exposes on the
 // /integrations page. Visual style is borrowed from the cnblocks
@@ -111,11 +126,14 @@ function IntegrationCard({ integration }: { integration: Integration }) {
 
 export type IntegrationsSectionProps = {
   ipam: PhpIpamIntegrationPublic | null;
+  storageBoxSites: StorageBoxSiteState[];
 };
 
-export function IntegrationsSection({ ipam }: IntegrationsSectionProps) {
+export function IntegrationsSection({ ipam, storageBoxSites }: IntegrationsSectionProps) {
   const [ipamOpen, setIpamOpen] = useState(false);
+  const [storageBoxOpen, setStorageBoxOpen] = useState(false);
   const ipamConfigured = Boolean(ipam?.enabled && ipam?.hasToken);
+  const storageBoxConfigured = storageBoxSites.some((s) => s.summary.configured);
 
   const integrations: Integration[] = [
     {
@@ -125,6 +143,14 @@ export function IntegrationsSection({ ipam }: IntegrationsSectionProps) {
       icon: <Database className="size-9" />,
       status: ipamConfigured ? "configured" : "available",
       onClick: () => setIpamOpen(true),
+    },
+    {
+      name: "Hetzner Storage Box",
+      description:
+        "Off-site backup target — verified offload, native CIFS mount, box management via the Hetzner API.",
+      icon: <Cloud className="size-9" />,
+      status: storageBoxConfigured ? "configured" : "available",
+      onClick: () => setStorageBoxOpen(true),
     },
     {
       name: "NetBox",
@@ -170,6 +196,52 @@ export function IntegrationsSection({ ipam }: IntegrationsSectionProps) {
           <IntegrationCard key={integration.name} integration={integration} />
         ))}
       </div>
+
+      <Dialog onOpenChange={setStorageBoxOpen} open={storageBoxOpen}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>
+              {storageBoxConfigured ? "Hetzner Storage Box" : "Connect a Hetzner Storage Box"}
+            </DialogTitle>
+            <DialogDescription>
+              Per-site off-site backup target. Once connected, offload controls appear on the
+              site&apos;s Backups page; a Hetzner Console API token additionally unlocks service
+              toggles, box snapshots and live usage.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {storageBoxSites.map((site) => (
+              <div className="space-y-4" key={site.siteSlug}>
+                {storageBoxSites.length > 1 && (
+                  <h3 className="text-[13px] font-medium text-zinc-300">{site.siteName}</h3>
+                )}
+                <StorageBoxCard
+                  dirStorages={[]}
+                  nodes={[]}
+                  offloadLog={site.offloadLog}
+                  showRetrieve={false}
+                  siteSlug={site.siteSlug}
+                  summary={site.summary}
+                />
+                {site.summary.configured && (
+                  <HetznerBoxPanel
+                    box={site.hetznerBox}
+                    error={site.hetznerError}
+                    hetznerConnected={site.summary.hetznerConnected}
+                    siteSlug={site.siteSlug}
+                    snapshots={site.hetznerSnapshots}
+                  />
+                )}
+              </div>
+            ))}
+            {storageBoxSites.length === 0 && (
+              <p className="text-[12.5px] text-zinc-500">
+                No enabled sites — add a Proxmox site first.
+              </p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog onOpenChange={setIpamOpen} open={ipamOpen}>
         <DialogContent className="sm:max-w-2xl">

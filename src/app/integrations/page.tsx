@@ -1,9 +1,10 @@
-import { Cloud, Plug } from "lucide-react";
+import { Plug } from "lucide-react";
 import { redirect } from "next/navigation";
 
-import { HetznerBoxPanel } from "@/components/hetzner-box-panel";
-import { StorageBoxCard } from "@/components/storage-box-card";
-import { IntegrationsSection } from "@/components/ui/integrations-section";
+import {
+  IntegrationsSection,
+  type StorageBoxSiteState,
+} from "@/components/ui/integrations-section";
 import { getCurrentSession } from "@/lib/auth";
 import {
   getHetznerStorageBox,
@@ -19,29 +20,17 @@ import {
   getHetznerApiContext,
   getStorageBoxSummary,
   listOffloadLog,
-  type OffloadLogEntry,
-  type StorageBoxSummary,
 } from "@/lib/storage-box";
 
 export const dynamic = "force-dynamic";
 
-type SiteBoxState = {
-  siteSlug: string;
-  siteName: string;
-  summary: StorageBoxSummary;
-  offloadLog: OffloadLogEntry[];
-  hetznerBox: HetznerStorageBox | null;
-  hetznerSnapshots: HetznerSnapshot[];
-  hetznerError: string | null;
-};
-
-async function loadSiteBoxStates(): Promise<SiteBoxState[]> {
+async function loadSiteBoxStates(): Promise<StorageBoxSiteState[]> {
   const sites = await listEnabledSites();
 
   return Promise.all(
     sites.map(async (site) => {
       const siteConfig = await resolveSiteConfigBySlug(site.slug);
-      return withSiteConfig(siteConfig, async (): Promise<SiteBoxState> => {
+      return withSiteConfig(siteConfig, async (): Promise<StorageBoxSiteState> => {
         const [summary, offloadLog] = await Promise.all([
           getStorageBoxSummary(),
           listOffloadLog(8),
@@ -84,7 +73,7 @@ export default async function IntegrationsPage() {
   if (!session) redirect("/login");
   if (session.user.role !== "admin") redirect("/");
 
-  const [ipam, siteBoxStates] = await Promise.all([
+  const [ipam, storageBoxSites] = await Promise.all([
     getIpamIntegrationPublic(),
     loadSiteBoxStates(),
   ]);
@@ -102,47 +91,7 @@ export default async function IntegrationsPage() {
         </p>
       </div>
 
-      <IntegrationsSection ipam={ipam} />
-
-      {/* Hetzner Storage Box — per site, since backups and offload are site-scoped */}
-      <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <Cloud className="h-4 w-4 text-zinc-300" />
-          <h2 className="text-[14px] font-medium text-white">
-            Hetzner Storage Box — off-site backup
-          </h2>
-        </div>
-        <p className="text-[12px] text-zinc-500">
-          Per-site off-site backup target. Once connected here, offload controls appear on the
-          site&apos;s Backups page; adding a Hetzner Console API token unlocks box management
-          (services, snapshots, usage).
-        </p>
-      </div>
-
-      {siteBoxStates.map((state) => (
-        <div className="space-y-4" key={state.siteSlug}>
-          {siteBoxStates.length > 1 && (
-            <h3 className="text-[13px] font-medium text-zinc-300">{state.siteName}</h3>
-          )}
-          <StorageBoxCard
-            dirStorages={[]}
-            nodes={[]}
-            offloadLog={state.offloadLog}
-            showRetrieve={false}
-            siteSlug={state.siteSlug}
-            summary={state.summary}
-          />
-          {state.summary.configured && (
-            <HetznerBoxPanel
-              box={state.hetznerBox}
-              error={state.hetznerError}
-              hetznerConnected={state.summary.hetznerConnected}
-              siteSlug={state.siteSlug}
-              snapshots={state.hetznerSnapshots}
-            />
-          )}
-        </div>
-      ))}
+      <IntegrationsSection ipam={ipam} storageBoxSites={storageBoxSites} />
     </div>
   );
 }
