@@ -1,12 +1,46 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Eye, EyeOff, KeyRound, Loader2, Save, Sparkles, Zap } from "lucide-react";
+import {
+  Eye,
+  EyeOff,
+  KeyRound,
+  Loader2,
+  Save,
+  ServerCog,
+  Sparkles,
+  Users,
+  Zap,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { SectionPanel } from "@/components/ui/section-panel";
 import { cn } from "@/lib/utils";
-import type { CopilotSettings, CopilotUsageSnapshot } from "@/lib/copilot/store";
+import type {
+  CopilotSettings,
+  CopilotUsageSnapshot,
+  CopilotUserUsageSummary,
+  GroupToolPolicy,
+} from "@/lib/copilot/store";
+
+type GroupInfo = { id: string; name: string; isAdmin: boolean };
+type UserUsageRow = CopilotUserUsageSummary & { email: string; name: string };
+
+function estimateUsd(
+  inputTokens: number,
+  outputTokens: number,
+  costIn: number | null,
+  costOut: number | null,
+): number | null {
+  if (costIn === null && costOut === null) return null;
+  return (
+    (inputTokens / 1_000_000) * (costIn ?? 0) + (outputTokens / 1_000_000) * (costOut ?? 0)
+  );
+}
+
+function formatUsd(value: number): string {
+  return value < 0.01 && value > 0 ? "<$0.01" : `$${value.toFixed(2)}`;
+}
 
 const inputClassName =
   "mt-1.5 w-full rounded-xl border border-white/[0.06] bg-white/[0.025] px-4 py-3 text-[13px] text-zinc-200 outline-none transition-all duration-200 placeholder:text-zinc-600 focus:border-white/[0.15] focus:bg-white/[0.04] focus:shadow-[0_0_0_3px_rgba(255,255,255,0.03)]";
@@ -23,6 +57,14 @@ export function CopilotSettingsPanel() {
   const [tokenBudget, setTokenBudget] = useState(500_000);
   const [toolBudget, setToolBudget] = useState(200);
   const [enabled, setEnabled] = useState(true);
+  const [baseUrl, setBaseUrl] = useState("");
+  const [customModelId, setCustomModelId] = useState("");
+  const [operatorNotes, setOperatorNotes] = useState("");
+  const [costIn, setCostIn] = useState("");
+  const [costOut, setCostOut] = useState("");
+  const [groupPolicies, setGroupPolicies] = useState<Record<string, GroupToolPolicy>>({});
+  const [groups, setGroups] = useState<GroupInfo[]>([]);
+  const [userUsage, setUserUsage] = useState<UserUsageRow[]>([]);
   const [feedback, setFeedback] = useState<{ kind: "success" | "error"; text: string } | null>(
     null,
   );
@@ -35,6 +77,8 @@ export function CopilotSettingsPanel() {
         settings: CopilotSettings;
         usage: CopilotUsageSnapshot;
         isAdmin: boolean;
+        groups?: GroupInfo[];
+        userUsage?: UserUsageRow[];
       };
       setSettings(json.settings);
       setUsage(json.usage);
@@ -43,6 +87,14 @@ export function CopilotSettingsPanel() {
       setTokenBudget(json.settings.dailyTokenBudget);
       setToolBudget(json.settings.dailyToolCallBudget);
       setEnabled(json.settings.enabled);
+      setBaseUrl(json.settings.baseUrl ?? "");
+      setCustomModelId(json.settings.customModelId ?? "");
+      setOperatorNotes(json.settings.operatorNotes ?? "");
+      setCostIn(json.settings.costPerMInputUsd?.toString() ?? "");
+      setCostOut(json.settings.costPerMOutputUsd?.toString() ?? "");
+      setGroupPolicies(json.settings.groupPolicies ?? {});
+      setGroups(json.groups ?? []);
+      setUserUsage(json.userUsage ?? []);
     } catch {
       setFeedback({ kind: "error", text: "Failed to load copilot settings." });
     } finally {
@@ -68,6 +120,12 @@ export function CopilotSettingsPanel() {
             dailyTokenBudget: tokenBudget,
             dailyToolCallBudget: toolBudget,
             enabled,
+            baseUrl: baseUrl.trim() || null,
+            customModelId: customModelId.trim() || null,
+            operatorNotes,
+            groupPolicies,
+            costPerMInputUsd: costIn.trim() === "" ? null : Number(costIn),
+            costPerMOutputUsd: costOut.trim() === "" ? null : Number(costOut),
           }),
         });
         const json = (await res.json()) as { settings?: CopilotSettings; error?: string };
@@ -84,7 +142,18 @@ export function CopilotSettingsPanel() {
         setSaving(false);
       }
     },
-    [model, tokenBudget, toolBudget, enabled],
+    [
+      model,
+      tokenBudget,
+      toolBudget,
+      enabled,
+      baseUrl,
+      customModelId,
+      operatorNotes,
+      groupPolicies,
+      costIn,
+      costOut,
+    ],
   );
 
   const removeKey = useCallback(async () => {
@@ -228,6 +297,52 @@ export function CopilotSettingsPanel() {
                 icon={<Sparkles className="h-3.5 w-3.5" />}
               />
             </div>
+            {baseUrl.trim() && (
+              <p className="text-[11px] text-amber-200/80 mt-1.5">
+                A custom endpoint is set — the model presets above are ignored in favour of
+                the custom model id below.
+              </p>
+            )}
+          </div>
+
+          {/* Custom endpoint */}
+          <div>
+            <label className="text-[12px] font-medium text-zinc-300 flex items-center gap-1.5">
+              <ServerCog className="h-3 w-3" />
+              Custom endpoint (self-hosted models)
+            </label>
+            <p className="text-[11.5px] text-zinc-500 mt-0.5">
+              Point Tainy at any OpenAI-compatible server — vLLM, Ollama, LM Studio, or a
+              corporate gateway — instead of DeepInfra. Use the base URL up to (not
+              including) <code>/chat/completions</code>, e.g.{" "}
+              <code className="text-zinc-400">https://vllm.example.com/v1</code>. https is
+              required; the API key above is optional for endpoints that don&apos;t need one.
+              Leave empty to use DeepInfra.
+            </p>
+            {isAdmin ? (
+              <div className="mt-1 grid grid-cols-[2fr_1fr] gap-2">
+                <input
+                  className={inputClassName}
+                  type="url"
+                  value={baseUrl}
+                  onChange={(e) => setBaseUrl(e.target.value)}
+                  placeholder="https://vllm.example.com/v1"
+                  autoComplete="off"
+                />
+                <input
+                  className={inputClassName}
+                  type="text"
+                  value={customModelId}
+                  onChange={(e) => setCustomModelId(e.target.value)}
+                  placeholder="Model id, e.g. qwen3-32b"
+                  autoComplete="off"
+                />
+              </div>
+            ) : settings.baseUrl ? (
+              <p className="text-[11.5px] text-zinc-400 mt-1">
+                Using custom endpoint <code>{settings.baseUrl}</code> ({settings.modelId}).
+              </p>
+            ) : null}
           </div>
 
           {/* Budgets */}
@@ -251,7 +366,15 @@ export function CopilotSettingsPanel() {
               ) : null}
               <UsageBar
                 pct={tokenPct}
-                label={`${(usage.inputTokens + usage.outputTokens).toLocaleString()} / ${usage.tokenBudget.toLocaleString()} (you, today)`}
+                label={`${(usage.inputTokens + usage.outputTokens).toLocaleString()} / ${usage.tokenBudget.toLocaleString()} (you, today)${(() => {
+                  const cost = estimateUsd(
+                    usage.inputTokens,
+                    usage.outputTokens,
+                    settings.costPerMInputUsd,
+                    settings.costPerMOutputUsd,
+                  );
+                  return cost !== null ? ` · ~${formatUsd(cost)}` : "";
+                })()}`}
               />
             </div>
             <div>
@@ -273,6 +396,67 @@ export function CopilotSettingsPanel() {
               ) : null}
               <UsageBar pct={toolPct} label={`${usage.toolCalls} / ${usage.toolCallBudget} (you, today)`} />
             </div>
+          </div>
+
+          {/* Cost estimation */}
+          {(isAdmin || settings.costPerMInputUsd !== null || settings.costPerMOutputUsd !== null) && (
+            <div>
+              <label className="text-[12px] font-medium text-zinc-300">
+                Cost estimation (optional)
+              </label>
+              <p className="text-[11.5px] text-zinc-500 mt-0.5">
+                USD per million tokens for your provider/model. Purely informational — turns
+                token counts in the usage displays into a dollar estimate. Leave empty to
+                hide costs.
+              </p>
+              {isAdmin && (
+                <div className="mt-1 grid grid-cols-2 gap-2">
+                  <input
+                    className={inputClassName}
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    value={costIn}
+                    onChange={(e) => setCostIn(e.target.value)}
+                    placeholder="Input $/1M tokens"
+                  />
+                  <input
+                    className={inputClassName}
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    value={costOut}
+                    onChange={(e) => setCostOut(e.target.value)}
+                    placeholder="Output $/1M tokens"
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Operator notes */}
+          <div>
+            <label className="text-[12px] font-medium text-zinc-300">Operator notes</label>
+            <p className="text-[11.5px] text-zinc-500 mt-0.5">
+              Site-specific guidance injected into Tainy&apos;s instructions — runbook rules
+              like &quot;never restart CT 105 during business hours&quot; or &quot;prefer the
+              servers IP pool for new containers&quot;. Visible to every user via the
+              copilot&apos;s behaviour; max 4,000 characters.
+            </p>
+            {isAdmin ? (
+              <textarea
+                className={cn(inputClassName, "min-h-[84px] resize-y")}
+                value={operatorNotes}
+                onChange={(e) => setOperatorNotes(e.target.value.slice(0, 4000))}
+                placeholder="e.g. Production containers are tagged 'prod' — always suggest a snapshot before touching them."
+              />
+            ) : operatorNotes.trim() ? (
+              <pre className="mt-1.5 whitespace-pre-wrap rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2.5 text-[12px] text-zinc-400 font-sans">
+                {operatorNotes}
+              </pre>
+            ) : (
+              <p className="text-[11.5px] text-zinc-600 mt-1">None set.</p>
+            )}
           </div>
 
           {feedback && (
@@ -305,6 +489,129 @@ export function CopilotSettingsPanel() {
           )}
         </div>
       </SectionPanel>
+
+      {isAdmin && groups.length > 0 && (
+        <SectionPanel
+          title="Group tool policy"
+          description="Restrict which classes of copilot tools each group may use. Read tools (list, get, metrics) are always available; unchecking a box hides those tools from the model and blocks them server-side. Admins are exempt. Changes apply on Save above."
+        >
+          <div className="divide-y divide-white/[0.04]">
+            <div className="grid grid-cols-[1fr_auto_auto] gap-x-6 pb-1.5 text-[10.5px] uppercase tracking-wide text-zinc-600">
+              <span>Group</span>
+              <span>Write & admin</span>
+              <span>Destructive</span>
+            </div>
+            {groups.map((group) => {
+              const policy = groupPolicies[group.id] ?? {
+                allowWrite: true,
+                allowDestructive: true,
+              };
+              const setPolicy = (patch: Partial<GroupToolPolicy>) =>
+                setGroupPolicies((prev) => ({
+                  ...prev,
+                  [group.id]: { ...policy, ...patch },
+                }));
+              return (
+                <div
+                  key={group.id}
+                  className="grid grid-cols-[1fr_auto_auto] items-center gap-x-6 py-1.5"
+                >
+                  <span className="text-[12px] text-zinc-200 truncate">
+                    {group.name}
+                    {group.isAdmin && (
+                      <span className="ml-1.5 text-[10px] text-violet-300/80">
+                        admin group — exempt
+                      </span>
+                    )}
+                  </span>
+                  <input
+                    type="checkbox"
+                    className="h-3.5 w-3.5 accent-emerald-500 justify-self-center"
+                    checked={policy.allowWrite}
+                    disabled={group.isAdmin}
+                    onChange={(e) => setPolicy({ allowWrite: e.target.checked })}
+                  />
+                  <input
+                    type="checkbox"
+                    className="h-3.5 w-3.5 accent-emerald-500 justify-self-center"
+                    checked={policy.allowDestructive}
+                    disabled={group.isAdmin}
+                    onChange={(e) => setPolicy({ allowDestructive: e.target.checked })}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        </SectionPanel>
+      )}
+
+      {isAdmin && (
+        <SectionPanel
+          title="Usage by user"
+          description="Token and tool-call spend per user — today and over the rolling 30-day window the usage log keeps."
+        >
+          {userUsage.length === 0 ? (
+            <div className="flex items-center gap-2 text-[12px] text-zinc-500">
+              <Users className="h-3.5 w-3.5" /> No copilot usage recorded yet.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-[12px]">
+                <thead>
+                  <tr className="text-left text-[10.5px] uppercase tracking-wide text-zinc-600">
+                    <th className="pb-1.5 pr-4 font-medium">User</th>
+                    <th className="pb-1.5 pr-4 font-medium text-right">Tokens today</th>
+                    <th className="pb-1.5 pr-4 font-medium text-right">Tools today</th>
+                    <th className="pb-1.5 pr-4 font-medium text-right">Tokens 30d</th>
+                    <th className="pb-1.5 pr-4 font-medium text-right">Tools 30d</th>
+                    {(settings.costPerMInputUsd !== null ||
+                      settings.costPerMOutputUsd !== null) && (
+                      <th className="pb-1.5 font-medium text-right">Est. cost 30d</th>
+                    )}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/[0.04]">
+                  {userUsage.map((row) => {
+                    const cost = estimateUsd(
+                      row.monthInputTokens,
+                      row.monthOutputTokens,
+                      settings.costPerMInputUsd,
+                      settings.costPerMOutputUsd,
+                    );
+                    return (
+                      <tr key={row.userId}>
+                        <td className="py-1.5 pr-4">
+                          <span className="text-zinc-200">{row.name}</span>
+                          <span className="ml-1.5 text-[10.5px] text-zinc-600">
+                            {row.email}
+                          </span>
+                        </td>
+                        <td className="py-1.5 pr-4 text-right tabular-nums text-zinc-300">
+                          {(row.todayInputTokens + row.todayOutputTokens).toLocaleString()}
+                        </td>
+                        <td className="py-1.5 pr-4 text-right tabular-nums text-zinc-300">
+                          {row.todayToolCalls.toLocaleString()}
+                        </td>
+                        <td className="py-1.5 pr-4 text-right tabular-nums text-zinc-400">
+                          {(row.monthInputTokens + row.monthOutputTokens).toLocaleString()}
+                        </td>
+                        <td className="py-1.5 pr-4 text-right tabular-nums text-zinc-400">
+                          {row.monthToolCalls.toLocaleString()}
+                        </td>
+                        {cost !== null && (
+                          <td className="py-1.5 text-right tabular-nums text-zinc-300">
+                            ~{formatUsd(cost)}
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </SectionPanel>
+      )}
 
       <SectionPanel
         title="Permissions & safety"

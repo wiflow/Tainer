@@ -1,6 +1,23 @@
 import "server-only";
 
-const DEEPINFRA_API = "https://api.deepinfra.com/v1/openai/chat/completions";
+export const DEFAULT_OPENAI_BASE_URL = "https://api.deepinfra.com/v1/openai";
+
+/**
+ * Resolve the chat-completions URL for an OpenAI-compatible base URL
+ * ("https://host/v1" for vLLM/Ollama, DeepInfra's /v1/openai by default).
+ */
+function chatCompletionsUrl(baseUrl: string | null | undefined): string {
+  const base = (baseUrl || DEFAULT_OPENAI_BASE_URL).replace(/\/+$/, "");
+  return `${base}/chat/completions`;
+}
+
+/** Self-hosted endpoints (vLLM, Ollama) often run without an API key. */
+function buildHeaders(apiKey: string | null): Record<string, string> {
+  return {
+    ...(apiKey ? { authorization: `Bearer ${apiKey}` } : {}),
+    "content-type": "application/json",
+  };
+}
 
 export type OpenAiToolCall = {
   id: string;
@@ -93,17 +110,14 @@ async function throwApiError(response: Response): Promise<never> {
 }
 
 export async function callDeepInfra(
-  apiKey: string,
+  apiKey: string | null,
   body: OpenAiRequest,
-  options: { signal?: AbortSignal } = {},
+  options: { signal?: AbortSignal; baseUrl?: string | null } = {},
 ): Promise<OpenAiResponse> {
-  const response = await fetch(DEEPINFRA_API, {
+  const response = await fetch(chatCompletionsUrl(options.baseUrl), {
     method: "POST",
     signal: options.signal,
-    headers: {
-      authorization: `Bearer ${apiKey}`,
-      "content-type": "application/json",
-    },
+    headers: buildHeaders(apiKey),
     body: JSON.stringify(body),
   });
 
@@ -151,17 +165,14 @@ type StreamChunk = {
  * final value.
  */
 export async function* streamDeepInfra(
-  apiKey: string,
+  apiKey: string | null,
   body: OpenAiRequest,
-  options: { signal?: AbortSignal } = {},
+  options: { signal?: AbortSignal; baseUrl?: string | null } = {},
 ): AsyncGenerator<DeepInfraStreamDelta, DeepInfraStreamResult> {
-  const response = await fetch(DEEPINFRA_API, {
+  const response = await fetch(chatCompletionsUrl(options.baseUrl), {
     method: "POST",
     signal: options.signal,
-    headers: {
-      authorization: `Bearer ${apiKey}`,
-      "content-type": "application/json",
-    },
+    headers: buildHeaders(apiKey),
     body: JSON.stringify({
       ...body,
       stream: true,

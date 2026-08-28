@@ -47,6 +47,13 @@ export type ToolDefinition = {
    * surface it.
    */
   execute: (args: ToolArgs, ctx: ToolExecutionContext) => Promise<unknown>;
+  /**
+   * True when the tool's result contains content authored outside this
+   * Tainer instance (e.g. Docker Hub descriptions). Such results are fed to
+   * the model wrapped in untrusted-data markers, and any gated action
+   * proposed afterwards carries a provenance warning on its approval card.
+   */
+  returnsExternalContent?: boolean;
 };
 
 export type ToolExecutionContext = {
@@ -130,6 +137,10 @@ export type CopilotStreamEvent =
       confirmString: string | null;
       plan?: ApprovalPlan | null;
       token: string;
+      /** External (e.g. Docker Hub) content entered the conversation before
+       *  this action was proposed — the approval card shows a provenance
+       *  warning so the user double-checks the action matches their ask. */
+      afterExternalContent: boolean;
     }
   | { type: "turn_end"; stopReason: string; usage: { input: number; output: number } }
   | { type: "error"; message: string };

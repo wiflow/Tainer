@@ -21,7 +21,9 @@ export function listTools(): ToolDefinition[] {
   return Array.from(registry.values());
 }
 
-export function listToolsForModel(): Array<{
+export function listToolsForModel(
+  isAllowed: (tool: ToolDefinition) => boolean = () => true,
+): Array<{
   type: "function";
   function: {
     name: string;
@@ -29,12 +31,14 @@ export function listToolsForModel(): Array<{
     parameters: ToolDefinition["input_schema"];
   };
 }> {
-  return listTools().map((tool) => ({
-    type: "function" as const,
-    function: {
-      name: tool.name,
-      description: `[${tool.klass}] ${tool.description}`,
-      parameters: tool.input_schema,
-    },
-  }));
+  return listTools()
+    .filter(isAllowed)
+    .map((tool) => ({
+      type: "function" as const,
+      function: {
+        name: tool.name,
+        description: `[${tool.klass}] ${tool.description}`,
+        parameters: tool.input_schema,
+      },
+    }));
 }

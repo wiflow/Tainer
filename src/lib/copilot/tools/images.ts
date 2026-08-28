@@ -39,6 +39,10 @@ registerTool({
   name: "search_docker_images",
   category: "Templates",
   klass: "read",
+  // Docker Hub descriptions are public, third-party-authored text — the run
+  // loop fences them as untrusted data and flags follow-up approvals with a
+  // provenance warning.
+  returnsExternalContent: true,
   description:
     "Search Docker Hub for images by name. Use this BEFORE pull_docker_image whenever you're not certain of the namespace — many popular projects are NOT official images (e.g. Pi-hole is 'pihole/pihole', not 'library/pihole'). Returns namespace, repository, description, and popularity so you can pick the right one.",
   input_schema: {

@@ -12,17 +12,45 @@ const DATA_FILE = "copilot-store.json";
 const DEFAULT_DAILY_TOKEN_BUDGET = 500_000;
 const DEFAULT_DAILY_TOOL_CALL_BUDGET = 200;
 const DEFAULT_MODEL: CopilotModel = "smart";
+const MAX_OPERATOR_NOTES_LENGTH = 4000;
+const MAX_CUSTOM_MODEL_ID_LENGTH = 200;
+
+/**
+ * Per-group restriction on which tool classes the copilot may use. Read
+ * tools are always allowed; `allowWrite` covers write + admin klasses.
+ * Absence of a policy for a group means "allow everything" — the feature
+ * restricts, it doesn't grant (permissions still gate every call).
+ */
+export type GroupToolPolicy = {
+  allowWrite: boolean;
+  allowDestructive: boolean;
+};
 
 type StoredSettings = {
-  /** Encrypted DeepInfra API key (AES-256-GCM under AUTH_SECRET). Null = no key set. */
+  /** Encrypted API key (AES-256-GCM under AUTH_SECRET). Null = no key set. */
   encryptedKey: string | null;
   /** Last 4 chars of the plaintext key, for display only. */
   keyHint: string | null;
   model: CopilotModel;
+  /**
+   * OpenAI-compatible base URL override (e.g. "https://vllm.lan/v1" for a
+   * self-hosted model). Null = DeepInfra. https is required unless
+   * TAINER_COPILOT_ALLOW_INSECURE_ENDPOINT=true.
+   */
+  baseUrl: string | null;
+  /** Model id sent to a custom endpoint. Ignored unless baseUrl is set. */
+  customModelId: string | null;
   /** Per-user daily budgets — the key is shared, the caps apply to each user. */
   dailyTokenBudget: number;
   dailyToolCallBudget: number;
   enabled: boolean;
+  /** Admin-authored operational notes injected into the system prompt. */
+  operatorNotes: string;
+  /** Group id → tool-class restriction. Missing id = no restriction. */
+  groupPolicies: Record<string, GroupToolPolicy>;
+  /** USD per million tokens, for the usage panel's cost estimate. Null = hide. */
+  costPerMInputUsd: number | null;
+  costPerMOutputUsd: number | null;
   updatedAt: string;
 };
 
@@ -45,9 +73,15 @@ function defaultSettings(): StoredSettings {
     encryptedKey: null,
     keyHint: null,
     model: DEFAULT_MODEL,
+    baseUrl: null,
+    customModelId: null,
     dailyTokenBudget: DEFAULT_DAILY_TOKEN_BUDGET,
     dailyToolCallBudget: DEFAULT_DAILY_TOOL_CALL_BUDGET,
     enabled: true,
+    operatorNotes: "",
+    groupPolicies: {},
+    costPerMInputUsd: null,
+    costPerMOutputUsd: null,
     updatedAt: new Date(0).toISOString(),
   };
 }
@@ -81,9 +115,15 @@ export type CopilotSettings = {
   keyHint: string | null;
   model: CopilotModel;
   modelId: string;
+  baseUrl: string | null;
+  customModelId: string | null;
   dailyTokenBudget: number;
   dailyToolCallBudget: number;
   enabled: boolean;
+  operatorNotes: string;
+  groupPolicies: Record<string, GroupToolPolicy>;
+  costPerMInputUsd: number | null;
+  costPerMOutputUsd: number | null;
   updatedAt: string | null;
 };
 
@@ -92,12 +132,52 @@ function toPublic(stored: StoredSettings): CopilotSettings {
     hasKey: Boolean(stored.encryptedKey),
     keyHint: stored.keyHint,
     model: stored.model,
-    modelId: COPILOT_MODEL_IDS[stored.model],
+    // On a custom endpoint the operator's model id wins; the fast/smart
+    // presets only mean something on DeepInfra.
+    modelId:
+      stored.baseUrl && stored.customModelId
+        ? stored.customModelId
+        : COPILOT_MODEL_IDS[stored.model],
+    baseUrl: stored.baseUrl,
+    customModelId: stored.customModelId,
     dailyTokenBudget: stored.dailyTokenBudget,
     dailyToolCallBudget: stored.dailyToolCallBudget,
     enabled: stored.enabled,
+    operatorNotes: stored.operatorNotes,
+    groupPolicies: stored.groupPolicies,
+    costPerMInputUsd: stored.costPerMInputUsd,
+    costPerMOutputUsd: stored.costPerMOutputUsd,
     updatedAt: stored.updatedAt === new Date(0).toISOString() ? null : stored.updatedAt,
   };
+}
+
+/**
+ * Validate a copilot endpoint override. Deny-by-default: only https URLs
+ * pass unless the operator explicitly sets
+ * TAINER_COPILOT_ALLOW_INSECURE_ENDPOINT=true (plain http exposes the API
+ * key and all cluster data in the prompts to the network path).
+ * Returns the normalised URL, or throws with an operator-readable message.
+ */
+export function validateCopilotBaseUrl(raw: string): string {
+  const trimmed = raw.trim().replace(/\/+$/, "");
+  let url: URL;
+  try {
+    url = new URL(trimmed);
+  } catch {
+    throw new Error("Endpoint must be a valid URL, e.g. https://vllm.example.com/v1");
+  }
+  const allowInsecure =
+    (process.env.TAINER_COPILOT_ALLOW_INSECURE_ENDPOINT ?? "").trim().toLowerCase() ===
+    "true";
+  if (url.protocol !== "https:" && !(url.protocol === "http:" && allowInsecure)) {
+    throw new Error(
+      "Endpoint must use https. To allow plain http on a trusted network, set TAINER_COPILOT_ALLOW_INSECURE_ENDPOINT=true.",
+    );
+  }
+  if (url.search || url.hash || url.username || url.password) {
+    throw new Error("Endpoint must be a bare base URL — no query, fragment, or credentials.");
+  }
+  return trimmed;
 }
 
 export async function getCopilotSettings(): Promise<CopilotSettings> {
@@ -118,9 +198,16 @@ export async function getCopilotApiKey(): Promise<string | null> {
 export type CopilotSettingsInput = {
   apiKey?: string | null;
   model?: CopilotModel;
+  /** Already validated with validateCopilotBaseUrl. Null clears the override. */
+  baseUrl?: string | null;
+  customModelId?: string | null;
   dailyTokenBudget?: number;
   dailyToolCallBudget?: number;
   enabled?: boolean;
+  operatorNotes?: string;
+  groupPolicies?: Record<string, GroupToolPolicy>;
+  costPerMInputUsd?: number | null;
+  costPerMOutputUsd?: number | null;
 };
 
 export async function saveCopilotSettings(
@@ -140,6 +227,13 @@ export async function saveCopilotSettings(
       }
     }
     if (input.model) settings.model = input.model;
+    if (input.baseUrl !== undefined) {
+      settings.baseUrl = input.baseUrl?.trim() || null;
+    }
+    if (input.customModelId !== undefined) {
+      settings.customModelId =
+        input.customModelId?.trim().slice(0, MAX_CUSTOM_MODEL_ID_LENGTH) || null;
+    }
     if (typeof input.dailyTokenBudget === "number" && input.dailyTokenBudget > 0) {
       settings.dailyTokenBudget = Math.floor(input.dailyTokenBudget);
     }
@@ -147,6 +241,34 @@ export async function saveCopilotSettings(
       settings.dailyToolCallBudget = Math.floor(input.dailyToolCallBudget);
     }
     if (typeof input.enabled === "boolean") settings.enabled = input.enabled;
+    if (typeof input.operatorNotes === "string") {
+      settings.operatorNotes = input.operatorNotes.slice(0, MAX_OPERATOR_NOTES_LENGTH);
+    }
+    if (input.groupPolicies) {
+      const clean: Record<string, GroupToolPolicy> = {};
+      for (const [groupId, policy] of Object.entries(input.groupPolicies)) {
+        if (!policy || typeof policy !== "object") continue;
+        // Only persist actual restrictions — an all-allow entry is the default.
+        if (policy.allowWrite !== false && policy.allowDestructive !== false) continue;
+        clean[groupId] = {
+          allowWrite: policy.allowWrite !== false,
+          allowDestructive: policy.allowDestructive !== false,
+        };
+      }
+      settings.groupPolicies = clean;
+    }
+    if (input.costPerMInputUsd !== undefined) {
+      settings.costPerMInputUsd =
+        typeof input.costPerMInputUsd === "number" && input.costPerMInputUsd >= 0
+          ? input.costPerMInputUsd
+          : null;
+    }
+    if (input.costPerMOutputUsd !== undefined) {
+      settings.costPerMOutputUsd =
+        typeof input.costPerMOutputUsd === "number" && input.costPerMOutputUsd >= 0
+          ? input.costPerMOutputUsd
+          : null;
+    }
     settings.updatedAt = new Date().toISOString();
 
     return toPublic(settings);
@@ -215,4 +337,72 @@ export async function recordCopilotUsage(
     const cutoffDay = cutoff.toISOString().slice(0, 10);
     store.usage = store.usage.filter((u) => u.day >= cutoffDay);
   });
+}
+
+/**
+ * Resolve the effective tool-class policy for a user. Read tools are never
+ * restricted. Admins are exempt (they can already do everything in the UI).
+ * With multiple groups the most restrictive answer wins — a restriction
+ * applied to any of the user's groups holds even if another group has none.
+ */
+export async function getGroupToolPolicyForUser(user: {
+  role: string;
+  groupIds: string[];
+}): Promise<GroupToolPolicy> {
+  if (user.role === "admin") return { allowWrite: true, allowDestructive: true };
+  const store = await readStore();
+  const policies = store.settings.groupPolicies;
+  let allowWrite = true;
+  let allowDestructive = true;
+  for (const groupId of user.groupIds) {
+    const policy = policies[groupId];
+    if (!policy) continue;
+    allowWrite = allowWrite && policy.allowWrite;
+    allowDestructive = allowDestructive && policy.allowDestructive;
+  }
+  return { allowWrite, allowDestructive };
+}
+
+export type CopilotUserUsageSummary = {
+  userId: string;
+  todayInputTokens: number;
+  todayOutputTokens: number;
+  todayToolCalls: number;
+  monthInputTokens: number;
+  monthOutputTokens: number;
+  monthToolCalls: number;
+};
+
+/** Per-user aggregates over the rolling 30-day usage log, for the admin panel. */
+export async function listCopilotUsageSummaries(): Promise<CopilotUserUsageSummary[]> {
+  const store = await readStore();
+  const today = currentUtcDay();
+  const byUser = new Map<string, CopilotUserUsageSummary>();
+  for (const entry of store.usage) {
+    let summary = byUser.get(entry.userId);
+    if (!summary) {
+      summary = {
+        userId: entry.userId,
+        todayInputTokens: 0,
+        todayOutputTokens: 0,
+        todayToolCalls: 0,
+        monthInputTokens: 0,
+        monthOutputTokens: 0,
+        monthToolCalls: 0,
+      };
+      byUser.set(entry.userId, summary);
+    }
+    summary.monthInputTokens += entry.inputTokens;
+    summary.monthOutputTokens += entry.outputTokens;
+    summary.monthToolCalls += entry.toolCalls;
+    if (entry.day === today) {
+      summary.todayInputTokens += entry.inputTokens;
+      summary.todayOutputTokens += entry.outputTokens;
+      summary.todayToolCalls += entry.toolCalls;
+    }
+  }
+  return Array.from(byUser.values()).sort(
+    (a, b) =>
+      b.monthInputTokens + b.monthOutputTokens - (a.monthInputTokens + a.monthOutputTokens),
+  );
 }

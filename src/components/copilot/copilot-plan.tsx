@@ -31,6 +31,9 @@ export type ToolCallView = {
   confirmString?: string | null;
   plan?: ApprovalPlan | null;
   token?: string;
+  /** External content (e.g. Docker Hub descriptions) entered the conversation
+   *  before this action was proposed — show a provenance warning. */
+  afterExternalContent?: boolean;
 };
 
 // Humanize tool names + args into short subtask titles. Falls back to the
@@ -475,6 +478,15 @@ function ApprovalCard({
           <div className="text-[10.5px] text-zinc-400 mt-0.5">
             This action runs with your permissions. Approve to execute or deny to cancel.
           </div>
+          {tc.afterExternalContent && (
+            <div className="mt-1.5 flex items-start gap-1.5 rounded-md border border-amber-500/25 bg-amber-500/[0.06] px-2 py-1.5 text-[10.5px] text-amber-200/90">
+              <ShieldAlert className="h-3 w-3 mt-px flex-shrink-0" />
+              <span>
+                External content (e.g. Docker Hub descriptions) was read earlier in this
+                conversation. Double-check this action matches what you actually asked for.
+              </span>
+            </div>
+          )}
           {needsConfirm && (
             <div className="mt-2">
               <label className="block text-[10.5px] text-zinc-400 mb-1">

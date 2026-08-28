@@ -14,19 +14,68 @@ import {
   getCopilotApiKey,
   getCopilotSettings,
   getCopilotUsage,
+  getGroupToolPolicyForUser,
   recordCopilotUsage,
+  type GroupToolPolicy,
 } from "@/lib/copilot/store";
 import "@/lib/copilot/tools";
 import { getTool, listToolsForModel } from "@/lib/copilot/registry";
-import {
-  COPILOT_MODEL_IDS,
-  type ChatMessage,
-  type CopilotStreamEvent,
+import type {
+  ChatMessage,
+  CopilotStreamEvent,
+  ToolClass,
 } from "@/lib/copilot/types";
 
 // Hard ceilings — defense in depth on top of the configured daily budgets.
 const MAX_TOOL_CALLS_PER_TURN = 15;
 const MAX_TOKENS_PER_RESPONSE = 4096;
+
+// Burst protection: daily budgets alone let a user (or a stolen session)
+// burn the whole day's tokens in seconds against the shared key. Sliding
+// per-user window, in-memory — single-process deployment, same as the
+// approval flow's assumptions.
+const MAX_TURNS_PER_MINUTE = 10;
+const TURN_RATE_WINDOW_MS = 60_000;
+const turnTimestamps = new Map<string, number[]>();
+
+function checkTurnRateLimit(userId: string): boolean {
+  const now = Date.now();
+  const recent = (turnTimestamps.get(userId) ?? []).filter(
+    (t) => now - t < TURN_RATE_WINDOW_MS,
+  );
+  if (recent.length >= MAX_TURNS_PER_MINUTE) {
+    turnTimestamps.set(userId, recent);
+    return false;
+  }
+  recent.push(now);
+  turnTimestamps.set(userId, recent);
+  return true;
+}
+
+function klassAllowedByPolicy(klass: ToolClass, policy: GroupToolPolicy): boolean {
+  if (klass === "read") return true;
+  if (klass === "destructive") return policy.allowDestructive;
+  // write + admin share the write gate.
+  return policy.allowWrite;
+}
+
+// Results from tools that carry externally-authored content (Docker Hub
+// descriptions etc.) are fenced so the system prompt can declare everything
+// inside as data-not-instructions.
+function fenceExternalContent(json: string): string {
+  return `<<EXTERNAL_UNTRUSTED_DATA>>\n${json}\n<<END_EXTERNAL_UNTRUSTED_DATA>>`;
+}
+
+/** Did any prior tool call in the conversation return external content? */
+function historyHasExternalContent(messages: ChatMessage[]): boolean {
+  for (const msg of messages) {
+    if (msg.role !== "assistant") continue;
+    for (const tc of msg.toolCalls ?? []) {
+      if (getTool(tc.name)?.returnsExternalContent) return true;
+    }
+  }
+  return false;
+}
 
 export type RunInput = {
   session: AuthSession;
@@ -55,11 +104,29 @@ export async function* runCopilotTurn(
   }
 
   const apiKey = await getCopilotApiKey();
-  if (!apiKey) {
+  // A custom (self-hosted) endpoint may legitimately run keyless; the
+  // DeepInfra default never does.
+  if (!apiKey && !settings.baseUrl) {
     yield {
       type: "error",
       message:
         "No DeepInfra API key configured. An admin can add one in Settings → Tainy. Get a key at https://deepinfra.com/dash/api_keys.",
+    };
+    return;
+  }
+
+  if (!checkTurnRateLimit(session.user.id)) {
+    await recordCopilotAudit({
+      session,
+      toolName: "(turn)",
+      klass: "read",
+      args: {},
+      outcome: "budget-exceeded",
+      detail: `Turn rate limit hit (${MAX_TURNS_PER_MINUTE}/min)`,
+    });
+    yield {
+      type: "error",
+      message: `Slow down — at most ${MAX_TURNS_PER_MINUTE} messages per minute. Wait a moment and try again.`,
     };
     return;
   }
@@ -88,9 +155,15 @@ export async function* runCopilotTurn(
     return;
   }
 
-  const systemPrompt = await buildSystemPrompt(session, input.context);
-  const tools = listToolsForModel();
-  const modelId = COPILOT_MODEL_IDS[settings.model];
+  const systemPrompt = await buildSystemPrompt(session, input.context, {
+    operatorNotes: settings.operatorNotes,
+  });
+  // Group tool policy: tools a policy denies aren't even offered to the
+  // model, and the gated-call path below re-checks in case the model calls
+  // one by name anyway.
+  const policy = await getGroupToolPolicyForUser(session.user);
+  const tools = listToolsForModel((tool) => klassAllowedByPolicy(tool.klass, policy));
+  const modelId = settings.modelId;
 
   // Convert client messages into the OpenAI chat format, system prompt first.
   const chatMessages: OpenAiMessage[] = [
@@ -101,6 +174,7 @@ export async function* runCopilotTurn(
   let toolCallsThisTurn = 0;
   let inputTokensAccum = 0;
   let outputTokensAccum = 0;
+  let externalContentSeen = historyHasExternalContent(input.messages);
 
   // The try/finally guarantees usage is recorded even when the client
   // disconnects mid-stream — the route's for-await abandons the generator at
@@ -147,7 +221,7 @@ export async function* runCopilotTurn(
           },
           // A hung upstream would otherwise hold the SSE stream (and the
           // user's "Thinking…" state) open indefinitely.
-          { signal: AbortSignal.timeout(120_000) },
+          { signal: AbortSignal.timeout(120_000), baseUrl: settings.baseUrl },
         );
 
         while (true) {
@@ -169,12 +243,13 @@ export async function* runCopilotTurn(
           for (const ev of roundEvents.splice(0)) yield ev;
         }
       } catch (err) {
+        const apiLabel = settings.baseUrl ? "Model API" : "DeepInfra API";
         const message =
           err instanceof DeepInfraApiError
-            ? `DeepInfra API ${err.status}: ${err.message}`
+            ? `${apiLabel} ${err.status}: ${err.message}`
             : err instanceof Error
               ? err.message
-              : "Unknown DeepInfra API error";
+              : `Unknown ${apiLabel} error`;
         yield { type: "error", message };
         break;
       }
@@ -258,6 +333,28 @@ export async function* runCopilotTurn(
         }
 
         if (tool.klass !== "read") {
+          // The policy filter keeps denied tools out of the offered set, but
+          // the model can still call any registered tool by name — re-check.
+          if (!klassAllowedByPolicy(tool.klass, policy)) {
+            const message = `The tool ${tc.function.name} is disabled for your group by this site's copilot policy.`;
+            await recordCopilotAudit({
+              session,
+              toolName: tc.function.name,
+              klass: tool.klass,
+              args,
+              outcome: "denied",
+              detail: "Blocked by group tool policy",
+            });
+            toolResults.push(emitError(message));
+            yield {
+              type: "tool_result",
+              toolCallId: tc.id,
+              content: { error: message },
+              isError: true,
+              durationMs: 0,
+            };
+            continue;
+          }
           if (pendingApproval) {
             // Second gated call in this turn — refuse rather than queue.
             const message =
@@ -284,10 +381,14 @@ export async function* runCopilotTurn(
         try {
           const result = await tool.execute(args, { session, via: "copilot" });
           toolCallsThisTurn++;
+          const resultJson = JSON.stringify(result ?? null);
+          if (tool.returnsExternalContent) externalContentSeen = true;
           toolResults.push({
             role: "tool",
             tool_call_id: tc.id,
-            content: JSON.stringify(result ?? null),
+            content: tool.returnsExternalContent
+              ? fenceExternalContent(resultJson)
+              : resultJson,
           });
           yield {
             type: "tool_result",
@@ -347,6 +448,7 @@ export async function* runCopilotTurn(
             : null,
           plan,
           token,
+          afterExternalContent: externalContentSeen,
         };
         // We do NOT push tool results to chatMessages here — the client will
         // assemble the next /chat call with our reads plus the approved tool
@@ -485,6 +587,26 @@ export async function executeApprovedTool(
       detail: "Unknown tool",
     });
     return { result: { error: `Unknown tool: ${toolName}` }, isError: true };
+  }
+
+  // Re-check the group policy at execution time — the approval token has a
+  // 5-minute window in which an admin may have tightened the policy.
+  const policy = await getGroupToolPolicyForUser(session.user);
+  if (!klassAllowedByPolicy(tool.klass, policy)) {
+    await recordCopilotAudit({
+      session,
+      toolName,
+      klass: tool.klass,
+      args,
+      outcome: "denied",
+      detail: "Blocked by group tool policy",
+    });
+    return {
+      result: {
+        error: `The tool ${toolName} is disabled for your group by this site's copilot policy.`,
+      },
+      isError: true,
+    };
   }
 
   await recordCopilotAudit({

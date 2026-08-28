@@ -379,6 +379,7 @@ export function CopilotSidebar({
               confirmString: event.confirmString,
               plan: event.plan ?? null,
               token: event.token,
+              afterExternalContent: event.afterExternalContent,
             },
           ],
         }));
