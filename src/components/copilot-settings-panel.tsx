@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import {
+  Brain,
   Eye,
   EyeOff,
   KeyRound,
@@ -53,7 +54,7 @@ export function CopilotSettingsPanel() {
   const [saving, setSaving] = useState(false);
   const [showKey, setShowKey] = useState(false);
   const [apiKey, setApiKey] = useState("");
-  const [model, setModel] = useState<"fast" | "smart">("smart");
+  const [model, setModel] = useState<"fast" | "smart" | "kimi">("smart");
   const [tokenBudget, setTokenBudget] = useState(500_000);
   const [toolBudget, setToolBudget] = useState(200);
   const [enabled, setEnabled] = useState(true);
@@ -279,9 +280,10 @@ export function CopilotSettingsPanel() {
             <label className="text-[12px] font-medium text-zinc-300">Model</label>
             <p className="text-[11.5px] text-zinc-500 mt-0.5">
               Fast = Gemma 4 26B A4B (MoE — cheap, great for triage). Smart = Gemma 4 31B (best
-              for multi-step reasoning). Both served by DeepInfra.
+              for multi-step reasoning). Kimi = Kimi K3 (Moonshot&apos;s frontier MoE, strongest
+              at agentic tool use). All served by DeepInfra.
             </p>
-            <div className="mt-2 grid grid-cols-2 gap-2">
+            <div className="mt-2 grid grid-cols-3 gap-2">
               <ModelTile
                 active={model === "fast"}
                 onClick={isAdmin ? () => setModel("fast") : undefined}
@@ -295,6 +297,13 @@ export function CopilotSettingsPanel() {
                 title="Smart"
                 subtitle="Gemma 4 31B"
                 icon={<Sparkles className="h-3.5 w-3.5" />}
+              />
+              <ModelTile
+                active={model === "kimi"}
+                onClick={isAdmin ? () => setModel("kimi") : undefined}
+                title="Kimi"
+                subtitle="Kimi K3"
+                icon={<Brain className="h-3.5 w-3.5" />}
               />
             </div>
             {baseUrl.trim() && (

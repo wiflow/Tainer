@@ -86,12 +86,13 @@ export type ChatMessage =
     }
   | { role: "tool"; results: ChatToolResult[] };
 
-export type CopilotModel = "fast" | "smart";
+export type CopilotModel = "fast" | "smart" | "kimi";
 
 /** DeepInfra model ids (OpenAI-compatible endpoint). */
 export const COPILOT_MODEL_IDS: Record<CopilotModel, string> = {
   fast: "google/gemma-4-26B-A4B-it",
   smart: "google/gemma-4-31B-it",
+  kimi: "moonshotai/Kimi-K3",
 };
 
 export type ApprovalPlanRow = {

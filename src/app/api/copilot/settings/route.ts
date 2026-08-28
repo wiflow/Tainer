@@ -83,7 +83,9 @@ export async function PUT(request: Request) {
   } else if (typeof body.apiKey === "string") {
     update.apiKey = body.apiKey.trim() || null;
   }
-  if (body.model === "fast" || body.model === "smart") update.model = body.model;
+  if (body.model === "fast" || body.model === "smart" || body.model === "kimi") {
+    update.model = body.model;
+  }
   if (body.baseUrl === null) {
     update.baseUrl = null;
   } else if (typeof body.baseUrl === "string") {
