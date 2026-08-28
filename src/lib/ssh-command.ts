@@ -9,7 +9,16 @@ type RunSshCommandInput = {
   destination: string;
   hostKeyOptions: string[];
   input?: string;
-  password: string;
+  password?: string;
+  /** PEM private key used instead of password auth when set. */
+  privateKey?: string;
+  port?: number;
+  /**
+   * Send the command verbatim instead of wrapping it in `sh -lc`. Required for
+   * restricted remotes (e.g. Hetzner Storage Boxes) that whitelist commands
+   * and provide no shell.
+   */
+  raw?: boolean;
   remoteCommand: string;
   timeoutMs?: number;
 };
@@ -64,33 +73,66 @@ export async function runSshCommand({
   hostKeyOptions,
   input,
   password,
+  privateKey,
+  port,
+  raw,
   remoteCommand,
   timeoutMs = 15_000,
 }: RunSshCommandInput) {
   const sshPath = await resolveFirstExistingPath(["/usr/bin/ssh", "/bin/ssh"]) ?? "ssh";
   const sshpassPath = await resolveFirstExistingPath(["/usr/bin/sshpass", "/bin/sshpass"]);
+
+  let keyFile: { path: string; cleanup: () => Promise<void> } | null = null;
+  if (privateKey) {
+    const tempDirectory = await mkdtemp(path.join(os.tmpdir(), "tainer-ssh-key-"));
+    const keyPath = path.join(tempDirectory, "id");
+    await writeFile(keyPath, privateKey.endsWith("\n") ? privateKey : `${privateKey}\n`, {
+      encoding: "utf8",
+      mode: 0o600,
+    });
+    keyFile = {
+      cleanup: () => rm(tempDirectory, { force: true, recursive: true }),
+      path: keyPath,
+    };
+  }
+
   const sshArgs = [
     ...hostKeyOptions,
-    "-o",
-    "BatchMode=no",
+    ...(port ? ["-p", String(port)] : []),
+    ...(keyFile
+      ? [
+          "-i",
+          keyFile.path,
+          "-o",
+          "BatchMode=yes",
+          "-o",
+          "PreferredAuthentications=publickey",
+          "-o",
+          "IdentitiesOnly=yes",
+        ]
+      : [
+          "-o",
+          "BatchMode=no",
+          "-o",
+          "NumberOfPasswordPrompts=1",
+          "-o",
+          "PreferredAuthentications=password,keyboard-interactive",
+        ]),
     "-o",
     "ConnectTimeout=5",
     "-o",
     "LogLevel=ERROR",
-    "-o",
-    "NumberOfPasswordPrompts=1",
-    "-o",
-    "PreferredAuthentications=password,keyboard-interactive",
     destination,
-    `sh -lc ${shellSingleQuote(remoteCommand)}`,
+    raw ? remoteCommand : `sh -lc ${shellSingleQuote(remoteCommand)}`,
   ];
 
-  const askpass = sshpassPath
+  const askpass = sshpassPath || keyFile
     ? null
-    : await createAskpassScript(password);
+    : await createAskpassScript(password ?? "");
 
-  const command = sshpassPath ?? sshPath;
-  const args = sshpassPath
+  const usePassword = !keyFile;
+  const command = usePassword && sshpassPath ? sshpassPath : sshPath;
+  const args = usePassword && sshpassPath
     ? ["-e", sshPath, ...sshArgs]
     : sshArgs;
 
@@ -100,7 +142,7 @@ export async function runSshCommand({
         env: {
           ...process.env,
           ...(askpass?.env ?? {}),
-          ...(sshpassPath ? { SSHPASS: password } : {}),
+          ...(usePassword && sshpassPath ? { SSHPASS: password ?? "" } : {}),
         },
         stdio: ["pipe", "pipe", "pipe"],
       });
@@ -168,5 +210,6 @@ export async function runSshCommand({
     });
   } finally {
     await askpass?.cleanup().catch(() => {});
+    await keyFile?.cleanup().catch(() => {});
   }
 }

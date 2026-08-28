@@ -18,6 +18,8 @@ const SITE_SCOPED_FILES = [
   "deployment-ssh-keys.json",
   "backup-policies.json",
   "backup-run-log.json",
+  "storage-box.json",
+  "storage-box-offload-log.json",
   "alert-policies.json",
   "alert-runtime-state.json",
   "notification-log.json",

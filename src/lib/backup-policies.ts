@@ -22,6 +22,10 @@ export type BackupPolicy = {
   mode: BackupMode;
   name: string;
   nextRunAt: string | null;
+  /** Copy each finished archive to the site's Storage Box. */
+  offloadEnabled: boolean;
+  /** Remote copies to keep per guest; 0 keeps all. */
+  offloadRetentionCount: number;
   retentionCount: number;
   scope: BackupPolicyScope;
   storage: string;
@@ -81,6 +85,11 @@ function normalizePolicy(raw: Partial<BackupPolicy>): BackupPolicy {
       : "snapshot",
     name: typeof raw.name === "string" && raw.name.trim() ? raw.name.trim() : "Unnamed policy",
     nextRunAt: typeof raw.nextRunAt === "string" ? raw.nextRunAt : null,
+    offloadEnabled: typeof raw.offloadEnabled === "boolean" ? raw.offloadEnabled : false,
+    offloadRetentionCount:
+      typeof raw.offloadRetentionCount === "number" && Number.isFinite(raw.offloadRetentionCount)
+        ? Math.max(0, Math.round(raw.offloadRetentionCount))
+        : 0,
     retentionCount:
       typeof raw.retentionCount === "number" && Number.isFinite(raw.retentionCount)
         ? Math.max(0, Math.round(raw.retentionCount))

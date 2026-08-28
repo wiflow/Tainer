@@ -24,7 +24,9 @@ import { getCurrentSession } from "@/lib/auth";
 import { listBackupPolicies } from "@/lib/backup-policies";
 import { listBackupRuns } from "@/lib/backup-run-log";
 import { listContainerTags } from "@/lib/container-groups";
-import { getBackupOverview, getProxmoxDefaults, getRootfsTargets, withSiteConfig } from "@/lib/proxmox";
+import { getBackupOverview, getProxmoxDefaults, getRootfsTargets, getStorageConfig, withSiteConfig } from "@/lib/proxmox";
+import { getStorageBoxSummary, listOffloadLog } from "@/lib/storage-box";
+import { StorageBoxCard } from "@/components/storage-box-card";
 import { ensureSiteConfig } from "@/lib/site-context";
 import { resolveSiteConfigBySlug } from "@/lib/site-resolver";
 import { cn, formatBytes } from "@/lib/utils";
@@ -64,6 +66,23 @@ export default async function BackupsPage({
   }
 
   const [overview, settings, rootfsResult, backupPolicies, backupRuns, availableTags] = await getBackupsPageData(siteSlug);
+
+  // Storage Box state is read fresh (not through the cached loader): connect /
+  // test actions must reflect immediately.
+  const storageBoxSiteConfig = await resolveSiteConfigBySlug(siteSlug);
+  const [storageBoxSummary, offloadLog, storageConfigs] = await withSiteConfig(
+    storageBoxSiteConfig,
+    () =>
+      Promise.all([
+        getStorageBoxSummary(),
+        listOffloadLog(20),
+        getStorageConfig().catch(() => [] as unknown[]),
+      ]),
+  );
+  const dirStorages = (storageConfigs as { storage?: string; path?: string; content?: string }[])
+    .filter((s) => s?.storage && s.path && (s.content ?? "").includes("backup"))
+    .map((s) => s.storage as string);
+
   const defaults = getProxmoxDefaults();
   const isAdmin = session.user.role === "admin";
   const restoreTargetStorage = resolveDefaultRootfsStorage(
@@ -96,6 +115,16 @@ export default async function BackupsPage({
             )}
           </CardContent>
         </Card>
+
+        {isAdmin && (
+          <StorageBoxCard
+            dirStorages={dirStorages}
+            nodes={[]}
+            offloadLog={offloadLog}
+            siteSlug={siteSlug}
+            summary={storageBoxSummary}
+          />
+        )}
 
         <ProxmoxIssues
           description="Errors encountered while querying backup storage from the Proxmox API."
@@ -161,6 +190,17 @@ export default async function BackupsPage({
         issues={[...overview.issues, ...rootfsResult.issues]}
         title="API access notes"
       />
+
+      {/* Off-site backup (Hetzner Storage Box) */}
+      {isAdmin && (
+        <StorageBoxCard
+          dirStorages={dirStorages}
+          nodes={[...new Set(overview.backupStoragePools.map((p) => p.node))]}
+          offloadLog={offloadLog}
+          siteSlug={siteSlug}
+          summary={storageBoxSummary}
+        />
+      )}
 
       {/* Backup policies */}
       {isAdmin && (

@@ -58,6 +58,11 @@ function parsePolicyInput(formData: FormData): BackupPolicyInput {
     ),
     mode,
     name,
+    offloadEnabled: formData.get("offloadEnabled") === "on",
+    offloadRetentionCount: Math.max(
+      0,
+      Math.round(Number(formData.get("offloadRetentionCount") || "0")),
+    ),
     retentionCount: Math.max(
       0,
       Math.round(Number(formData.get("retentionCount") || "0")),

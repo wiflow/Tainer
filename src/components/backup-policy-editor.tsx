@@ -251,6 +251,40 @@ export function BackupPolicyEditor({
             </label>
           </div>
 
+          {/* Off-site offload */}
+          <div className="rounded-xl border border-white/5 bg-zinc-900/20 p-4 space-y-3">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                className="h-4 w-4 border-white/10 bg-zinc-900 text-sky-400"
+                defaultChecked={policy?.offloadEnabled ?? false}
+                name="offloadEnabled"
+                type="checkbox"
+              />
+              <span className="text-[13px] font-medium text-zinc-200">
+                Copy finished backups to the Storage Box
+              </span>
+            </label>
+            <p className="text-[11px] text-zinc-500">
+              After each successful backup the archive is copied off-site over rsync. Requires a
+              connected Hetzner Storage Box on this site; without one the copy is skipped.
+            </p>
+            <label className="block rounded-md border border-white/5 bg-[#111113] px-4 py-3">
+              <span className="text-[13px] font-medium text-zinc-200">
+                Off-site retention (keep last)
+              </span>
+              <input
+                className={fieldClassName}
+                defaultValue={policy?.offloadRetentionCount ?? 0}
+                min="0"
+                name="offloadRetentionCount"
+                type="number"
+              />
+              <p className="mt-1.5 text-[11px] text-zinc-500">
+                Remote copies kept per guest. 0 = keep all.
+              </p>
+            </label>
+          </div>
+
           {/* Scope */}
           <div className="rounded-xl border border-white/5 bg-zinc-900/20 p-4 space-y-3">
             <div>

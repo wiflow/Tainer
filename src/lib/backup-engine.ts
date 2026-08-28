@@ -21,6 +21,7 @@ import {
   triggerBackup,
   type LiveDeployment,
 } from "@/lib/proxmox";
+import { scheduleArchiveOffload } from "@/lib/storage-box";
 import { extractManagedTagSlugs } from "@/lib/tag-utils";
 
 // In-flight state is stored on globalThis so it survives Next.js HMR without losing progress
@@ -36,11 +37,14 @@ type ActivePolicyRun = {
   completed: BackupWorkloadResult[];
   pending: LiveDeployment[];
   policyId: string;
+  policyName: string;
   runId: string;
   storage: string;
   compression: string;
   mode: string;
   retentionCount: number;
+  offloadEnabled: boolean;
+  offloadRetentionCount: number;
 };
 
 type BackupEngineState = {
@@ -193,6 +197,23 @@ async function pollInFlightVm(state: BackupEngineState): Promise<void> {
       workloads: run.completed,
     });
 
+    if (isSuccess && run.offloadEnabled) {
+      // Queues the copy on the serialized offload queue; the backup loop
+      // never waits on the WAN transfer.
+      try {
+        await scheduleArchiveOffload({
+          node,
+          policyId: run.policyId,
+          policyName: run.policyName,
+          remoteRetentionCount: run.offloadRetentionCount,
+          storage: run.storage,
+          vmid,
+        });
+      } catch (err) {
+        console.error(`[backup-engine] Failed to schedule offload for VMID ${vmid}:`, err);
+      }
+    }
+
     state.inFlightVm = null;
     state.backingUpVmids.delete(vmid);
   } catch (err) {
@@ -253,8 +274,11 @@ async function startPolicyRun(
     completed: [],
     compression: policy.compression,
     mode: policy.mode,
+    offloadEnabled: policy.offloadEnabled,
+    offloadRetentionCount: policy.offloadRetentionCount,
     pending: scopedDeployments,
     policyId: policy.id,
+    policyName: policy.name,
     retentionCount: policy.retentionCount,
     runId: run.id,
     storage: policy.storage,

@@ -225,6 +225,18 @@ async function runProxmoxRootCommand(
   }
 }
 
+/**
+ * Run a root command on a Proxmox node over SSH. Used by the off-site backup
+ * offload to drive rsync on the node that holds the archive.
+ */
+export async function runNodeRootCommand(
+  node: string,
+  remoteCommand: string,
+  options?: { input?: string; timeoutMs?: number },
+) {
+  return runProxmoxRootCommand(node, remoteCommand, options);
+}
+
 function mergeCustomLxcConfig(
   currentConfig: string,
   configLines: string[],
