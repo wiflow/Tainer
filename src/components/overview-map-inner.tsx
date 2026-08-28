@@ -212,6 +212,9 @@ export const OverviewMapInner = forwardRef<OverviewMapHandle, {
               className="bg-zinc-900 text-zinc-100 border border-white/[0.08]"
             >
               <p className="font-medium text-zinc-200 text-xs">{site.name}</p>
+              {site.location.address && (
+                <p className="mt-0.5 text-[10px] text-zinc-500">{site.location.address}</p>
+              )}
               <p className="mt-0.5 text-[10px] text-zinc-400">
                 {site.nodeCount} node{site.nodeCount !== 1 ? "s" : ""} &middot;{" "}
                 {site.deploymentCount} deployment{site.deploymentCount !== 1 ? "s" : ""}

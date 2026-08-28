@@ -10,6 +10,7 @@ import {
   requireSession,
 } from "@/lib/auth";
 import type { BasicActionState } from "@/lib/action-states";
+import { geocodeAddress } from "@/lib/geocode";
 import { resolveSiteConfigBySlug } from "@/lib/site-resolver";
 import {
   createSite,
@@ -227,11 +228,9 @@ export async function createSiteAction(
       }
     }
 
-    const latRaw = String(formData.get("latitude") ?? "").trim();
-    const lngRaw = String(formData.get("longitude") ?? "").trim();
-    const latitude = latRaw ? parseFloat(latRaw) : null;
-    const longitude = lngRaw ? parseFloat(lngRaw) : null;
+    const addressRaw = String(formData.get("address") ?? "").trim();
     const countryCodeRaw = String(formData.get("countryCode") ?? "").trim();
+    const geo = addressRaw ? await geocodeAddress(addressRaw) : null;
 
     await createSite({
       name: siteName,
@@ -242,9 +241,10 @@ export async function createSiteAction(
       tlsMode,
       tlsCustomCaPem,
       defaultNode,
-      latitude: latitude != null && isFinite(latitude) ? latitude : null,
-      longitude: longitude != null && isFinite(longitude) ? longitude : null,
-      countryCode: countryCodeRaw || null,
+      latitude: geo?.latitude ?? null,
+      longitude: geo?.longitude ?? null,
+      address: addressRaw || null,
+      countryCode: countryCodeRaw || geo?.countryCode || null,
     }, fingerprints);
 
     revalidatePath("/sites");
@@ -378,8 +378,7 @@ export async function updateSiteAction(
       return errorState(_previousState, "Missing site ID.");
     }
 
-    const latRaw = String(formData.get("latitude") ?? "").trim();
-    const lngRaw = String(formData.get("longitude") ?? "").trim();
+    const addressRaw = String(formData.get("address") ?? "").trim();
 
     const updates: Record<string, unknown> = {};
     if (siteName) updates.name = siteName;
@@ -391,11 +390,22 @@ export async function updateSiteAction(
     updates.tlsCustomCaPem = tlsCustomCaPem;
     if (defaultNode) updates.defaultNode = defaultNode;
 
-    if (latRaw || lngRaw) {
-      const lat = latRaw ? parseFloat(latRaw) : null;
-      const lng = lngRaw ? parseFloat(lngRaw) : null;
-      updates.latitude = lat != null && isFinite(lat) ? lat : null;
-      updates.longitude = lng != null && isFinite(lng) ? lng : null;
+    // Address wins over coordinates: an empty submitted field clears the
+    // location, a value is geocoded server-side.
+    if (formData.has("address")) {
+      if (addressRaw) {
+        const geo = await geocodeAddress(addressRaw);
+        updates.latitude = geo.latitude;
+        updates.longitude = geo.longitude;
+        updates.address = addressRaw;
+        if (!formData.has("countryCode") && geo.countryCode) {
+          updates.countryCode = geo.countryCode;
+        }
+      } else {
+        updates.latitude = null;
+        updates.longitude = null;
+        updates.address = null;
+      }
     }
 
     // The country select always submits a value (even if empty for "—").

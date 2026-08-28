@@ -31,6 +31,8 @@ export type ProxmoxSitePayload = {
 export type SiteLocation = {
   latitude: number;
   longitude: number;
+  /** Human-readable address the coordinates were geocoded from. */
+  address?: string | null;
 };
 
 export type SiteRecord = {
@@ -109,6 +111,8 @@ export type SiteInput = {
 
   latitude?: number | null;
   longitude?: number | null;
+  /** Geocoded source address; stored alongside the coordinates. */
+  address?: string | null;
   /** ISO-3166-1 alpha-2; empty string clears, undefined leaves untouched. */
   countryCode?: string | null;
 };

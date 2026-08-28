@@ -128,14 +128,20 @@ export async function getLegacyImportedEnvSiteId(): Promise<string | null> {
   return store.legacyImportedEnvSiteId;
 }
 
-function buildLocation(input: Pick<SiteInput, "latitude" | "longitude">): SiteLocation | null {
+function buildLocation(
+  input: Pick<SiteInput, "latitude" | "longitude" | "address">,
+): SiteLocation | null {
   if (
     input.latitude != null &&
     input.longitude != null &&
     isFinite(input.latitude) &&
     isFinite(input.longitude)
   ) {
-    return { latitude: input.latitude, longitude: input.longitude };
+    return {
+      address: input.address?.trim() || null,
+      latitude: input.latitude,
+      longitude: input.longitude,
+    };
   }
   return null;
 }
@@ -235,10 +241,18 @@ export async function updateSite(
       site.payload.consoleKnownHostsContent = input.consoleKnownHostsContent?.trim() || null;
     }
 
-    if (input.latitude !== undefined || input.longitude !== undefined) {
+    if (
+      input.latitude !== undefined ||
+      input.longitude !== undefined ||
+      input.address !== undefined
+    ) {
       const lat = input.latitude ?? site.location?.latitude;
       const lng = input.longitude ?? site.location?.longitude;
-      site.location = buildLocation({ latitude: lat, longitude: lng });
+      site.location = buildLocation({
+        address: input.address ?? site.location?.address,
+        latitude: lat,
+        longitude: lng,
+      });
     }
 
     // `countryCode === ""` is the explicit "clear it" signal from the form;

@@ -51,7 +51,7 @@ type SiteInfo = {
   lastValidationOk: boolean | null;
   lastValidatedAt: string | null;
   isDefault: boolean;
-  location: { latitude: number; longitude: number } | null;
+  location: { latitude: number; longitude: number; address?: string | null } | null;
   countryCode: string | null;
 };
 
@@ -153,22 +153,25 @@ function EditSiteForm({ site, onClose }: { site: SiteInfo; onClose: () => void }
           </label>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="block">
-            <span className="flex items-center gap-1.5 text-[11px] font-medium text-zinc-500">
-              <MapPin className="h-3.5 w-3.5" />
-              Latitude
+        <label className="block">
+          <span className="flex items-center gap-1.5 text-[11px] font-medium text-zinc-500">
+            <MapPin className="h-3.5 w-3.5" />
+            Location (address — geocoded automatically)
+          </span>
+          <input
+            className={inputClassName}
+            defaultValue={site.location?.address ?? ""}
+            name="address"
+            placeholder="e.g. Ballerup, Denmark"
+            type="text"
+          />
+          {site.location && !site.location.address && (
+            <span className="mt-1 block text-[10.5px] text-zinc-500">
+              Currently pinned at {site.location.latitude.toFixed(4)}, {site.location.longitude.toFixed(4)} —
+              enter an address to replace it, or leave empty to clear.
             </span>
-            <input className={inputClassName} name="latitude" type="number" step="any" placeholder="e.g. 40.7128" defaultValue={site.location?.latitude ?? ""} />
-          </label>
-          <label className="block">
-            <span className="flex items-center gap-1.5 text-[11px] font-medium text-zinc-500">
-              <MapPin className="h-3.5 w-3.5" />
-              Longitude
-            </span>
-            <input className={inputClassName} name="longitude" type="number" step="any" placeholder="e.g. -74.0060" defaultValue={site.location?.longitude ?? ""} />
-          </label>
-        </div>
+          )}
+        </label>
 
         <label className="block">
           <span className="flex items-center gap-1.5 text-[11px] font-medium text-zinc-500">
@@ -550,22 +553,18 @@ export function SiteManagementPanel({
               <input className={inputClassName} name="apiUrl" placeholder="https://proxmox.example.com:8006" required />
             </label>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <label className="block">
-                <span className="flex items-center gap-1.5 text-[12px] font-medium text-zinc-400">
-                  <MapPin className="h-3.5 w-3.5" />
-                  Latitude
-                </span>
-                <input className={inputClassName} name="latitude" type="number" step="any" placeholder="e.g. 40.7128" />
-              </label>
-              <label className="block">
-                <span className="flex items-center gap-1.5 text-[12px] font-medium text-zinc-400">
-                  <MapPin className="h-3.5 w-3.5" />
-                  Longitude
-                </span>
-                <input className={inputClassName} name="longitude" type="number" step="any" placeholder="e.g. -74.0060" />
-              </label>
-            </div>
+            <label className="block">
+              <span className="flex items-center gap-1.5 text-[12px] font-medium text-zinc-400">
+                <MapPin className="h-3.5 w-3.5" />
+                Location (address — geocoded automatically)
+              </span>
+              <input
+                className={inputClassName}
+                name="address"
+                placeholder="e.g. Ballerup, Denmark"
+                type="text"
+              />
+            </label>
 
             <label className="block">
               <span className="flex items-center gap-1.5 text-[12px] font-medium text-zinc-400">
