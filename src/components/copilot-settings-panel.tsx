@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { InfoTip } from "@/components/ui/info-tip";
 import { SectionPanel } from "@/components/ui/section-panel";
 import { cn } from "@/lib/utils";
 import type {
@@ -214,12 +215,18 @@ export function CopilotSettingsPanel() {
         <div className="grid gap-4">
           {/* API key */}
           <div>
-            <label className="text-[12px] font-medium text-zinc-300 flex items-center gap-1.5">
-              <KeyRound className="h-3 w-3" />
-              DeepInfra API key (site-wide)
-            </label>
+            <span className="flex items-center gap-1.5">
+              <label className="text-[12px] font-medium text-zinc-300 flex items-center gap-1.5">
+                <KeyRound className="h-3 w-3" />
+                DeepInfra API key (site-wide)
+              </label>
+              <InfoTip label="DeepInfra API key" side="right">
+                One key for the whole site, managed by admins. Stored AES-256-GCM encrypted under
+                your Tainer AUTH_SECRET.
+              </InfoTip>
+            </span>
             <p className="text-[11.5px] text-zinc-500 mt-0.5">
-              One key for the whole site, managed by admins. Get a key at{" "}
+              Get a key at{" "}
               <a
                 href="https://deepinfra.com/dash/api_keys"
                 target="_blank"
@@ -228,7 +235,7 @@ export function CopilotSettingsPanel() {
               >
                 deepinfra.com
               </a>
-              . Stored AES-256-GCM encrypted under your Tainer AUTH_SECRET.
+              .
             </p>
             {settings.hasKey ? (
               <div className="mt-2 flex items-center justify-between rounded-xl border border-emerald-500/20 bg-emerald-500/[0.04] px-3 py-2.5">
@@ -277,12 +284,14 @@ export function CopilotSettingsPanel() {
 
           {/* Model */}
           <div>
-            <label className="text-[12px] font-medium text-zinc-300">Model</label>
-            <p className="text-[11.5px] text-zinc-500 mt-0.5">
-              Fast = Gemma 4 26B A4B (MoE — cheap, great for triage). Smart = Gemma 4 31B (best
-              for multi-step reasoning). Kimi = Kimi K3 (Moonshot&apos;s frontier MoE, strongest
-              at agentic tool use). All served by DeepInfra.
-            </p>
+            <span className="flex items-center gap-1.5">
+              <label className="text-[12px] font-medium text-zinc-300">Model</label>
+              <InfoTip label="Model" side="right">
+                Fast = Gemma 4 26B A4B (MoE — cheap, great for triage). Smart = Gemma 4 31B (best
+                for multi-step reasoning). Kimi = Kimi K3 (Moonshot&apos;s frontier MoE, strongest
+                at agentic tool use). All served by DeepInfra.
+              </InfoTip>
+            </span>
             <div className="mt-2 grid grid-cols-3 gap-2">
               <ModelTile
                 active={model === "fast"}
@@ -316,18 +325,20 @@ export function CopilotSettingsPanel() {
 
           {/* Custom endpoint */}
           <div>
-            <label className="text-[12px] font-medium text-zinc-300 flex items-center gap-1.5">
-              <ServerCog className="h-3 w-3" />
-              Custom endpoint (self-hosted models)
-            </label>
-            <p className="text-[11.5px] text-zinc-500 mt-0.5">
-              Point Tainy at any OpenAI-compatible server — vLLM, Ollama, LM Studio, or a
-              corporate gateway — instead of DeepInfra. Use the base URL up to (not
-              including) <code>/chat/completions</code>, e.g.{" "}
-              <code className="text-zinc-400">https://vllm.example.com/v1</code>. https is
-              required; the API key above is optional for endpoints that don&apos;t need one.
-              Leave empty to use DeepInfra.
-            </p>
+            <span className="flex items-center gap-1.5">
+              <label className="text-[12px] font-medium text-zinc-300 flex items-center gap-1.5">
+                <ServerCog className="h-3 w-3" />
+                Custom endpoint (self-hosted models)
+              </label>
+              <InfoTip label="Custom endpoint" side="right">
+                Point Tainy at any OpenAI-compatible server — vLLM, Ollama, LM Studio, or a
+                corporate gateway — instead of DeepInfra. Use the base URL up to (not including){" "}
+                <code className="text-zinc-200">/chat/completions</code>, e.g.{" "}
+                <code className="text-zinc-200">https://vllm.example.com/v1</code>. https is
+                required; the API key above is optional for endpoints that don&apos;t need one.
+                Leave empty to use DeepInfra.
+              </InfoTip>
+            </span>
             {isAdmin ? (
               <div className="mt-1 grid grid-cols-[2fr_1fr] gap-2">
                 <input
@@ -357,12 +368,14 @@ export function CopilotSettingsPanel() {
           {/* Budgets */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-[12px] font-medium text-zinc-300">
-                Daily token budget (per user)
-              </label>
-              <p className="text-[11.5px] text-zinc-500 mt-0.5">
-                Total input + output tokens per user per day. Resets at 00:00 UTC.
-              </p>
+              <span className="flex items-center gap-1.5">
+                <label className="text-[12px] font-medium text-zinc-300">
+                  Daily token budget (per user)
+                </label>
+                <InfoTip label="Daily token budget" side="top">
+                  Total input + output tokens per user per day. Resets at 00:00 UTC.
+                </InfoTip>
+              </span>
               {isAdmin ? (
                 <input
                   className={inputClassName}
@@ -387,12 +400,14 @@ export function CopilotSettingsPanel() {
               />
             </div>
             <div>
-              <label className="text-[12px] font-medium text-zinc-300">
-                Daily tool-call budget (per user)
-              </label>
-              <p className="text-[11.5px] text-zinc-500 mt-0.5">
-                Caps how many tools the agent can run per user per day.
-              </p>
+              <span className="flex items-center gap-1.5">
+                <label className="text-[12px] font-medium text-zinc-300">
+                  Daily tool-call budget (per user)
+                </label>
+                <InfoTip label="Daily tool-call budget" side="top">
+                  Caps how many tools the agent can run per user per day.
+                </InfoTip>
+              </span>
               {isAdmin ? (
                 <input
                   className={inputClassName}
@@ -410,14 +425,16 @@ export function CopilotSettingsPanel() {
           {/* Cost estimation */}
           {(isAdmin || settings.costPerMInputUsd !== null || settings.costPerMOutputUsd !== null) && (
             <div>
-              <label className="text-[12px] font-medium text-zinc-300">
-                Cost estimation (optional)
-              </label>
-              <p className="text-[11.5px] text-zinc-500 mt-0.5">
-                USD per million tokens for your provider/model. Purely informational — turns
-                token counts in the usage displays into a dollar estimate. Leave empty to
-                hide costs.
-              </p>
+              <span className="flex items-center gap-1.5">
+                <label className="text-[12px] font-medium text-zinc-300">
+                  Cost estimation (optional)
+                </label>
+                <InfoTip label="Cost estimation" side="right">
+                  USD per million tokens for your provider/model. Purely informational — turns
+                  token counts in the usage displays into a dollar estimate. Leave empty to hide
+                  costs.
+                </InfoTip>
+              </span>
               {isAdmin && (
                 <div className="mt-1 grid grid-cols-2 gap-2">
                   <input
@@ -445,13 +462,15 @@ export function CopilotSettingsPanel() {
 
           {/* Operator notes */}
           <div>
-            <label className="text-[12px] font-medium text-zinc-300">Operator notes</label>
-            <p className="text-[11.5px] text-zinc-500 mt-0.5">
-              Site-specific guidance injected into Tainy&apos;s instructions — runbook rules
-              like &quot;never restart CT 105 during business hours&quot; or &quot;prefer the
-              servers IP pool for new containers&quot;. Visible to every user via the
-              copilot&apos;s behaviour; max 4,000 characters.
-            </p>
+            <span className="flex items-center gap-1.5">
+              <label className="text-[12px] font-medium text-zinc-300">Operator notes</label>
+              <InfoTip label="Operator notes" side="right">
+                Site-specific guidance injected into Tainy&apos;s instructions — runbook rules like
+                &quot;never restart CT 105 during business hours&quot; or &quot;prefer the servers
+                IP pool for new containers&quot;. Visible to every user via the copilot&apos;s
+                behaviour; max 4,000 characters.
+              </InfoTip>
+            </span>
             {isAdmin ? (
               <textarea
                 className={cn(inputClassName, "min-h-[84px] resize-y")}
@@ -502,13 +521,25 @@ export function CopilotSettingsPanel() {
       {isAdmin && groups.length > 0 && (
         <SectionPanel
           title="Group tool policy"
-          description="Restrict which classes of copilot tools each group may use. Read tools (list, get, metrics) are always available; unchecking a box hides those tools from the model and blocks them server-side. Admins are exempt. Changes apply on Save above."
+          description="Restrict which classes of copilot tools each group may use. Changes apply on Save above."
         >
           <div className="divide-y divide-white/[0.04]">
             <div className="grid grid-cols-[1fr_auto_auto] gap-x-6 pb-1.5 text-[10.5px] uppercase tracking-wide text-zinc-600">
               <span>Group</span>
-              <span>Write & admin</span>
-              <span>Destructive</span>
+              <span className="inline-flex items-center gap-1.5">
+                Write & admin
+                <InfoTip className="normal-case" label="Write and admin tools" side="top">
+                  Unchecking hides these tools from the model and blocks them server-side. Read
+                  tools (list, get, metrics) are always available. Admin groups are exempt.
+                </InfoTip>
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                Destructive
+                <InfoTip className="normal-case" label="Destructive tools" side="top">
+                  Unchecking hides these tools from the model and blocks them server-side. Admin
+                  groups are exempt.
+                </InfoTip>
+              </span>
             </div>
             {groups.map((group) => {
               const policy = groupPolicies[group.id] ?? {

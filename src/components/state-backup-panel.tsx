@@ -10,6 +10,7 @@ import {
 import { useActionFlashFeedback } from "@/components/task-toast-provider";
 import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
+import { InfoTip } from "@/components/ui/info-tip";
 import { SectionPanel } from "@/components/ui/section-panel";
 import { initialBasicActionState } from "@/lib/action-states";
 import { formatBytes } from "@/lib/utils";
@@ -112,41 +113,52 @@ export function StateBackupPanel({
                 max={60}
               />
             </label>
-            <label className="block text-[12px] text-zinc-400">
-              Destination directory
+            <div className="text-[12px] text-zinc-400">
+              <span className="flex items-center gap-1.5">
+                <label htmlFor="destinationDir">Destination directory</label>
+                <InfoTip label="Destination directory" side="top">
+                  The default destination is on the same disk as the data itself. Point it at a
+                  mounted share, or download copies below, for real disaster recovery.
+                </InfoTip>
+              </span>
               <input
                 className={inputClassName}
                 defaultValue={config.destinationDir}
+                id="destinationDir"
                 name="destinationDir"
                 placeholder={defaultDestination}
               />
-            </label>
+            </div>
           </div>
 
-          <label className="block text-[12px] text-zinc-400">
-            Backup passphrase{" "}
-            {config.hasPassphrase ? (
-              <span className="text-emerald-400/80">
-                (set — leave empty to keep the current one)
-              </span>
-            ) : (
-              <span className="text-amber-300/90">(required before backups can run)</span>
-            )}
+          <div className="text-[12px] text-zinc-400">
+            <span className="flex flex-wrap items-center gap-1.5">
+              <label htmlFor="passphrase">Backup passphrase</label>
+              {config.hasPassphrase ? (
+                <span className="text-emerald-400/80">
+                  (set — leave empty to keep the current one)
+                </span>
+              ) : (
+                <span className="text-amber-300/90">(required before backups can run)</span>
+              )}
+              <InfoTip label="Backup passphrase" side="top">
+                Restoring needs only this passphrase and{" "}
+                <code className="text-zinc-200">scripts/restore-state-backup.mjs</code>.
+              </InfoTip>
+            </span>
             <input
               autoComplete="new-password"
               className={inputClassName}
+              id="passphrase"
               name="passphrase"
               placeholder={config.hasPassphrase ? "••••••••••••" : "At least 12 characters"}
               type="password"
             />
-          </label>
+          </div>
           <p className="text-[11px] leading-relaxed text-zinc-500">
             <ShieldCheck className="mr-1 inline h-3 w-3 align-[-2px]" />
-            Restoring needs only this passphrase and{" "}
-            <code className="text-zinc-400">scripts/restore-state-backup.mjs</code> — store it
-            somewhere that survives losing this host (password manager). The default
-            destination is on the same disk as the data itself; point it at a mounted
-            share, or download copies below, for real disaster recovery.
+            Store the passphrase somewhere that survives losing this host (a password manager) —
+            without it a backup cannot be restored.
           </p>
 
           <div className="flex items-center gap-2 border-t border-white/5 pt-4">

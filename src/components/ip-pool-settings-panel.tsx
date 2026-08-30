@@ -6,6 +6,7 @@ import { AlertTriangle, Plus, Trash2, X } from "lucide-react";
 import { createIpPoolAction, deleteIpPoolAction } from "@/app/settings-actions";
 import { useActionTaskFeedback } from "@/components/task-toast-provider";
 import { Button } from "@/components/ui/button";
+import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
 import { Form } from "@/components/ui/form";
 import { initialActionState } from "@/lib/action-states";
 import { getTagPillClass } from "@/lib/tag-utils";
@@ -407,21 +408,25 @@ function IpPoolDeleteButton({
   });
 
   return (
-    <Form
-      action={formAction}
-      onSubmit={(event) => {
-        if (!window.confirm(`Delete IP pool "${poolName}"?`)) {
-          event.preventDefault();
-        }
-      }}
-    >
+    <Form action={formAction}>
       <input name="siteSlug" type="hidden" value={siteSlug} />
       <input name="poolId" type="hidden" value={poolId} />
       <input name="poolName" type="hidden" value={poolName} />
-      <Button disabled={isPending} size="sm" type="submit" variant="ghost">
+      <ConfirmSubmitButton
+        className="h-8"
+        consequences={[
+          "Addresses already assigned to running guests keep working — they are not reclaimed.",
+          "New deployments can no longer draw an address from this range.",
+        ]}
+        description={`Delete the IP pool "${poolName}"?`}
+        disabled={isPending}
+        pending={isPending}
+        title="Delete IP pool"
+        variant="ghost"
+      >
         <Trash2 className="h-3.5 w-3.5" />
         {isPending ? "Deleting…" : "Delete"}
-      </Button>
+      </ConfirmSubmitButton>
     </Form>
   );
 }

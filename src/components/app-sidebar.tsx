@@ -380,6 +380,26 @@ export function AppSidebar({
           </div>
         )}
 
+        {/* Command palette affordance. The ⌘K listener lives in
+            CommandPalette; this is purely how anyone finds out it exists.
+            Clicking dispatches the same shortcut the listener is watching
+            for, so there's one code path to keep working. */}
+        <button
+          className="mx-2 mb-4 flex items-center gap-2 rounded-md border border-white/5 bg-white/[0.02] px-3 py-2 text-left transition-colors hover:border-white/10 hover:bg-white/[0.05]"
+          onClick={() =>
+            document.dispatchEvent(
+              new KeyboardEvent("keydown", { bubbles: true, key: "k", metaKey: true }),
+            )
+          }
+          type="button"
+        >
+          <Search className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
+          <span className="text-[12px] text-zinc-500">Search…</span>
+          <kbd className="ml-auto rounded border border-white/10 bg-white/5 px-1.5 py-0.5 font-sans text-[10px] text-zinc-500">
+            ⌘K
+          </kbd>
+        </button>
+
         {/* Sectioned nav. Each section auto-expands when its current route is
             active; otherwise the user's last collapsed/expanded state from
             localStorage wins. Default-open for first-time visitors is

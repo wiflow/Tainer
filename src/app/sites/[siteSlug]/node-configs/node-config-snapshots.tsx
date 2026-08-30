@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useRef, useState } from "react";
 import {
   Camera,
   Eye,
@@ -13,6 +13,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
 import { deleteConfigSnapshotAction, takeConfigSnapshotAction } from "@/app/node-config-actions";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useActionFlashFeedback } from "@/components/task-toast-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -58,6 +59,9 @@ function SnapshotRow({
     successTitle: "Snapshot deleted",
   });
 
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const deleteFormRef = useRef<HTMLFormElement>(null);
+
   return (
     <div className="flex items-center gap-3 border-b border-white/5/40 px-5 py-3 last:border-b-0 hover:bg-[#111113] transition-colors">
       <input
@@ -89,25 +93,34 @@ function SnapshotRow({
       >
         <History className="h-3.5 w-3.5" />
       </Link>
-      <Form
-        action={deleteAction}
-        onSubmit={(e) => {
-          if (!confirm("Delete this config snapshot?")) {
-            e.preventDefault();
-          }
-        }}
-      >
+      <Form action={deleteAction} ref={deleteFormRef}>
         <input name="siteSlug" type="hidden" value={siteSlug} />
         <input name="snapshotId" type="hidden" value={snapshot.id} />
         <button
           className="rounded-md p-1.5 text-zinc-600 hover:bg-zinc-800 hover:text-zinc-300 transition-colors"
           disabled={isDeleting}
+          onClick={() => setConfirmOpen(true)}
           title="Delete snapshot"
-          type="submit"
+          type="button"
         >
           <Trash2 className="h-3.5 w-3.5" />
         </button>
       </Form>
+
+      <ConfirmDialog
+        consequences={[
+          "Only this saved copy of the node configuration is removed — the node itself is untouched.",
+        ]}
+        description={`Delete the config snapshot "${snapshot.label}"?`}
+        onConfirm={() => {
+          setConfirmOpen(false);
+          deleteFormRef.current?.requestSubmit();
+        }}
+        onOpenChange={setConfirmOpen}
+        open={confirmOpen}
+        pending={isDeleting}
+        title="Delete config snapshot"
+      />
     </div>
   );
 }

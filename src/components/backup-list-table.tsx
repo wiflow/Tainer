@@ -1,13 +1,20 @@
 "use client";
 
 import { useActionState } from "react";
-import { Trash2 } from "lucide-react";
+import { Archive, Trash2 } from "lucide-react";
 
 import { deleteBackupAction } from "@/app/backup-actions";
 import { BackupRestoreButton } from "@/components/backup-restore-button";
 import { useActionTaskFeedback } from "@/components/task-toast-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { Form } from "@/components/ui/form";
 import { initialActionState } from "@/lib/action-states";
 import type { ProxmoxBackupArchive } from "@/lib/proxmox";
@@ -68,14 +75,23 @@ export function BackupListTable({
 }) {
   if (archives.length === 0) {
     return (
-      <div className="px-5 py-4 text-[13px] text-zinc-500">
-        No backup archives found.
-      </div>
+      <Empty className="border border-white/5">
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <Archive />
+          </EmptyMedia>
+          <EmptyTitle>No backup archives yet</EmptyTitle>
+          <EmptyDescription>
+            Archives appear here once a backup runs. Create a policy to have them taken on a
+            schedule, or back up a single guest from its own page.
+          </EmptyDescription>
+        </EmptyHeader>
+      </Empty>
     );
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border border-white/5 bg-[#111113]">
+    <div className="overflow-hidden overflow-x-auto rounded-xl border border-white/5 bg-[#111113]">
       <table className="w-full text-left text-[13px]">
         <thead>
           <tr className="border-b border-white/5 bg-black/40">

@@ -10,6 +10,7 @@ import {
 } from "@/app/ssh-key-actions";
 import { useActionFlashFeedback } from "@/components/task-toast-provider";
 import { Button } from "@/components/ui/button";
+import { InfoTip } from "@/components/ui/info-tip";
 import { SectionPanel } from "@/components/ui/section-panel";
 import { Form } from "@/components/ui/form";
 import { initialBasicActionState } from "@/lib/action-states";
@@ -78,7 +79,7 @@ export function SshKeySettingsForm({
   return (
     <SectionPanel
       title="Tainer SSH Authority"
-      description="Tainer signs short-lived SSH certificates with this server-only CA. New SSH-ready Linux templates must trust the public key below and create the managed access user ahead of time."
+      description="Tainer signs short-lived SSH certificates with this server-only CA. New SSH-ready Linux templates must trust the public key below."
     >
         {keyInfo ? (
           <div className="space-y-5">
@@ -101,14 +102,26 @@ export function SshKeySettingsForm({
 
               <div className="flex items-center justify-between rounded-md border border-white/5 bg-[#111113] px-4 py-3">
                 <div>
-                  <p className="text-[12px] font-medium text-zinc-500">Managed login user</p>
+                  <span className="flex items-center gap-1.5">
+                    <p className="text-[12px] font-medium text-zinc-500">Managed login user</p>
+                    <InfoTip label="Managed login user" side="right">
+                      SSH-ready Linux templates must create this user ahead of time — Tainer signs
+                      short-lived certificates for it.
+                    </InfoTip>
+                  </span>
                   <p className="mt-1 font-mono text-[13px] text-zinc-200">{keyInfo.managedLoginUser}</p>
                 </div>
               </div>
 
               {showPublicKey ? (
                 <div className="rounded-md border border-white/5 bg-[#111113] px-4 py-3">
-                  <p className="text-[12px] font-medium text-zinc-500">CA public key</p>
+                  <span className="flex items-center gap-1.5">
+                    <p className="text-[12px] font-medium text-zinc-500">CA public key</p>
+                    <InfoTip label="CA public key" side="right">
+                      The CA private key is encrypted at rest and never leaves the server; only this
+                      public half is exposed.
+                    </InfoTip>
+                  </span>
                   <p className="mt-2 break-all font-mono text-[11px] leading-relaxed text-zinc-400">
                     {keyInfo.publicKey}
                   </p>
@@ -159,8 +172,8 @@ export function SshKeySettingsForm({
             </div>
 
             <p className="text-[11px] leading-relaxed text-zinc-600">
-              The CA private key is encrypted at rest and never leaves the server. Rotating it invalidates
-              existing SSH-ready templates and guests until they are rebuilt to trust the new CA.
+              Rotating the authority invalidates existing SSH-ready templates and guests until they
+              are rebuilt to trust the new CA.
             </p>
           </div>
         ) : (

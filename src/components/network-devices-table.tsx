@@ -20,7 +20,7 @@ export function NetworkDevicesTable({ devices, siteSlug }: Props) {
   const now = Date.now();
 
   return (
-    <div className="overflow-hidden rounded-xl border border-white/[0.06] bg-zinc-950/40">
+    <div className="overflow-hidden overflow-x-auto rounded-xl border border-white/[0.06] bg-zinc-950/40">
       <table className="w-full text-left text-[12.5px]">
         <thead className="bg-white/[0.02] text-[10.5px] uppercase tracking-[0.14em] text-zinc-500">
           <tr>

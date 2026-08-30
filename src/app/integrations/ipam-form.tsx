@@ -10,6 +10,7 @@ import {
 } from "@/app/integration-actions";
 import { useActionFlashFeedback } from "@/components/task-toast-provider";
 import { Button } from "@/components/ui/button";
+import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
 import { Form } from "@/components/ui/form";
 import { initialBasicActionState } from "@/lib/action-states";
 import type { PhpIpamIntegrationPublic } from "@/lib/integrations";
@@ -174,26 +175,23 @@ export function IpamForm({
             {isTesting ? "Testing…" : "Test connection"}
           </Button>
           {isEdit && (
-            <Button
+            <ConfirmSubmitButton
               className="text-red-400 hover:bg-red-500/10 hover:text-red-300"
+              confirmLabel="Remove integration"
+              consequences={[
+                "IPAM-side reservations stop appearing alongside IP pools.",
+                "Nothing in phpIPAM itself is changed or deleted.",
+              ]}
+              description="Remove the phpIPAM integration?"
               disabled={isDeleting}
               formAction={deleteAction}
-              formNoValidate
-              onClick={(e) => {
-                if (
-                  !confirm(
-                    "Remove the phpIPAM integration? Tainer will stop showing IPAM-side reservations alongside IP pools until it's reconfigured.",
-                  )
-                ) {
-                  e.preventDefault();
-                }
-              }}
-              type="submit"
+              pending={isDeleting}
+              title="Remove phpIPAM"
               variant="ghost"
             >
               <Trash2 className="h-3.5 w-3.5" />
               {isDeleting ? "Removing…" : "Remove"}
-            </Button>
+            </ConfirmSubmitButton>
           )}
         </div>
         <div className="flex items-center gap-2">

@@ -12,6 +12,7 @@ import { CopyableText } from "@/components/copyable-text";
 import { useActionFlashFeedback } from "@/components/task-toast-provider";
 import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
+import { InfoTip } from "@/components/ui/info-tip";
 import { SectionPanel } from "@/components/ui/section-panel";
 import type { ApiTokenSummary } from "@/lib/api-tokens";
 import { SITE_PERMISSION_LABELS, SITE_PERMISSIONS } from "@/lib/permissions";
@@ -59,7 +60,7 @@ export function ApiTokenPanel({
   return (
     <SectionPanel
       title="API tokens"
-      description="Applies to the whole Tainer instance. Scoped bearer tokens so scripts, Terraform, or CI can call Tainer's API without a browser session. Tokens act as operators with only the permissions you grant — user, group, and site management are never token-accessible."
+      description="Applies to the whole Tainer instance. Scoped bearer tokens so scripts, Terraform, or CI can call Tainer's API without a browser session."
     >
       <div className="space-y-5">
         {createState.createdToken ? (
@@ -86,14 +87,31 @@ export function ApiTokenPanel({
                 Name
                 <input className={inputClassName} name="name" placeholder="terraform-prod" required />
               </label>
-              <label className="block text-[12px] text-zinc-400">
-                Expires after (days, empty = never)
-                <input className={inputClassName} inputMode="numeric" name="expiresDays" placeholder="90" />
-              </label>
+              <div className="text-[12px] text-zinc-400">
+                <span className="flex items-center gap-1.5">
+                  <label htmlFor="expiresDays">Expires after (days)</label>
+                  <InfoTip label="Expires after" side="top">
+                    Leave it empty for a token that never expires.
+                  </InfoTip>
+                </span>
+                <input
+                  className={inputClassName}
+                  id="expiresDays"
+                  inputMode="numeric"
+                  name="expiresDays"
+                  placeholder="90"
+                />
+              </div>
             </div>
 
             <fieldset>
-              <legend className="text-[12px] text-zinc-400">Permissions</legend>
+              <legend className="flex items-center gap-1.5 text-[12px] text-zinc-400">
+                Permissions
+                <InfoTip label="Permissions" side="right">
+                  Tokens act as operators with only the permissions you grant — user, group, and
+                  site management are never token-accessible.
+                </InfoTip>
+              </legend>
               <div className="mt-2 grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
                 {SITE_PERMISSIONS.map((permission) => (
                   <label
@@ -113,8 +131,11 @@ export function ApiTokenPanel({
             </fieldset>
 
             <fieldset>
-              <legend className="text-[12px] text-zinc-400">
-                Sites (none selected = all sites)
+              <legend className="flex items-center gap-1.5 text-[12px] text-zinc-400">
+                Sites
+                <InfoTip label="Sites" side="right">
+                  Leave every box unchecked to give the token access to all sites.
+                </InfoTip>
               </legend>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {sites.map((site) => (

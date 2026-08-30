@@ -1,12 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { LoaderCircle, Trash2 } from "lucide-react";
 
 import { deleteTagAction } from "@/app/group-actions";
 import { useActionFlashFeedback } from "@/components/task-toast-provider";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { initialBasicActionState } from "@/lib/action-states";
 import { useSiteBasePath } from "@/lib/use-site-path";
 import { cn } from "@/lib/utils";
@@ -35,6 +36,7 @@ export function TagDeleteButton({
     initialBasicActionState,
   );
   const lastHandledRequestId = useRef("");
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   useActionFlashFeedback(state, {
     errorTitle: "Delete failed",
@@ -51,14 +53,7 @@ export function TagDeleteButton({
   }, [redirectTo, router, state]);
 
   function handleDelete() {
-    const message = memberCount > 0
-      ? `Delete "${tagName}" and remove it from ${memberCount} deployment(s)?`
-      : `Delete "${tagName}"?`;
-
-    if (!confirm(message)) {
-      return;
-    }
-
+    setConfirmOpen(false);
     const nextFormData = new FormData();
     nextFormData.set("siteSlug", siteSlug);
     nextFormData.set("groupId", tagId);
@@ -66,21 +61,42 @@ export function TagDeleteButton({
   }
 
   return (
-    <Button
-      className={cn(compact && "w-8 px-0", className)}
-      disabled={isPending}
-      onClick={handleDelete}
-      size="sm"
-      title={compact ? `Delete ${tagName}` : undefined}
-      type="button"
-      variant="danger"
-    >
-      {isPending ? (
-        <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
-      ) : (
-        <Trash2 className="h-3.5 w-3.5" />
-      )}
-      {compact ? <span className="sr-only">Delete {tagName}</span> : "Delete"}
-    </Button>
+    <>
+      <Button
+        className={cn(compact && "w-8 px-0", className)}
+        disabled={isPending}
+        onClick={() => setConfirmOpen(true)}
+        size="sm"
+        title={compact ? `Delete ${tagName}` : undefined}
+        type="button"
+        variant="danger"
+      >
+        {isPending ? (
+          <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+        ) : (
+          <Trash2 className="h-3.5 w-3.5" />
+        )}
+        {compact ? <span className="sr-only">Delete {tagName}</span> : "Delete"}
+      </Button>
+
+      <ConfirmDialog
+        consequences={
+          memberCount > 0
+            ? [
+                <>
+                  Removed from <span className="text-zinc-200">{memberCount}</span> deployment
+                  {memberCount === 1 ? "" : "s"} — the deployments themselves are not touched.
+                </>,
+              ]
+            : undefined
+        }
+        description={`Delete the tag "${tagName}"?`}
+        onConfirm={handleDelete}
+        onOpenChange={setConfirmOpen}
+        open={confirmOpen}
+        pending={isPending}
+        title="Delete tag"
+      />
+    </>
   );
 }

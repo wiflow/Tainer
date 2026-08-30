@@ -26,6 +26,7 @@ import {
 } from "@/app/auth-actions";
 import { useActionFlashFeedback } from "@/components/task-toast-provider";
 import { Button } from "@/components/ui/button";
+import { InfoTip } from "@/components/ui/info-tip";
 import { SectionPanel } from "@/components/ui/section-panel";
 import { Form } from "@/components/ui/form";
 import {
@@ -185,15 +186,23 @@ export function AccountSettingsPanel({
 
       {/* ── Profile & Password ── */}
       <div className="grid gap-4 xl:grid-cols-[1fr_1fr]">
-        <SectionPanel title="Profile" description="Update the name shown in the Tainer workspace sidebar and account views.">
+        <SectionPanel title="Profile" description="Update your account profile.">
             <Form action={profileAction} className="space-y-4">
-              <label className="block">
+              <div>
                 <span className="flex items-center gap-2 text-[13px] font-medium text-zinc-300">
                   <UserRound className="h-4 w-4 text-zinc-500" />
-                  Display name
+                  <label htmlFor="name">Display name</label>
+                  <InfoTip label="Display name" side="right">
+                    Shown in the Tainer workspace sidebar and account views.
+                  </InfoTip>
                 </span>
-                <input className={inputClassName} defaultValue={account.name} name="name" />
-              </label>
+                <input
+                  className={inputClassName}
+                  defaultValue={account.name}
+                  id="name"
+                  name="name"
+                />
+              </div>
 
               <div className="rounded-xl border border-white/5 bg-[#111113] px-4 py-3 text-[12px] text-zinc-500">
                 Created {new Date(account.createdAt).toLocaleString()}

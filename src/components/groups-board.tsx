@@ -8,6 +8,7 @@ import { deleteGroupAction } from "@/app/group-management-actions";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { initialBasicActionState } from "@/lib/action-states";
 import type { ManagedUserSummary } from "@/lib/auth";
 import type { UserGroup } from "@/lib/user-groups";
@@ -75,7 +76,7 @@ export function GroupsBoard({
         </Card>
       ) : (
         <div className="space-y-4">
-          <div className="overflow-hidden rounded-xl border border-white/5 bg-[#111113]">
+          <div className="overflow-hidden overflow-x-auto rounded-xl border border-white/5 bg-[#111113]">
             <table className="w-full text-left text-[13px]">
               <thead>
                 <tr className="border-b border-white/5 bg-black/40">
@@ -136,11 +137,10 @@ function GroupTableRow({
   memberCount: number;
 }) {
   const [deleting, setDeleting] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   async function handleDelete() {
-    if (!confirm(`Delete group "${group.name}"? Members will lose this group's permissions.`)) {
-      return;
-    }
+    setConfirmOpen(false);
     setDeleting(true);
     const fd = new FormData();
     fd.set("groupId", group.id);
@@ -178,12 +178,27 @@ function GroupTableRow({
         <div className="flex justify-end items-center gap-2 relative">
           <Button
             disabled={deleting}
-            onClick={handleDelete}
+            onClick={() => setConfirmOpen(true)}
             size="sm"
             variant="ghost"
           >
             <Trash2 className="h-3.5 w-3.5 text-zinc-500" />
           </Button>
+          <ConfirmDialog
+            consequences={[
+              <>
+                <span className="text-zinc-200">{memberCount}</span> member
+                {memberCount === 1 ? "" : "s"} lose the permissions this group grants — their
+                accounts stay.
+              </>,
+            ]}
+            description={`Delete the group "${group.name}"?`}
+            onConfirm={handleDelete}
+            onOpenChange={setConfirmOpen}
+            open={confirmOpen}
+            pending={deleting}
+            title="Delete group"
+          />
           <Link
             className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/5 px-3 py-1.5 text-[12px] font-medium text-zinc-200 transition-colors hover:bg-white/10"
             href={`/groups/${group.id}`}

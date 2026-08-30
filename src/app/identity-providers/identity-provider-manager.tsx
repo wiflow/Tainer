@@ -1,7 +1,7 @@
 "use client";
 
 import { KeyRound, Network, Pencil, Plus, TestTube2, Trash2 } from "lucide-react";
-import { useActionState, useState } from "react";
+import { useActionState, useRef, useState } from "react";
 
 import {
   createIdpProviderAction,
@@ -10,6 +10,7 @@ import {
   updateIdpProviderAction,
 } from "@/app/identity-provider-actions";
 import { initialTestIdpActionState } from "@/app/identity-provider-action-states";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { LdapConfigForm } from "@/app/ldap/ldap-config-form";
 import { useActionFlashFeedback } from "@/components/task-toast-provider";
 import { Badge } from "@/components/ui/badge";
@@ -209,6 +210,8 @@ function ProviderRow({
     testIdpProviderAction,
     initialTestIdpActionState,
   );
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const deleteFormRef = useRef<HTMLFormElement>(null);
   useActionFlashFeedback(deleteState, {
     errorTitle: "Delete failed",
     successTitle: "Provider deleted",
@@ -257,24 +260,34 @@ function ProviderRow({
         >
           <Pencil className="h-3.5 w-3.5" />
         </button>
-        <Form
-          action={deleteAction}
-          onSubmit={(e) => {
-            if (!confirm(`Delete provider "${provider.name}"? Users created via SSO will keep their accounts but won't be able to sign in through this provider anymore.`)) {
-              e.preventDefault();
-            }
-          }}
-        >
+        <Form action={deleteAction} ref={deleteFormRef}>
           <input name="providerId" type="hidden" value={provider.id} />
           <button
             className="rounded-md p-1.5 text-zinc-600 hover:bg-zinc-800 hover:text-red-400 transition-colors"
             disabled={isDeleting}
+            onClick={() => setConfirmOpen(true)}
             title="Delete"
-            type="submit"
+            type="button"
           >
             <Trash2 className="h-3.5 w-3.5" />
           </button>
         </Form>
+
+        <ConfirmDialog
+          consequences={[
+            "Users created through this provider keep their accounts, but can no longer sign in with it.",
+            "Anyone without a local password will need another way in — check that first.",
+          ]}
+          description={`Delete the identity provider "${provider.name}"?`}
+          onConfirm={() => {
+            setConfirmOpen(false);
+            deleteFormRef.current?.requestSubmit();
+          }}
+          onOpenChange={setConfirmOpen}
+          open={confirmOpen}
+          pending={isDeleting}
+          title="Delete identity provider"
+        />
       </div>
     </div>
   );

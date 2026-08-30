@@ -1,7 +1,7 @@
 "use client";
 
 import { CalendarClock, Pause, Play, Plus, Trash2, Zap } from "lucide-react";
-import { useActionState, useState } from "react";
+import { useActionState, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 
 import {
@@ -10,6 +10,7 @@ import {
   runConfigSnapshotPolicyNowAction,
   toggleConfigSnapshotPolicyAction,
 } from "@/app/node-config-actions";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useActionFlashFeedback } from "@/components/task-toast-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -81,6 +82,8 @@ function ScheduleRow({
     deleteConfigSnapshotPolicyAction,
     initialBasicActionState,
   );
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const deleteFormRef = useRef<HTMLFormElement>(null);
 
   useActionFlashFeedback(toggleState, {
     errorTitle: "Toggle failed",
@@ -152,23 +155,35 @@ function ScheduleRow({
             )}
           </button>
         </Form>
-        <Form
-          action={deleteAction}
-          onSubmit={(e) => {
-            if (!confirm(`Delete schedule "${policy.name}"?`)) e.preventDefault();
-          }}
-        >
+        <Form action={deleteAction} ref={deleteFormRef}>
           <input name="siteSlug" type="hidden" value={siteSlug} />
           <input name="policyId" type="hidden" value={policy.id} />
           <button
             className="rounded-md p-1.5 text-zinc-600 hover:bg-zinc-800 hover:text-red-400 transition-colors"
             disabled={isDeleting}
+            onClick={() => setConfirmOpen(true)}
             title="Delete schedule"
-            type="submit"
+            type="button"
           >
             <Trash2 className="h-3.5 w-3.5" />
           </button>
         </Form>
+
+        <ConfirmDialog
+          consequences={[
+            "Snapshots already taken by this schedule are kept.",
+            "No further snapshots will be taken automatically for this node.",
+          ]}
+          description={`Delete the snapshot schedule "${policy.name}"?`}
+          onConfirm={() => {
+            setConfirmOpen(false);
+            deleteFormRef.current?.requestSubmit();
+          }}
+          onOpenChange={setConfirmOpen}
+          open={confirmOpen}
+          pending={isDeleting}
+          title="Delete snapshot schedule"
+        />
       </div>
     </div>
   );

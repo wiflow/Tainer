@@ -11,6 +11,7 @@ import {
 } from "@/app/backup-policy-actions";
 import { useActionFlashFeedback } from "@/components/task-toast-provider";
 import { Button } from "@/components/ui/button";
+import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form } from "@/components/ui/form";
 import { initialBasicActionState } from "@/lib/action-states";
@@ -366,20 +367,22 @@ export function BackupPolicyEditor({
                   </Button>
                 </Form>
 
-                <Form
-                  action={deleteAction}
-                  onSubmit={(e) => {
-                    if (!confirm("Delete this backup policy? This cannot be undone.")) {
-                      e.preventDefault();
-                    }
-                  }}
-                >
+                <Form action={deleteAction}>
                   <input name="siteSlug" type="hidden" value={siteSlug} />
                   <input name="policyId" type="hidden" value={policy.id} />
-                  <Button disabled={isDeleting} type="submit" variant="secondary">
+                  <ConfirmSubmitButton
+                    consequences={[
+                      "Backups already taken by this policy are kept — only the schedule is removed.",
+                      "Nothing will be backed up on this schedule again unless you recreate it.",
+                    ]}
+                    description={`Delete the backup policy "${policy.name}"?`}
+                    disabled={isDeleting}
+                    pending={isDeleting}
+                    title="Delete backup policy"
+                  >
                     <Trash2 className="h-3.5 w-3.5" />
                     {isDeleting ? "Deleting..." : "Delete"}
-                  </Button>
+                  </ConfirmSubmitButton>
                 </Form>
               </>
             )}

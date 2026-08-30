@@ -11,6 +11,7 @@ import {
 import { useActionFlashFeedback } from "@/components/task-toast-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
 import { Form } from "@/components/ui/form";
 import { initialBasicActionState } from "@/lib/action-states";
 import type { LdapConfigPublic } from "@/lib/ldap-config";
@@ -304,20 +305,22 @@ export function LdapConfigForm({
                 <TestTube2 className="h-3.5 w-3.5" />
                 {isTesting ? "Testing…" : "Test connection"}
               </Button>
-              <Button
+              <ConfirmSubmitButton
+                confirmLabel="Remove LDAP"
+                consequences={[
+                  "Users who sign in via LDAP lose access until it is reconfigured.",
+                  "Local accounts and their passwords are unaffected.",
+                ]}
+                description="Remove the LDAP configuration?"
                 disabled={isDeleting}
                 formAction={deleteAction}
-                onClick={(event) => {
-                  if (!confirm("Remove the LDAP configuration? Users currently signing in via LDAP will lose access until it's reconfigured.")) {
-                    event.preventDefault();
-                  }
-                }}
-                type="submit"
+                pending={isDeleting}
+                title="Remove LDAP configuration"
                 variant="danger"
               >
                 <Trash2 className="h-3.5 w-3.5" />
                 {isDeleting ? "Removing…" : "Remove"}
-              </Button>
+              </ConfirmSubmitButton>
             </>
           ) : null}
         </div>

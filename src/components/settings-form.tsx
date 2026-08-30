@@ -10,6 +10,7 @@ import {
 } from "@/app/settings-actions";
 import { useActionTaskFeedback } from "@/components/task-toast-provider";
 import { Button } from "@/components/ui/button";
+import { InfoTip } from "@/components/ui/info-tip";
 import { SectionPanel } from "@/components/ui/section-panel";
 import { Form } from "@/components/ui/form";
 import { initialActionState } from "@/lib/action-states";
@@ -167,22 +168,27 @@ export function DockerLibraryForm({
     >
       <Form action={formAction} className="space-y-5">
         <input name="siteSlug" type="hidden" value={siteSlug} />
-        <label className="block rounded-md border border-white/5 bg-[#111113] px-4 py-3">
-          <span className="text-[13px] font-medium text-zinc-200">Library path</span>
+        <div className="rounded-md border border-white/5 bg-[#111113] px-4 py-3">
+          <span className="flex items-center gap-1.5">
+            <label className="text-[13px] font-medium text-zinc-200" htmlFor="dockerLibraryPath">
+              Library path
+            </label>
+            <InfoTip label="Library path" side="right">
+              <code className="text-zinc-200">/app/data/docker-library</code> lives on the
+              already-mounted data volume, so it works with no redeploy — the directory is created
+              on the first pull. Leave blank to fall back to the{" "}
+              <code className="text-zinc-200">DOCKER_LIBRARY_PATH</code> environment variable.
+            </InfoTip>
+          </span>
           <input
             className={inputClassName}
             defaultValue={dockerLibraryPath}
+            id="dockerLibraryPath"
             name="dockerLibraryPath"
             placeholder="/app/data/docker-library"
             spellCheck={false}
           />
-          <p className="mt-2 text-[11px] text-zinc-500">
-            Tip: <code className="text-zinc-300">/app/data/docker-library</code> lives on the
-            already-mounted data volume, so it works with no redeploy — the directory is created on
-            the first pull. Leave blank to fall back to the{" "}
-            <code className="text-zinc-300">DOCKER_LIBRARY_PATH</code> environment variable.
-          </p>
-        </label>
+        </div>
 
         <div className="flex items-center justify-between rounded-md border border-white/5 bg-[#111113] px-4 py-3 text-[12px] text-zinc-500">
           <span>Effective path</span>
@@ -240,11 +246,23 @@ export function BackupSettingsForm({
       >
         <Form action={formAction} className="space-y-5">
           <input name="siteSlug" type="hidden" value={siteSlug} />
-          <label className="block rounded-md border border-white/5 bg-[#111113] px-4 py-3">
-            <span className="text-[13px] font-medium text-zinc-200">Default backup storage</span>
+          <div className="rounded-md border border-white/5 bg-[#111113] px-4 py-3">
+            <span className="flex items-center gap-1.5">
+              <label
+                className="text-[13px] font-medium text-zinc-200"
+                htmlFor="defaultBackupStorage"
+              >
+                Default backup storage
+              </label>
+              <InfoTip label="Default backup storage" side="right">
+                Must already be configured in Proxmox as a backup-capable target — for example a
+                CIFS/SMB share with the &quot;backup&quot; content type.
+              </InfoTip>
+            </span>
             <select
               className={inputClassName}
               defaultValue={defaultBackupStorage}
+              id="defaultBackupStorage"
               name="defaultBackupStorage"
             >
               <option value="">None selected</option>
@@ -256,24 +274,29 @@ export function BackupSettingsForm({
                 </option>
               ))}
             </select>
-            <p className="mt-2 text-[11px] text-zinc-500">
-              The backup storage must already be configured in Proxmox as a backup-capable target (e.g. CIFS/SMB share with &quot;backup&quot; content type).
-            </p>
-          </label>
+          </div>
 
-          <label className="block rounded-md border border-white/5 bg-[#111113] px-4 py-3">
-            <span className="text-[13px] font-medium text-zinc-200">Backup SLA (hours)</span>
+          <div className="rounded-md border border-white/5 bg-[#111113] px-4 py-3">
+            <span className="flex items-center gap-1.5">
+              <label
+                className="text-[13px] font-medium text-zinc-200"
+                htmlFor="defaultBackupSlaHours"
+              >
+                Backup SLA (hours)
+              </label>
+              <InfoTip label="Backup SLA (hours)" side="right">
+                Deployments without a successful backup within this window are flagged as at risk.
+              </InfoTip>
+            </span>
             <input
               className={inputClassName}
               defaultValue={defaultBackupSlaHours}
+              id="defaultBackupSlaHours"
               min="1"
               name="defaultBackupSlaHours"
               type="number"
             />
-            <p className="mt-2 text-[11px] text-zinc-500">
-              Deployments without a successful backup within this window are flagged as at risk.
-            </p>
-          </label>
+          </div>
 
           <div className="flex items-center justify-between rounded-md border border-white/5 bg-[#111113] px-4 py-3 text-[12px] text-zinc-500">
             <span>Last updated</span>

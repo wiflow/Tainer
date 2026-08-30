@@ -12,6 +12,7 @@ import {
 import { useActionFlashFeedback } from "@/components/task-toast-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form } from "@/components/ui/form";
 import { initialBasicActionState } from "@/lib/action-states";
@@ -583,20 +584,22 @@ export function AlertPolicyEditor({
                   </Button>
                 </Form>
 
-                <Form
-                  action={deleteAction}
-                  onSubmit={(e) => {
-                    if (!confirm("Delete this alert policy? This cannot be undone.")) {
-                      e.preventDefault();
-                    }
-                  }}
-                >
+                <Form action={deleteAction}>
                   <input name="siteSlug" type="hidden" value={siteSlug} />
                   <input name="policyId" type="hidden" value={policy.id} />
-                  <Button disabled={isDeleting} type="submit" variant="secondary">
+                  <ConfirmSubmitButton
+                    consequences={[
+                      "The conditions this policy watches will stop being evaluated.",
+                      "Any alert it currently has firing is cleared.",
+                    ]}
+                    description={`Delete the alert policy "${policy.name}"?`}
+                    disabled={isDeleting}
+                    pending={isDeleting}
+                    title="Delete alert policy"
+                  >
                     <Trash2 className="h-3.5 w-3.5" />
                     {isDeleting ? "Deleting..." : "Delete"}
-                  </Button>
+                  </ConfirmSubmitButton>
                 </Form>
               </>
             )}

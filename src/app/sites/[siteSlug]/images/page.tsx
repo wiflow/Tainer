@@ -7,6 +7,7 @@ import { IntentLink } from "@/components/intent-link";
 import { ProxmoxIssues } from "@/components/proxmox-issues";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
+import { InfoTip } from "@/components/ui/info-tip";
 import { SectionPanel } from "@/components/ui/section-panel";
 import { MetricCard } from "@/components/ui/metric-card";
 import { getDockerHubOverview } from "@/lib/docker-hub";
@@ -211,30 +212,48 @@ function DockerHubView({
 
       <SectionPanel
         title="Search Docker Hub"
-        description="Enter a search query to use Docker Hub's global repository search. Leave it blank to browse a specific namespace like `library`."
+        description="Search all of Docker Hub, or browse a single namespace."
       >
         <form action={`/sites/${siteSlug}/images`} className="grid gap-3 sm:grid-cols-[180px_1fr_auto]">
           <input name="source" type="hidden" value="docker-hub" />
-          <label className="rounded-md border border-white/5 bg-[#111113] px-4 py-3">
-            <span className="text-[12px] font-medium text-zinc-500">Browse namespace</span>
+          <div className="rounded-md border border-white/5 bg-[#111113] px-4 py-3">
+            <span className="flex items-center gap-1.5">
+              <label className="text-[12px] font-medium text-zinc-500" htmlFor="namespace">
+                Browse namespace
+              </label>
+              <InfoTip label="Browse namespace" side="top">
+                Browsed when the search query is left blank — for example{" "}
+                <code className="text-zinc-200">library</code> for Docker&apos;s official images.
+              </InfoTip>
+            </span>
             <input
               className="mt-1.5 w-full rounded-md border border-white/10 bg-zinc-900 px-3 py-2 text-[13px] text-zinc-200 outline-none transition-colors focus:border-zinc-500"
               defaultValue={overview.namespace}
+              id="namespace"
               name="namespace"
               type="text"
             />
-          </label>
+          </div>
 
-          <label className="rounded-md border border-white/5 bg-[#111113] px-4 py-3">
-            <span className="text-[12px] font-medium text-zinc-500">Search query</span>
+          <div className="rounded-md border border-white/5 bg-[#111113] px-4 py-3">
+            <span className="flex items-center gap-1.5">
+              <label className="text-[12px] font-medium text-zinc-500" htmlFor="name">
+                Search query
+              </label>
+              <InfoTip label="Search query" side="top">
+                Runs Docker Hub&apos;s global repository search across every namespace. Leave it
+                blank to browse the namespace on the left instead.
+              </InfoTip>
+            </span>
             <input
               className="mt-1.5 w-full rounded-md border border-white/10 bg-zinc-900 px-3 py-2 text-[13px] text-zinc-200 outline-none transition-colors focus:border-zinc-500"
               defaultValue={overview.nameFilter}
+              id="name"
               name="name"
               placeholder="nginx, postgres, grafana, ..."
               type="text"
             />
-          </label>
+          </div>
 
           <div className="flex items-end">
             <button className={cn(buttonVariants({ size: "md", variant: "primary" }))} type="submit">

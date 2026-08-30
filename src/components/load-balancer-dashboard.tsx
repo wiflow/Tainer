@@ -15,6 +15,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
 import { InfoLabel, InfoTip } from "@/components/ui/info-tip";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { PillTabs } from "@/components/ui/pill-tabs";
 import { SectionPanel } from "@/components/ui/section-panel";
 import { initialBasicActionState } from "@/lib/action-states";
@@ -101,9 +108,18 @@ function NodeScoreTable({
 }) {
   if (scores.length === 0) {
     return (
-      <div className="flex items-center justify-center py-12 text-[13px] text-zinc-500">
-        No node scores available. Enable the load balancer to start collecting data.
-      </div>
+      <Empty>
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <Server />
+          </EmptyMedia>
+          <EmptyTitle>No node scores yet</EmptyTitle>
+          <EmptyDescription>
+            Turn the load balancer on in Settings below and scores appear within a poll interval —
+            it starts in Observe mode, so nothing moves until you say so.
+          </EmptyDescription>
+        </EmptyHeader>
+      </Empty>
     );
   }
 

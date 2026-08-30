@@ -140,6 +140,7 @@ export function DeploymentFirewallCard({
             {options.enable ? "" : " once the firewall is enabled"}.
           </p>
         ) : (
+          <div className="overflow-x-auto">
           <table className="w-full text-left text-[12px]">
             <thead>
               <tr className="border-b border-white/5 bg-black/40 text-zinc-400">
@@ -205,6 +206,7 @@ export function DeploymentFirewallCard({
               ))}
             </tbody>
           </table>
+          </div>
         )}
 
         {canManage ? (

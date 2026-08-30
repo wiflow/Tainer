@@ -15,7 +15,7 @@ export function BackupJobTable({
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border border-white/5 bg-[#111113]">
+    <div className="overflow-hidden overflow-x-auto rounded-xl border border-white/5 bg-[#111113]">
       <table className="w-full text-left text-[13px]">
         <thead>
           <tr className="border-b border-white/5 bg-black/40">
