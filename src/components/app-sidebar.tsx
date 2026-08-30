@@ -280,23 +280,9 @@ export function AppSidebar({
           </button>
         </div>
 
-        {/* ── Overview (top-level, separate from sectioned nav) ── */}
-        <nav className="mb-4">
-          <NavLink
-            active={pathname === "/"}
-            href="/"
-            icon={MapIcon}
-            label="Overview"
-          />
-          <NavLink
-            active={pathname === "/settings/copilot"}
-            href="/settings/copilot"
-            icon={Sparkles}
-            label="Tainy"
-          />
-        </nav>
-
-        {/* Site Switcher */}
+        {/* Site switcher — first, because it scopes everything in the
+            "This site" zone below it. Anything above or below that zone is
+            global, and the ScopeLabel dividers say so. */}
         {sites.length > 0 && (
           <div className="relative mb-2" ref={switcherRef}>
             <div className="flex items-center gap-1">
@@ -384,21 +370,47 @@ export function AppSidebar({
             CommandPalette; this is purely how anyone finds out it exists.
             Clicking dispatches the same shortcut the listener is watching
             for, so there's one code path to keep working. */}
-        <button
-          className="mx-2 mb-4 flex items-center gap-2 rounded-md border border-white/5 bg-white/[0.02] px-3 py-2 text-left transition-colors hover:border-white/10 hover:bg-white/[0.05]"
-          onClick={() =>
-            document.dispatchEvent(
-              new KeyboardEvent("keydown", { bubbles: true, key: "k", metaKey: true }),
-            )
-          }
-          type="button"
-        >
-          <Search className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
-          <span className="text-[12px] text-zinc-500">Search…</span>
-          <kbd className="ml-auto rounded border border-white/10 bg-white/5 px-1.5 py-0.5 font-sans text-[10px] text-zinc-500">
-            ⌘K
-          </kbd>
-        </button>
+        <div className="mx-2 mb-4 flex flex-col gap-1.5">
+          <button
+            className="flex items-center gap-2 rounded-md border border-white/5 bg-white/[0.02] px-3 py-2 text-left transition-colors hover:border-white/10 hover:bg-white/[0.05]"
+            onClick={() =>
+              document.dispatchEvent(
+                new KeyboardEvent("keydown", { bubbles: true, key: "k", metaKey: true }),
+              )
+            }
+            type="button"
+          >
+            <Search className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
+            <span className="text-[12px] text-zinc-500">Search…</span>
+            <kbd className="ml-auto rounded border border-white/10 bg-white/5 px-1.5 py-0.5 font-sans text-[10px] text-zinc-500">
+              ⌘K
+            </kbd>
+          </button>
+
+          {/* Opens the assistant panel rather than navigating — this used to
+              be a nav link to /settings/copilot, which meant the most
+              prominent item in the sidebar opened an admin config page
+              instead of Tainy. That page now lives under Platform. */}
+          <button
+            className="flex items-center gap-2 rounded-md border border-white/5 bg-white/[0.02] px-3 py-2 text-left transition-colors hover:border-white/10 hover:bg-white/[0.05]"
+            onClick={() =>
+              document.dispatchEvent(
+                new KeyboardEvent("keydown", { bubbles: true, key: "j", metaKey: true }),
+              )
+            }
+            type="button"
+          >
+            <Sparkles className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
+            <span className="text-[12px] text-zinc-500">Ask Tainy…</span>
+            <kbd className="ml-auto rounded border border-white/10 bg-white/5 px-1.5 py-0.5 font-sans text-[10px] text-zinc-500">
+              ⌘J
+            </kbd>
+          </button>
+        </div>
+
+        {/* Everything from here to the "All sites" divider resolves to
+            /sites/<slug>/… — switching sites changes what these pages show. */}
+        <ScopeLabel>{currentSite?.name ?? "This site"}</ScopeLabel>
 
         {/* Sectioned nav. Each section auto-expands when its current route is
             active; otherwise the user's last collapsed/expanded state from
@@ -520,6 +532,25 @@ export function AppSidebar({
             />
           </NavSection>
 
+          {/* Site settings closes the site zone. It was previously reachable
+              only through the unlabelled gear beside the switcher. */}
+          <NavLink
+            active={isActive("/settings")}
+            href={effectiveSlug ? `/sites/${effectiveSlug}/settings` : "/settings"}
+            icon={Settings}
+            label="Site settings"
+          />
+
+          {/* Nothing below this divider is affected by the site switcher. */}
+          <ScopeLabel className="mt-1">All sites</ScopeLabel>
+
+          <NavLink
+            active={pathname === "/"}
+            href="/"
+            icon={MapIcon}
+            label="Overview"
+          />
+
           {/* Platform — admin-only, global concerns about the Tainer install
               itself. Hosts everything that isn't scoped to one site: the list
               of sites you've connected (Sites), cluster-connectivity health
@@ -533,6 +564,7 @@ export function AppSidebar({
                 pathname === "/sites" ||
                 pathname.startsWith("/heartbeat") ||
                 pathname.startsWith("/integrations") ||
+                pathname === "/settings/copilot" ||
                 pathname.startsWith("/audit-log")
               }
               id="platform"
@@ -555,6 +587,12 @@ export function AppSidebar({
                 href="/integrations"
                 icon={Plug}
                 label="Integrations"
+              />
+              <NavLink
+                active={pathname === "/settings/copilot"}
+                href="/settings/copilot"
+                icon={Sparkles}
+                label="Tainy settings"
               />
               <NavLink
                 active={pathname.startsWith("/audit-log")}
@@ -762,6 +800,29 @@ function NavLink({
  * what the user had open. The section is also auto-expanded if it contains
  * the active route — the caller passes `defaultOpen` for that.
  */
+/**
+ * The scope divider. The sidebar has always been split into site-scoped and
+ * global routes, but nothing said so — you couldn't tell that switching sites
+ * changes what Backups shows and leaves Audit Log alone. This makes that
+ * boundary visible without adding another level of nesting.
+ */
+function ScopeLabel({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={cn("mb-2 flex items-center gap-2 px-3", className)}>
+      <span className="truncate text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-600">
+        {children}
+      </span>
+      <span aria-hidden="true" className="h-px flex-1 bg-white/[0.06]" />
+    </div>
+  );
+}
+
 function NavSection({
   children,
   defaultOpen,
