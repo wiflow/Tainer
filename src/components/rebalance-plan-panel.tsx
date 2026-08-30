@@ -12,6 +12,7 @@ import { useActionFlashFeedback } from "@/components/task-toast-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
+import { InfoLabel, InfoTip } from "@/components/ui/info-tip";
 import { SectionPanel } from "@/components/ui/section-panel";
 import { initialBasicActionState } from "@/lib/action-states";
 import type { RebalancePlan, RebalancePlanMove } from "@/lib/load-balancer/plan-store";
@@ -107,24 +108,38 @@ function ComputeForm({ siteSlug }: { siteSlug: string }) {
       <input type="hidden" name="siteSlug" value={siteSlug} />
       <div className="flex flex-wrap items-end gap-3">
         <div className="w-32">
-          <label className="text-[11px] font-medium text-zinc-400">Max Moves</label>
+          <InfoLabel
+            htmlFor="maxMoves"
+            tip="Upper bound on how many migrations the plan may contain. The optimizer stops as soon as extra moves stop meaningfully improving balance, so this is a ceiling, not a target."
+          >
+            Max Moves
+          </InfoLabel>
           <input
             className={fieldClassName}
             defaultValue={5}
+            id="maxMoves"
             name="maxMoves"
             type="number"
             min="1"
             max="20"
           />
         </div>
-        <label className="flex items-center gap-2 pb-2.5 text-[12px] text-zinc-400">
+        <div className="flex items-center gap-2 pb-2.5">
           <input
             className="h-4 w-4 rounded border-white/10 bg-zinc-900 text-sky-400"
+            id="includeContainers"
             name="includeContainers"
             type="checkbox"
           />
-          Include containers (restart migration — downtime)
-        </label>
+          <label className="text-[12px] text-zinc-400" htmlFor="includeContainers">
+            Include containers
+          </label>
+          <InfoTip label="Include containers" side="right">
+            Lets the plan move LXC containers as well as VMs. Proxmox cannot live-migrate a
+            container, so each one is stopped, transferred and started again — real downtime for
+            whatever runs inside it.
+          </InfoTip>
+        </div>
         <Button type="submit" disabled={isPending} className="gap-2">
           <Calculator className="h-3.5 w-3.5" />
           {isPending ? "Computing…" : "Compute Plan"}
@@ -218,12 +233,16 @@ export function RebalancePlanPanel({
               >
                 {plan.status}
               </Badge>
-              <span className="text-[12px] text-zinc-400">
+              <span className="flex items-center gap-1.5 text-[12px] text-zinc-400">
                 Projected imbalance{" "}
                 <span className="font-mono text-zinc-200">{plan.imbalanceBefore.toFixed(3)}</span>
                 {" → "}
                 <span className="font-mono text-emerald-400">{plan.imbalanceAfter.toFixed(3)}</span>
-                {" "}(coefficient of variation — lower is more even)
+                <InfoTip label="Projected imbalance" side="bottom">
+                  How unevenly load sits across the cluster, as the coefficient of variation of
+                  the node scores — lower is more even. The second figure is where the plan
+                  expects to land once every move has been applied.
+                </InfoTip>
               </span>
               <span className="text-[11px] text-zinc-500">
                 by {plan.createdBy} · {new Date(plan.createdAt).toLocaleString()}

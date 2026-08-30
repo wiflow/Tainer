@@ -37,6 +37,8 @@ Sections per release:
 
 ### Changed
 
+- **Load balancer settings now explain themselves inline.** Every setting, score column and rebalance-plan field carries a small ⓘ you can hover, focus or tap for a one-paragraph explanation of what it does and what happens if you change it — so you no longer have to read the page to find one knob. The helper paragraphs those tooltips replaced are gone, and the "How it works" section at the bottom is now a collapsed six-line summary rather than a wall of prose. The full write-up is still in `docs/load-balancer.md`.
+
 - **Auto-migration behaviour: existing deployments with auto-migration enabled switch to dry-run recommendations until Dry-Run Mode is explicitly unchecked, and containers stop being auto-migrated until opted in.** Both defaults changed to the safe side because container moves cause downtime (see Added). Review the new settings on the load-balancer page after upgrading.
 - **Load balancer default score weights are now memory-primary**: memory 50%, CPU 25%, disk 15%, latency 10% (previously CPU 40%, memory 30%, latency 20%, disk 10%). Memory is the truly finite resource — CPU contention degrades gracefully, memory exhaustion OOM-kills — and Proxmox's own scheduler weights memory 5:1 over CPU for the same reason. Only affects sites that never saved custom weights; saved settings keep their values.
 

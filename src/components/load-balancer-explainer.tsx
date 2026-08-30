@@ -1,106 +1,70 @@
-import { SectionPanel } from "@/components/ui/section-panel";
+import { ChevronRight } from "lucide-react";
 
 /**
- * User-facing "how does this work" reference for the load balancer page.
+ * Collapsed "how does this work" summary for the load balancer page.
  * Static server component — native <details> keeps it collapsible with no
- * client JS. The full write-up lives in docs/load-balancer.md; keep the two
- * in sync when behaviour changes.
+ * client JS.
+ *
+ * Deliberately short: the per-setting detail now lives in the ⓘ tooltips on
+ * the controls themselves, so this only has to carry the shape of the loop.
+ * The full write-up is docs/load-balancer.md; keep the two in sync when
+ * behaviour changes.
  */
 
-const stepClassName = "text-[13px] leading-relaxed text-zinc-400";
-const headingClassName = "text-[13px] font-medium text-zinc-200";
+const STEPS: { title: string; body: string }[] = [
+  {
+    title: "Score",
+    body:
+      "Every poll, each node's memory, CPU, disk and API latency are combined into one score, plus penalties when guests are visibly suffering. Lower is healthier, and new deployments are steered to the lowest.",
+  },
+  {
+    title: "Wait for it to persist",
+    body:
+      "A node becomes a migration candidate only after it stays over the threshold for several consecutive polls. A brief spike resets the counter.",
+  },
+  {
+    title: "Move the smallest thing that helps",
+    body:
+      "The balancer sheds just enough load — never a 64 GB VM when a 4 GB one would do — and only to a node with genuine headroom that beats the source by your minimum improvement.",
+  },
+  {
+    title: "Protect containers",
+    body:
+      "Proxmox live-migrates VMs with no downtime, but LXC containers always stop, transfer and start. Containers are therefore never moved automatically unless you opt in.",
+  },
+  {
+    title: "Dry-run first",
+    body:
+      "By default every decision is recorded in the activity log without being executed. Review the recommendations for a few days, then turn dry-run off.",
+  },
+  {
+    title: "Stay in control",
+    body:
+      "Drain a node for maintenance, exclude nodes or VMIDs, tag individual guests in Proxmox, or apply a whole-cluster rebalance plan yourself. Every decision and failure is logged.",
+  },
+];
 
 export function LoadBalancerExplainer() {
   return (
-    <SectionPanel
-      title="How the load balancer works"
-      description="What gets scored, when a workload moves, and the guardrails that keep migrations safe."
-    >
-      <div className="space-y-4">
-        <div className="space-y-1.5">
-          <h3 className={headingClassName}>1. Every node gets a score</h3>
-          <p className={stepClassName}>
-            Every few seconds (the poll interval) Tainer measures each node&apos;s memory, CPU, and
-            disk usage plus its API latency, and combines them into a single composite score using
-            your weights — memory counts most, because running out of it is what kills workloads.
-            Nodes hosting struggling guests — VMs losing CPU time to noisy neighbours (CPU steal),
-            containers hitting memory limits (failcnt) — get penalty points on top, and on Proxmox
-            VE 9+ the kernel&apos;s pressure metrics (PSI) add penalties when tasks are actually
-            stalling on CPU, memory, or IO, even if plain utilization looks fine.
-            <strong className="text-zinc-300"> Lower score = healthier node.</strong> New deployments
-            are automatically suggested onto low-score nodes.
-          </p>
-        </div>
-
-        <div className="space-y-1.5">
-          <h3 className={headingClassName}>2. Sustained overload triggers a move — not spikes</h3>
-          <p className={stepClassName}>
-            A node only becomes a migration candidate when its score stays above the cluster average
-            by your threshold for several consecutive polls. A brief CPU spike resets the counter and
-            nothing happens. When a node does qualify, the balancer works out how much load it needs
-            to shed and picks the <em>smallest</em> guest that gets it there — never a 64&nbsp;GB VM
-            when a 4&nbsp;GB one would do — trying VMs before containers, and using the balloon
-            driver&apos;s real memory figures rather than inflated host-reported ones. The target
-            node must genuinely have room (CPU below 90%, memory with 20% headroom, disk with 10%
-            headroom) and must beat the source score by your minimum improvement — otherwise it does
-            nothing and waits.
-          </p>
-        </div>
-
-        <div className="space-y-1.5">
-          <h3 className={headingClassName}>3. Containers are protected from surprise downtime</h3>
-          <p className={stepClassName}>
-            Proxmox live-migrates VMs with no downtime, but LXC containers always restart-migrate:
-            stop, transfer, start. The balancer therefore never moves containers automatically unless
-            you opt in — either fully, or only inside downtime windows you define (e.g. 22:00–06:00).
-            VMs are always eligible.
-          </p>
-        </div>
-
-        <div className="space-y-1.5">
-          <h3 className={headingClassName}>4. Dry-run first, then trust</h3>
-          <p className={stepClassName}>
-            With dry-run on (the default), the balancer records every move it <em>would</em> make as
-            a “dry-run” entry in the activity log below, without touching anything. Review the
-            recommendations for a few days; when they look right, disable dry-run and the same
-            decisions execute for real. Migrations are capped at your concurrency limit, and each
-            node gets a cooldown after a move so the cluster never churns.
-          </p>
-        </div>
-
-        <div className="space-y-1.5">
-          <h3 className={headingClassName}>5. Plan ahead — or let it see ahead</h3>
-          <p className={stepClassName}>
-            The <strong className="text-zinc-300">Rebalance Plan</strong> panel above computes a
-            whole-cluster optimization: the fewest moves that even the cluster out, shown as a
-            preview with projected imbalance before/after. Nothing migrates until you apply it, and
-            every move is re-checked against live state right before it fires. With{" "}
-            <strong className="text-zinc-300">predictive balancing</strong> enabled, the balancer
-            also watches each node&apos;s score trend and can move a workload <em>before</em> a
-            confidently forecast overload materialises — low-confidence or flat trends never act.
-          </p>
-        </div>
-
-        <div className="space-y-1.5">
-          <h3 className={headingClassName}>6. You stay in control</h3>
-          <p className={stepClassName}>
-            Mark a node for <strong className="text-zinc-300">maintenance</strong> and the balancer
-            drains its guests one at a time and stops placing anything new on it. Exclude specific
-            nodes or VMIDs from balancing entirely, or tag guests in Proxmox:{" "}
-            <code className="rounded bg-zinc-900 px-1 py-0.5 text-[12px] text-zinc-300">plb_ignore</code>{" "}
-            (never move),{" "}
-            <code className="rounded bg-zinc-900 px-1 py-0.5 text-[12px] text-zinc-300">plb_manual</code>{" "}
-            (no automatic moves; drains and plans still apply),{" "}
-            <code className="rounded bg-zinc-900 px-1 py-0.5 text-[12px] text-zinc-300">plb_pin_&lt;node&gt;</code>{" "}
-            (stay on a node),{" "}
-            <code className="rounded bg-zinc-900 px-1 py-0.5 text-[12px] text-zinc-300">plb_affinity_&lt;group&gt;</code>{" "}
-            (keep together), and{" "}
-            <code className="rounded bg-zinc-900 px-1 py-0.5 text-[12px] text-zinc-300">plb_anti_affinity_&lt;group&gt;</code>{" "}
-            (keep apart) — the same tag convention ProxLB uses. Every decision, failure, and
-            circuit-breaker event lands in the activity log.
-          </p>
-        </div>
+    <details className="group rounded-xl border border-white/5 bg-[#111113] shadow-sm">
+      <summary className="flex cursor-pointer list-none items-center gap-2 px-5 py-3.5 text-[13px] font-medium text-zinc-300 transition-colors hover:text-white [&::-webkit-details-marker]:hidden">
+        <ChevronRight className="h-3.5 w-3.5 text-zinc-500 transition-transform duration-200 group-open:rotate-90" />
+        How the load balancer works
+        <span className="text-[12px] font-normal text-zinc-500">
+          — the short version
+        </span>
+      </summary>
+      <div className="grid gap-x-6 gap-y-4 border-t border-white/5 px-5 py-4 sm:grid-cols-2">
+        {STEPS.map((step, i) => (
+          <div key={step.title}>
+            <h3 className="text-[12px] font-medium text-zinc-200">
+              <span className="mr-1.5 text-zinc-600 tabular-nums">{i + 1}</span>
+              {step.title}
+            </h3>
+            <p className="mt-1 text-[12px] leading-relaxed text-zinc-500">{step.body}</p>
+          </div>
+        ))}
       </div>
-    </SectionPanel>
+    </details>
   );
 }

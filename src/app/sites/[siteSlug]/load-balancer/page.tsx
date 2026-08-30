@@ -12,6 +12,7 @@ import { LoadBalancerEventViewer } from "@/components/load-balancer-event-viewer
 import { LoadBalancerExplainer } from "@/components/load-balancer-explainer";
 import { RebalancePlanPanel } from "@/components/rebalance-plan-panel";
 import { getRebalancePlan } from "@/lib/load-balancer/plan-store";
+import { InfoTip } from "@/components/ui/info-tip";
 import { MetricCard } from "@/components/ui/metric-card";
 import { getCurrentSession } from "@/lib/auth";
 import { ensureSiteConfig } from "@/lib/site-context";
@@ -111,11 +112,12 @@ export default async function LoadBalancerPage({
           <span className="text-[11px] text-zinc-500">
             ({events.length} of last 10,000 events)
           </span>
+          <InfoTip label="Activity log" side="right">
+            Every migration the balancer has triggered — including the ones it only recommended
+            in dry-run — plus failures and tick errors. Stored on disk, so it survives Tainer
+            restarts.
+          </InfoTip>
         </div>
-        <p className="text-[12px] text-zinc-500">
-          Persistent history of every migration the load balancer has triggered, plus
-          failures and tick errors. Survives Tainer restarts.
-        </p>
         <LoadBalancerEventViewer entries={events} />
       </div>
     </div>
