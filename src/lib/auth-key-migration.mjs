@@ -1,11 +1,12 @@
-import { createCipheriv, createDecipheriv, createHash, randomBytes, randomUUID } from "node:crypto";
-import { access, chmod, copyFile, mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, randomUUID } from "node:crypto";
+import { access, chmod, copyFile, mkdir, readdir, readFile, realpath, rename, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 const LEGACY_SECRET_FILE = "auth-secret.txt";
 const AUDIT_LOG_FILE = "admin-audit-log.json";
 const AUDIT_LOG_MAX_ENTRIES = 5000;
 const KEY_MIGRATION_BACKUP_PREFIX = "pre-2.0-key-migration-";
+const FINGERPRINT_FILE = "key-fingerprints.json";
 
 const ENCRYPTED_PAYLOAD_RX = /^[A-Za-z0-9_-]{16}\.[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]+$/;
 const ENCRYPTED_FIELD_NAMES = new Set([
@@ -62,6 +63,21 @@ async function exists(filePath) {
   }
 }
 
+function keyFingerprint(key) {
+  return createHmac("sha256", key).update("tainer-key-migration").digest("hex");
+}
+
+async function entryIs(dataDir, relativePath, entry, kind) {
+  if (!entry.isSymbolicLink()) return kind === "file" ? entry.isFile() : entry.isDirectory();
+  try {
+    const target = await stat(path.join(dataDir, relativePath));
+    return kind === "file" ? target.isFile() : target.isDirectory();
+  } catch (error) {
+    if (isMissing(error)) return false;
+    throw error;
+  }
+}
+
 async function listJsonFiles(dataDir, relativeDir) {
   let entries;
   try {
@@ -71,9 +87,36 @@ async function listJsonFiles(dataDir, relativeDir) {
     throw error;
   }
 
-  return entries
-    .filter((entry) => entry.isFile() && entry.name.endsWith(".json"))
-    .map((entry) => path.join(relativeDir, entry.name));
+  const files = [];
+  for (const entry of entries) {
+    const relativePath = path.join(relativeDir, entry.name);
+    if (entry.name.endsWith(".json") && (await entryIs(dataDir, relativePath, entry, "file"))) {
+      files.push(relativePath);
+    }
+  }
+  return files;
+}
+
+async function listBackupDirs(dataDir) {
+  return (await readdir(dataDir))
+    .filter((name) => name.startsWith(KEY_MIGRATION_BACKUP_PREFIX))
+    .sort()
+    .map((name) => path.join(dataDir, name));
+}
+
+async function findConflictingAttempt(dataDir, fingerprints) {
+  for (const backupDir of await listBackupDirs(dataDir)) {
+    let recorded;
+    try {
+      recorded = JSON.parse(await readFile(path.join(backupDir, FINGERPRINT_FILE), "utf8"));
+    } catch {
+      continue;
+    }
+    if (recorded?.oldKey === fingerprints.oldKey && recorded?.authSecret !== fingerprints.authSecret) {
+      return backupDir;
+    }
+  }
+  return null;
 }
 
 async function listStoreFiles(dataDir) {
@@ -87,8 +130,9 @@ async function listStoreFiles(dataDir) {
   }
 
   for (const siteDir of siteDirs) {
-    if (siteDir.isDirectory()) {
-      files.push(...(await listJsonFiles(dataDir, path.join("sites", siteDir.name))));
+    const relativeDir = path.join("sites", siteDir.name);
+    if (await entryIs(dataDir, relativeDir, siteDir, "directory")) {
+      files.push(...(await listJsonFiles(dataDir, relativeDir)));
     }
   }
 
@@ -137,7 +181,8 @@ function reencryptTree(node, location, keys, stats) {
   }
 }
 
-async function writeJsonFileAtomically(filePath, value, compact) {
+async function writeJsonFileAtomically(linkPath, value, compact) {
+  const filePath = await realpath(linkPath).catch(() => linkPath);
   const tempPath = `${filePath}.${randomUUID()}.tmp`;
   try {
     await writeFile(tempPath, `${JSON.stringify(value, null, compact ? undefined : 2)}\n`, { encoding: "utf8", mode: 0o600 });
@@ -149,7 +194,7 @@ async function writeJsonFileAtomically(filePath, value, compact) {
   }
 }
 
-async function backUpFiles(dataDir, backupDir, relativePaths) {
+async function backUpFiles(dataDir, backupDir, relativePaths, fingerprints) {
   await mkdir(backupDir, { mode: 0o700 });
   await chmod(backupDir, 0o700);
 
@@ -165,6 +210,8 @@ async function backUpFiles(dataDir, backupDir, relativePaths) {
     await copyFile(path.join(dataDir, relativePath), target);
     await chmod(target, 0o600);
   }
+
+  await writeFile(path.join(backupDir, FINGERPRINT_FILE), `${JSON.stringify(fingerprints)}\n`, { mode: 0o600 });
 }
 
 async function recordAuditEntry(dataDir, message) {
@@ -215,6 +262,15 @@ export async function migrateLegacyAuthSecret({ dataDir, authSecret, log = (line
     );
   }
   const keys = { next: createHash("sha256").update(secret).digest(), old: oldKey };
+  const fingerprints = { authSecret: keyFingerprint(keys.next), oldKey: keyFingerprint(keys.old) };
+
+  const conflict = await findConflictingAttempt(dataDir, fingerprints);
+  if (conflict) {
+    throw new Error(
+      `An earlier attempt already re-encrypted part of the data with a different AUTH_SECRET (see ${conflict}). ` +
+        `Start Tainer with the AUTH_SECRET from that attempt to finish the migration. Nothing was changed.`,
+    );
+  }
 
   const reports = [];
   const skipped = [];
@@ -246,7 +302,7 @@ export async function migrateLegacyAuthSecret({ dataDir, authSecret, log = (line
   if (await exists(path.join(dataDir, AUDIT_LOG_FILE))) backupList.push(AUDIT_LOG_FILE);
 
   try {
-    await backUpFiles(dataDir, backupDir, backupList);
+    await backUpFiles(dataDir, backupDir, backupList, fingerprints);
   } catch (error) {
     throw new Error(
       `Could not back up the data directory to ${backupDir} (${error.message}). Nothing was changed; ` +
@@ -274,12 +330,15 @@ export async function migrateLegacyAuthSecret({ dataDir, authSecret, log = (line
     { current: 0, failed: 0, migrated: 0 },
   );
 
+  const backupDirs = await listBackupDirs(dataDir).catch(() => [backupDir]);
+
   let auditRecorded = true;
   try {
     await recordAuditEntry(
       dataDir,
       `Re-encrypted ${plural(totals.migrated, "stored secret")} from ${LEGACY_SECRET_FILE} with AUTH_SECRET; ` +
-        `${totals.failed} could not be decrypted. Backup: ${path.basename(backupDir)}.`,
+        `${totals.failed} could not be decrypted. ${backupDirs.length === 1 ? "Backup" : "Backups"}: ` +
+        `${backupDirs.map((dir) => path.basename(dir)).join(", ")}.`,
     );
   } catch {
     auditRecorded = false;
@@ -312,15 +371,19 @@ export async function migrateLegacyAuthSecret({ dataDir, authSecret, log = (line
     );
   }
   if (skipped.length) lines.push(`  Skipped files that are not valid JSON: ${skipped.join(", ")}`);
-  lines.push(`  Backup of the original files and the old key: ${backupDir}`);
-  lines.push(
-    "  The backup contains the old key. Delete it once sign-in and every site have been checked.",
-  );
+  if (backupDirs.length === 1) {
+    lines.push(`  Backup of the original files and the old key: ${backupDirs[0]}`);
+    lines.push("  The backup contains the old key. Delete it once sign-in and every site have been checked.");
+  } else {
+    lines.push("  Backups of the original files and the old key, one per attempt:");
+    for (const dir of backupDirs) lines.push(`    ${dir}`);
+    lines.push("  Each backup contains the old key. Delete all of them once sign-in and every site have been checked.");
+  }
   if (!auditRecorded) lines.push(`  Could not add the audit log entry to ${AUDIT_LOG_FILE}.`);
   if (!secretRemoved) {
     lines.push(`  Could not remove ${secretPath}. Delete it by hand; the backup keeps a copy.`);
   }
   log(lines.join("\n"));
 
-  return { auditRecorded, backupDir, reports, secretRemoved, skipped, totals };
+  return { auditRecorded, backupDir, backupDirs, reports, secretRemoved, skipped, totals };
 }
