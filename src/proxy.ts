@@ -1,14 +1,52 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-export function proxy(request: NextRequest) {
-  const requestHeaders = new Headers(request.headers);
-  requestHeaders.set("x-pathname", request.nextUrl.pathname);
+const PUBLIC_PAGE_PATHS = new Set([
+  "/forgot-password",
+  "/hero-demo",
+  "/login",
+  "/reset-password",
+  "/setup",
+]);
 
-  const response = NextResponse.next({
-    request: {
-      headers: requestHeaders,
-    },
-  });
+function needsSessionCookie(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  if (
+    PUBLIC_PAGE_PATHS.has(pathname) ||
+    pathname === "/api" ||
+    pathname.startsWith("/api/") ||
+    pathname.startsWith("/auth/sso/") ||
+    pathname.startsWith("/_next/") ||
+    /\.[^/]+$/.test(pathname)
+  ) {
+    return false;
+  }
+
+  if (request.headers.get("authorization")?.startsWith("Bearer tnr_")) {
+    return false;
+  }
+
+  return !request.cookies.get("tainer_session")?.value;
+}
+
+export function proxy(request: NextRequest) {
+  let response: NextResponse;
+
+  if (needsSessionCookie(request)) {
+    const loginUrl = request.nextUrl.clone();
+    loginUrl.pathname = "/login";
+    loginUrl.search = "";
+    response = NextResponse.redirect(loginUrl);
+  } else {
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set("x-pathname", request.nextUrl.pathname);
+
+    response = NextResponse.next({
+      request: {
+        headers: requestHeaders,
+      },
+    });
+  }
 
   response.headers.set("Cache-Control", "no-store, max-age=0");
   response.headers.set("X-Content-Type-Options", "nosniff");
