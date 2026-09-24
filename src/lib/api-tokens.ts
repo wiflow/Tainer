@@ -132,6 +132,7 @@ export async function revokeApiToken(id: string): Promise<ApiTokenSummary | null
  * Resolve an Authorization header value to a synthetic session, or null.
  * Site scoping: the token's siteIds (or every enabled site when unscoped)
  * become accessibleSiteIds, and each carries the token's permission set.
+ * Global permissions stay empty, so a token only passes per-site checks.
  */
 export async function getSessionForBearerToken(
   authorizationHeader: string | null,
@@ -176,7 +177,7 @@ export async function getSessionForBearerToken(
       email: `api-token:${record.name}`,
       name: `API token "${record.name}"`,
       role: "operator",
-      permissions: [...record.permissions],
+      permissions: [],
       accessibleSiteIds: scopedSiteIds,
       sitePermissions,
       groupIds: [],
