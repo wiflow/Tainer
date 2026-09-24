@@ -57,6 +57,7 @@ function escapeHtml(unsafe: string): string {
 export type AuthRole = "admin" | "operator";
 
 import { ALL_PERMISSIONS, type Permission } from "@/lib/permissions";
+import type { UserGroupInput } from "@/lib/user-groups";
 export { ALL_PERMISSIONS, PERMISSION_LABELS, type Permission } from "@/lib/permissions";
 
 type StoredUser = {
@@ -1019,6 +1020,50 @@ export function requireSiteAccess(
 ): void {
   if (!hasSiteAccess(session, siteId)) {
     throw new Error("You do not have access to this site.");
+  }
+}
+
+async function isStoredUserAdmin(user: StoredUser): Promise<boolean> {
+  if (user.role === "admin") return true;
+  const groupIds = user.groupIds ?? [];
+  if (groupIds.length === 0) return false;
+  const { getUserGroupsByIds } = await import("@/lib/user-groups");
+  const groups = await getUserGroupsByIds(groupIds);
+  return groups.some((g) => g.isAdmin);
+}
+
+export async function getUserGroupMembership(
+  userId: string,
+): Promise<{ groupIds: string[]; isAdmin: boolean } | null> {
+  const store = await readAuthStore();
+  const user = store.users.find((u) => u.id === userId);
+  if (!user) return null;
+  return { groupIds: user.groupIds ?? [], isAdmin: await isStoredUserAdmin(user) };
+}
+
+export function canGrantGroup(
+  session: AuthSession,
+  group: Pick<UserGroupInput, "isAdmin" | "globalPermissions" | "siteAccess">,
+): boolean {
+  if (session.user.role === "admin") return true;
+  if (group.isAdmin) return false;
+  return (
+    group.globalPermissions.every((p) => hasPermission(session, p)) &&
+    group.siteAccess.every((entry) =>
+      entry.permissions.every((p) => hasSitePermission(session, entry.siteId, p)),
+    )
+  );
+}
+
+async function requireAdminToManageUser(session: AuthSession, target: StoredUser) {
+  if (session.user.role === "admin") return;
+  const { getUserGroupsByIds } = await import("@/lib/user-groups");
+  const groups = await getUserGroupsByIds(target.groupIds ?? []);
+  if (target.role === "admin" || groups.some((g) => g.isAdmin)) {
+    throw new Error("Only admins can manage admin users.");
+  }
+  if (!groups.every((g) => canGrantGroup(session, g))) {
+    throw new Error("You cannot manage users with permissions you do not have.");
   }
 }
 
@@ -2075,6 +2120,7 @@ export async function clearLoginLockoutsForUser(userId: string): Promise<number>
   if (!target) {
     throw new Error("User not found.");
   }
+  await requireAdminToManageUser(session, target);
 
   const emailPrefix = `${target.email}:`;
   return mutateAuthSecurityState((state) => {
@@ -2117,6 +2163,13 @@ export async function createUserAsAdmin(input: {
     const { getUserGroupsByIds } = await import("@/lib/user-groups");
     const groups = await getUserGroupsByIds(groupIds);
     effectiveRole = groups.some((g) => g.isAdmin) ? "admin" : "operator";
+    if (!groups.every((g) => canGrantGroup(session, g))) {
+      throw new Error("You cannot assign groups with permissions you do not have.");
+    }
+  }
+
+  if (effectiveRole === "admin" && session.user.role !== "admin") {
+    throw new Error("Only admins can create admin users.");
   }
 
   return mutateAuthStore(async (store) => {
@@ -2191,6 +2244,7 @@ export async function adminSetUserPassword(targetUserId: string, nextPassword: s
     if (!user) {
       throw new Error("User account could not be found.");
     }
+    await requireAdminToManageUser(session, user);
 
     const timestamp = nowIso();
     user.passwordHash = await hashPassword(nextPassword);

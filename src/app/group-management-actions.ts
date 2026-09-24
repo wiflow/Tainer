@@ -6,6 +6,8 @@ import { revalidatePath } from "next/cache";
 
 import type { BasicActionState } from "@/lib/action-states";
 import {
+  canGrantGroup,
+  getUserGroupMembership,
   requirePermission,
   requireSession,
   updateUserGroups,
@@ -13,7 +15,7 @@ import {
 } from "@/lib/auth";
 import { recordAdminAudit } from "@/lib/admin-audit-log";
 import type { Permission } from "@/lib/permissions";
-import { ALL_PERMISSIONS } from "@/lib/permissions";
+import { GLOBAL_PERMISSIONS, SITE_PERMISSIONS } from "@/lib/permissions";
 import { createRateLimiterOrThrow } from "@/lib/rate-limit";
 import {
   createUserGroup,
@@ -22,6 +24,7 @@ import {
   listUserGroups,
   updateUserGroup,
   type SiteAccessEntry,
+  type UserGroupInput,
 } from "@/lib/user-groups";
 
 const enforceRateLimit = createRateLimiterOrThrow("group-management", 20, 5 * 60_000);
@@ -41,6 +44,18 @@ function requireAdminForPrivilegedGroupOp(session: AuthSession): void {
     throw new Error(
       "Only admins can create, modify, or assign users to admin groups.",
     );
+  }
+}
+
+function requireGrantableGroup(
+  session: AuthSession,
+  group: Pick<UserGroupInput, "isAdmin" | "globalPermissions" | "siteAccess">,
+): void {
+  if (group.isAdmin) {
+    requireAdminForPrivilegedGroupOp(session);
+  }
+  if (!canGrantGroup(session, group)) {
+    throw new Error("You cannot grant permissions you do not have.");
   }
 }
 
@@ -75,9 +90,10 @@ export async function createGroupAction(
     const globalPermissions = globalPermsRaw
       .split(",")
       .map((p) => p.trim())
-      .filter((p): p is Permission => ALL_PERMISSIONS.includes(p as Permission));
+      .filter((p): p is Permission => GLOBAL_PERMISSIONS.includes(p as Permission));
 
     const siteAccess = parseSiteAccessFromFormData(formData);
+    requireGrantableGroup(session, { isAdmin, globalPermissions, siteAccess });
 
     const existing = await listUserGroups();
     if (existing.some((g) => g.name.toLowerCase() === name.toLowerCase())) {
@@ -135,14 +151,16 @@ export async function updateGroupAction(
     if (isAdmin || existing.isAdmin) {
       requireAdminForPrivilegedGroupOp(session);
     }
+    requireGrantableGroup(session, existing);
 
     const globalPermsRaw = String(formData.get("globalPermissions") ?? "");
     const globalPermissions = globalPermsRaw
       .split(",")
       .map((p) => p.trim())
-      .filter((p): p is Permission => ALL_PERMISSIONS.includes(p as Permission));
+      .filter((p): p is Permission => GLOBAL_PERMISSIONS.includes(p as Permission));
 
     const siteAccess = parseSiteAccessFromFormData(formData);
+    requireGrantableGroup(session, { isAdmin, globalPermissions, siteAccess });
 
     const allGroups = await listUserGroups();
     if (allGroups.some((g) => g.id !== groupId && g.name.toLowerCase() === name.toLowerCase())) {
@@ -189,6 +207,7 @@ export async function deleteGroupAction(
 
     const group = await getUserGroup(groupId);
     if (!group) return errorResult("Group not found.");
+    requireGrantableGroup(session, group);
 
     const deleted = await deleteUserGroup(groupId);
     if (!deleted) return errorResult("Failed to delete group.");
@@ -239,12 +258,20 @@ export async function updateUserGroupsAction(
       requireAdminForPrivilegedGroupOp(session);
     }
 
-    // Defense in depth: even an admin shouldn't be able to self-promote
-    // through this path (admins are already admin; non-admins are blocked
-    // above). This guard catches future regressions where the role gate
-    // is loosened or a new group flag is added that grants privilege.
-    if (userId === session.user.id && wouldGrantAdmin && session.user.role !== "admin") {
-      return errorResult("Self-promotion to admin via group assignment is not allowed.");
+    if (userId === session.user.id && session.user.role !== "admin") {
+      return errorResult("You cannot change your own groups.");
+    }
+
+    const target = await getUserGroupMembership(userId);
+    if (!target) return errorResult("User not found.");
+    if (target.isAdmin) {
+      requireAdminForPrivilegedGroupOp(session);
+    }
+
+    for (const group of allGroups) {
+      if (groupIds.includes(group.id) !== target.groupIds.includes(group.id)) {
+        requireGrantableGroup(session, group);
+      }
     }
 
     await updateUserGroups(userId, groupIds);
@@ -286,7 +313,7 @@ function parseSiteAccessFromFormData(formData: FormData): SiteAccessEntry[] {
     const permissions = permsRaw
       .split(",")
       .map((p) => p.trim())
-      .filter((p): p is Permission => ALL_PERMISSIONS.includes(p as Permission));
+      .filter((p): p is Permission => SITE_PERMISSIONS.includes(p as Permission));
 
     if (permissions.length > 0) {
       entries.push({ siteId, permissions });

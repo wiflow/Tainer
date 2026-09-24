@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 
 import { resolveDataFilePath } from "@/lib/app-data";
 import type { Permission } from "@/lib/permissions";
-import { SITE_PERMISSIONS } from "@/lib/permissions";
+import { GLOBAL_PERMISSIONS, SITE_PERMISSIONS } from "@/lib/permissions";
 import {
   createStoreMutator,
   readDataJsonFileCached,
@@ -208,7 +208,7 @@ export async function resolveEffectivePermissions(
     }
 
     for (const perm of group.globalPermissions) {
-      globalPermsSet.add(perm);
+      if (GLOBAL_PERMISSIONS.includes(perm)) globalPermsSet.add(perm);
     }
 
     for (const entry of group.siteAccess) {
