@@ -9,6 +9,7 @@ import {
   getDecryptedClientSecret,
   type IdpProvider,
 } from "@/lib/idp-providers";
+import { trustProxyHeaders } from "@/lib/proxy-trust";
 
 /**
  * Wrapper around `openid-client` v6. The library handles PKCE / state /
@@ -21,8 +22,8 @@ import {
  * Order of preference:
  *   1. `APP_URL` env var — set explicitly by the deploy script and the most reliable
  *      source when sitting behind a reverse proxy. Use this whenever it's set.
- *   2. `x-forwarded-proto` + `x-forwarded-host` headers — what Caddy / nginx /
- *      similar set when proxying. Honours the proxy without requiring config.
+ *   2. `x-forwarded-proto` + `x-forwarded-host` headers, only when
+ *      `TAINER_TRUST_PROXY_HEADERS=true` (see proxy-trust.ts).
  *   3. The request's own `Host` header + protocol — last-resort fallback that
  *      can yield `http://0.0.0.0:3000` when the request hits the bind socket
  *      directly inside Docker. Avoid using this unless 1 + 2 are unavailable.
@@ -33,9 +34,11 @@ export function getPublicOrigin(headers: Headers, requestUrl?: string): string {
   const envUrl = process.env.APP_URL?.trim();
   if (envUrl) return envUrl.replace(/\/+$/, "");
 
-  const proto = headers.get("x-forwarded-proto");
-  const host = headers.get("x-forwarded-host");
-  if (proto && host) return `${proto}://${host}`;
+  if (trustProxyHeaders()) {
+    const proto = headers.get("x-forwarded-proto")?.split(",")[0]?.trim().toLowerCase();
+    const host = headers.get("x-forwarded-host")?.split(",")[0]?.trim();
+    if ((proto === "http" || proto === "https") && host) return `${proto}://${host}`;
+  }
 
   if (requestUrl) {
     try {
@@ -50,7 +53,7 @@ export function getPublicOrigin(headers: Headers, requestUrl?: string): string {
   // will reject the redirect_uri. Better to surface the misconfiguration
   // than silently use 0.0.0.0:3000.
   throw new Error(
-    "Cannot determine public origin. Set APP_URL env var or configure x-forwarded-* headers on the reverse proxy.",
+    "Cannot determine public origin. Set the APP_URL env var.",
   );
 }
 
