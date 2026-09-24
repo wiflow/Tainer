@@ -695,7 +695,7 @@ function validateStorageName(storage: string, label = "storage") {
   return normalized;
 }
 
-function validateBackupVolid(volid: string, storage: string) {
+export function validateBackupVolid(volid: string, storage: string) {
   const normalized = volid.trim();
   const match = /^([a-zA-Z0-9._-]{1,63}):(backup\/[a-zA-Z0-9._:/-]+)$/.exec(normalized);
 

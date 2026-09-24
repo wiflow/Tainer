@@ -119,7 +119,7 @@ function isPrivateIpv6(address: string) {
   );
 }
 
-function isPrivateAddress(address: string) {
+export function isPrivateAddress(address: string) {
   const version = isIP(address);
 
   if (version === 4) {
