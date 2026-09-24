@@ -47,6 +47,7 @@ const ACTION_META: Record<AdminAuditAction, { category: string; level: Level }> 
   "group-deleted": { category: "groups", level: "destructive" },
   "sso-login": { category: "sso", level: "info" },
   "sso-user-provisioned": { category: "sso", level: "info" },
+  "sso-login-failure": { category: "sso", level: "warning" },
   "sso-provider-created": { category: "sso", level: "info" },
   "sso-provider-updated": { category: "sso", level: "info" },
   "sso-provider-deleted": { category: "sso", level: "destructive" },

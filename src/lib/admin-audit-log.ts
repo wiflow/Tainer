@@ -40,6 +40,7 @@ export type AdminAuditAction =
   | "guest-shell-step-up-failure"
   | "sso-login"
   | "sso-user-provisioned"
+  | "sso-login-failure"
   | "sso-provider-created"
   | "sso-provider-updated"
   | "sso-provider-deleted"

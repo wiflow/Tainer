@@ -9,6 +9,7 @@ import { signInWithSso } from "@/lib/auth";
 import {
   getIdpProviderBySlug,
   isEmailAllowed,
+  type IdpProvider,
 } from "@/lib/idp-providers";
 import {
   OIDC_FLOW_COOKIE,
@@ -38,6 +39,16 @@ function loginRedirect(request: NextRequest, error: string): NextResponse {
   // reused.
   response.cookies.delete(OIDC_FLOW_COOKIE);
   return response;
+}
+
+function auditSsoFailure(provider: IdpProvider, reason: string, email?: string, sub?: string) {
+  const actor = email || "unknown";
+  recordAdminAudit({
+    action: "sso-login-failure",
+    actorEmail: actor,
+    actorName: actor,
+    message: `SSO sign-in via ${provider.name} failed${sub ? ` (sub=${sub})` : ""}: ${reason}`,
+  }).catch(() => {});
 }
 
 export async function GET(
@@ -121,10 +132,12 @@ export async function GET(
     }
 
     console.error(`[oidc] Token exchange failed for ${provider.slug}:`, logBody);
+    auditSsoFailure(provider, detail);
     return loginRedirect(request, detail);
   }
 
   if (!isEmailAllowed(claims.email, provider.allowedEmailDomains)) {
+    auditSsoFailure(provider, "email domain not allowed", claims.email, claims.sub);
     return loginRedirect(
       request,
       `${claims.email} is not in the allowed-domain list for this provider.`,
@@ -143,10 +156,9 @@ export async function GET(
       defaultRole: provider.defaultRole,
     });
   } catch (error) {
-    return loginRedirect(
-      request,
-      error instanceof Error ? error.message : "Sign-in failed.",
-    );
+    const reason = error instanceof Error ? error.message : "Sign-in failed.";
+    auditSsoFailure(provider, reason, claims.email, claims.sub);
+    return loginRedirect(request, reason);
   }
 
   if (result.requiresTwoFactor) {
