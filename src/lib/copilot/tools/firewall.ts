@@ -107,7 +107,7 @@ registerTool({
   category: "Network",
   klass: "destructive",
   description:
-    "Delete a cluster-level Proxmox firewall rule by its position (pos, from list_firewall_rules). Destructive — removing an ACCEPT rule can cut off access, removing a DROP can open exposure. Requires manage-settings and manage-security, and typing the position number to confirm.",
+    "Delete a cluster-level Proxmox firewall rule by its position (pos, from list_firewall_rules). Destructive: removing an ACCEPT rule can cut off access, removing a DROP can open exposure. Requires manage-settings and manage-security, and typing the position number to confirm.",
   input_schema: siteSlugSchema({
     pos: { type: "integer", minimum: 0, description: "Rule position from list_firewall_rules." },
   }),

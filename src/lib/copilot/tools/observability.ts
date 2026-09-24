@@ -42,7 +42,7 @@ registerTool({
   category: "Diagnostics",
   klass: "read",
   description:
-    "List active cluster-connectivity (heartbeat) alerts — sites or endpoints Tainer currently can't reach. Global, not per-site. Use for 'is everything reachable?', 'any sites down?'. An empty result means all monitored endpoints are responding. Requires manage-settings.",
+    "List active cluster-connectivity (heartbeat) alerts: sites or endpoints Tainer currently can't reach. Global, not per-site. Use for 'is everything reachable?', 'any sites down?'. An empty result means all monitored endpoints are responding. Requires manage-settings.",
   input_schema: {
     type: "object",
     additionalProperties: false,
