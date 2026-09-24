@@ -19,7 +19,6 @@ data/
 *.key
 
 # Editor / local tooling
-.claude/
 .vscode/
 .idea/
 
@@ -27,3 +26,5 @@ data/
 docs/slides/tainer-tutorial-series.pdf
 docs/slides/slide-*.jpg
 mobile/
+
+*.tsbuildinfo

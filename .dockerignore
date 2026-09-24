@@ -7,9 +7,6 @@ out
 dist
 coverage
 
-# Source backup
-src_backup
-
 # Environment files
 .env
 .env.*
@@ -24,15 +21,9 @@ data
 .git
 .gitignore
 
-# Local tooling
-.claude
-CLAUDE.md
-
 # IDE / Editor
 .vscode
 .idea
-.cursor
-.cursorrules
 *.swp
 *.swo
 .DS_Store
@@ -45,8 +36,7 @@ mobile
 scripts
 
 # TypeScript build caches
-tsconfig.tsbuildinfo
-tsconfig.codex.tsbuildinfo
+*.tsbuildinfo
 
 # Debug logs
 npm-debug.log*
