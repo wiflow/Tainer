@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 
 import type { RestoreActionState } from "@/app/node-config-action-states";
 import type { BasicActionState } from "@/lib/action-states";
-import { requirePermission, requireSession } from "@/lib/auth";
+import { requireSession, requireSitePermission } from "@/lib/auth";
 import {
   createConfigSnapshotPolicy,
   deleteConfigSnapshotPolicy,
@@ -48,7 +48,6 @@ export async function takeConfigSnapshotAction(
 ): Promise<BasicActionState> {
   try {
     const session = await requireSession();
-    requirePermission(session, "manage-settings");
     const siteSlug = String(formData.get("siteSlug") ?? "");
     if (!siteSlug) return { message: "Missing site context.", requestId: randomUUID(), status: "error" };
 
@@ -58,6 +57,7 @@ export async function takeConfigSnapshotAction(
     const label = String(formData.get("label") ?? "").trim();
 
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
+    requireSitePermission(session, siteConfig.siteId, "manage-settings");
     return await withSiteConfig(siteConfig, async () => {
       const snapshot = await takeConfigSnapshot(node, session.user.name, label);
 
@@ -84,7 +84,6 @@ export async function restoreConfigSnapshotAction(
 ): Promise<RestoreActionState> {
   try {
     const session = await requireSession();
-    requirePermission(session, "manage-settings");
 
     const siteSlug = String(formData.get("siteSlug") ?? "");
     if (!siteSlug) {
@@ -131,6 +130,7 @@ export async function restoreConfigSnapshotAction(
     const reloadNetwork = formData.get("reloadNetwork") !== "off";
 
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
+    requireSitePermission(session, siteConfig.siteId, "manage-settings");
     return await withSiteConfig(siteConfig, async () => {
       const result = await restoreConfigSnapshot(snapshotId, selection, {
         destructive,
@@ -180,7 +180,6 @@ export async function deleteConfigSnapshotAction(
 ): Promise<BasicActionState> {
   try {
     const session = await requireSession();
-    requirePermission(session, "manage-settings");
     const siteSlug = String(formData.get("siteSlug") ?? "");
     if (!siteSlug) return { message: "Missing site context.", requestId: randomUUID(), status: "error" };
 
@@ -188,6 +187,7 @@ export async function deleteConfigSnapshotAction(
     if (!snapshotId) return { message: "Snapshot ID is required.", requestId: randomUUID(), status: "error" };
 
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
+    requireSitePermission(session, siteConfig.siteId, "manage-settings");
     return await withSiteConfig(siteConfig, async () => {
       const deleted = await deleteConfigSnapshot(snapshotId);
       if (!deleted) return { message: "Snapshot not found.", requestId: randomUUID(), status: "error" };
@@ -234,7 +234,6 @@ export async function createConfigSnapshotPolicyAction(
 ): Promise<BasicActionState> {
   try {
     const session = await requireSession();
-    requirePermission(session, "manage-settings");
 
     const siteSlug = String(formData.get("siteSlug") ?? "");
     if (!siteSlug)
@@ -245,6 +244,7 @@ export async function createConfigSnapshotPolicyAction(
       return { message: "Node is required.", requestId: randomUUID(), status: "error" };
 
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
+    requireSitePermission(session, siteConfig.siteId, "manage-settings");
     return await withSiteConfig(siteConfig, async () => {
       const policy = await createConfigSnapshotPolicy(input);
       revalidatePath(`/sites/${siteSlug}/node-configs`);
@@ -269,7 +269,6 @@ export async function updateConfigSnapshotPolicyAction(
 ): Promise<BasicActionState> {
   try {
     const session = await requireSession();
-    requirePermission(session, "manage-settings");
 
     const siteSlug = String(formData.get("siteSlug") ?? "");
     if (!siteSlug)
@@ -284,6 +283,7 @@ export async function updateConfigSnapshotPolicyAction(
       return { message: "Node is required.", requestId: randomUUID(), status: "error" };
 
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
+    requireSitePermission(session, siteConfig.siteId, "manage-settings");
     return await withSiteConfig(siteConfig, async () => {
       const policy = await updateConfigSnapshotPolicy(id, input);
       if (!policy)
@@ -310,7 +310,6 @@ export async function deleteConfigSnapshotPolicyAction(
 ): Promise<BasicActionState> {
   try {
     const session = await requireSession();
-    requirePermission(session, "manage-settings");
 
     const siteSlug = String(formData.get("siteSlug") ?? "");
     if (!siteSlug)
@@ -321,6 +320,7 @@ export async function deleteConfigSnapshotPolicyAction(
       return { message: "Schedule ID is required.", requestId: randomUUID(), status: "error" };
 
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
+    requireSitePermission(session, siteConfig.siteId, "manage-settings");
     return await withSiteConfig(siteConfig, async () => {
       const deleted = await deleteConfigSnapshotPolicy(id);
       if (!deleted)
@@ -347,7 +347,6 @@ export async function toggleConfigSnapshotPolicyAction(
 ): Promise<BasicActionState> {
   try {
     const session = await requireSession();
-    requirePermission(session, "manage-settings");
 
     const siteSlug = String(formData.get("siteSlug") ?? "");
     if (!siteSlug)
@@ -360,6 +359,7 @@ export async function toggleConfigSnapshotPolicyAction(
     const enabled = formData.get("enabled") === "on";
 
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
+    requireSitePermission(session, siteConfig.siteId, "manage-settings");
     return await withSiteConfig(siteConfig, async () => {
       const policy = await toggleConfigSnapshotPolicy(id, enabled);
       if (!policy)
@@ -390,7 +390,6 @@ export async function runConfigSnapshotPolicyNowAction(
 ): Promise<BasicActionState> {
   try {
     const session = await requireSession();
-    requirePermission(session, "manage-settings");
 
     const siteSlug = String(formData.get("siteSlug") ?? "");
     if (!siteSlug)
@@ -401,6 +400,7 @@ export async function runConfigSnapshotPolicyNowAction(
       return { message: "Schedule ID is required.", requestId: randomUUID(), status: "error" };
 
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
+    requireSitePermission(session, siteConfig.siteId, "manage-settings");
     return await withSiteConfig(siteConfig, async () => {
       const forced = await forceConfigSnapshotPolicyDue(id);
       if (!forced)

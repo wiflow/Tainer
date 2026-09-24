@@ -5,7 +5,7 @@ import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 
 import type { BasicActionState } from "@/lib/action-states";
-import { requirePermission, requireSession } from "@/lib/auth";
+import { requireSession, requireSitePermission } from "@/lib/auth";
 import { createStorageConfig, deleteStorageConfig, withSiteConfig } from "@/lib/proxmox";
 import { resolveSiteConfigBySlug } from "@/lib/site-resolver";
 import {
@@ -40,8 +40,8 @@ async function withBackupPermission<T>(
   callback: () => Promise<T>,
 ): Promise<T> {
   const session = await requireSession();
-  requirePermission(session, "manage-backups");
   const siteConfig = await resolveSiteConfigBySlug(siteSlug);
+  requireSitePermission(session, siteConfig.siteId, "manage-backups");
   return withSiteConfig(siteConfig, callback);
 }
 

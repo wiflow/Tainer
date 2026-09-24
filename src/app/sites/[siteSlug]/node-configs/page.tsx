@@ -6,7 +6,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { MetricCard } from "@/components/ui/metric-card";
 import { SectionPanel } from "@/components/ui/section-panel";
-import { requirePermission, requireSession } from "@/lib/auth";
+import { requireSession, requireSitePermission } from "@/lib/auth";
 import { listConfigSnapshotPolicies } from "@/lib/config-snapshot-policies";
 import { listConfigSnapshots, compareConfigSnapshots, getConfigSnapshot } from "@/lib/node-config-backup";
 import { getNodes, withSiteConfig } from "@/lib/proxmox";
@@ -29,7 +29,7 @@ export default async function NodeConfigsPage({
   const siteConfig = await ensureSiteConfig(siteSlug);
 
   const session = await requireSession();
-  requirePermission(session, "manage-settings");
+  requireSitePermission(session, siteConfig.siteId, "manage-settings");
 
   const [snapshots, nodesData, schedules] = await withSiteConfig(siteConfig, () =>
     Promise.all([

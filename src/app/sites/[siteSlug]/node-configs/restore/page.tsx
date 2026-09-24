@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { SectionPanel } from "@/components/ui/section-panel";
-import { requirePermission, requireSession } from "@/lib/auth";
+import { requireSession, requireSitePermission } from "@/lib/auth";
 import {
   compareConfigSnapshots,
   getConfigSnapshot,
@@ -69,7 +69,7 @@ export default async function RestoreSnapshotPage({
 
   const siteConfig = await ensureSiteConfig(siteSlug);
   const session = await requireSession();
-  requirePermission(session, "manage-settings");
+  requireSitePermission(session, siteConfig.siteId, "manage-settings");
 
   const snapshot = await withSiteConfig(siteConfig, () => getConfigSnapshot(id));
   if (!snapshot) notFound();
