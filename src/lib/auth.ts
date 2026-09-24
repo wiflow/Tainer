@@ -2447,6 +2447,49 @@ export async function disableTwoFactor(input: { currentPassword: string }) {
   await clearGuestShellStepUpCookie();
 }
 
+export async function adminResetUserTwoFactor(
+  targetUserId: string,
+): Promise<{ email: string; name: string }> {
+  const session = await requireAdminSession();
+
+  return mutateAuthStore((store) => {
+    const actorSession = store.sessions.find(
+      (entry) => entry.id === session.id && entry.userId === session.user.id && !entry.revokedAt,
+    );
+    if (!actorSession) {
+      throw new Error("Administrator access required.");
+    }
+
+    if (targetUserId === session.user.id) {
+      throw new Error("Use the account page to disable your own two-factor authentication.");
+    }
+
+    const user = store.users.find((entry) => entry.id === targetUserId);
+    if (!user) {
+      throw new Error("User account could not be found.");
+    }
+    if (!user.twoFactorSecret && !user.pendingTwoFactorSecret) {
+      throw new Error("This user does not have two-factor authentication enabled.");
+    }
+
+    const timestamp = nowIso();
+    user.pendingTwoFactorSecret = null;
+    user.pendingTwoFactorExpiresAt = null;
+    user.twoFactorRecoveryCodeHashes = [];
+    user.twoFactorSecret = null;
+    user.twoFactorUpdatedAt = timestamp;
+    user.updatedAt = timestamp;
+
+    for (const entry of store.sessions) {
+      if (entry.userId === user.id && !entry.revokedAt) {
+        entry.revokedAt = timestamp;
+      }
+    }
+
+    return { email: user.email, name: user.name };
+  });
+}
+
 export async function createPasswordReset(
   email: string,
   origin: string,

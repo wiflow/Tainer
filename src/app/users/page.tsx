@@ -24,7 +24,12 @@ export default async function UsersPage() {
 
   return (
     <div className="space-y-4">
-      <UserManagementPanel users={users} groups={groups} />
+      <UserManagementPanel
+        canResetTwoFactor={session.user.role === "admin"}
+        currentUserId={session.user.id}
+        users={users}
+        groups={groups}
+      />
     </div>
   );
 }

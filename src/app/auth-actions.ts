@@ -13,6 +13,7 @@ import type {
   TwoFactorSetupActionState,
 } from "@/lib/action-states";
 import {
+  adminResetUserTwoFactor,
   adminSetUserPassword,
   ALL_PERMISSIONS,
   beginLogin,
@@ -29,6 +30,7 @@ import {
   getCurrentSession,
   getLoginChallengeUser,
   isAcceptableLoginEmail,
+  requireAdminSession,
   requirePermission,
   requireSession,
   resetPasswordWithToken,
@@ -815,6 +817,43 @@ export async function adminResetPasswordAction(
     return errorState(
       _previousState,
       error instanceof Error ? error.message : "Failed to reset password.",
+    );
+  }
+}
+
+export async function adminResetTwoFactorAction(
+  _previousState: BasicActionState,
+  formData: FormData,
+): Promise<BasicActionState> {
+  try {
+    const session = await requireAdminSession();
+
+    const userId = String(formData.get("userId") ?? "").trim();
+    if (!userId) {
+      return errorState(_previousState, "User ID is required.");
+    }
+
+    const target = await adminResetUserTwoFactor(userId);
+
+    recordAdminAudit({
+      action: "two-factor-reset-by-admin",
+      actorEmail: session.user.email,
+      actorName: session.user.name,
+      targetEmail: target.email,
+      message: `Reset two-factor authentication for ${target.email} (user ${userId}) and revoked their sessions`,
+    }).catch(() => {});
+
+    revalidatePath("/users");
+
+    return {
+      message: "Two-factor authentication reset. The user's sessions have been revoked.",
+      requestId: randomUUID(),
+      status: "success",
+    };
+  } catch (error) {
+    return errorState(
+      _previousState,
+      error instanceof Error ? error.message : "Failed to reset 2FA.",
     );
   }
 }

@@ -23,6 +23,7 @@ const ACTION_META: Record<AdminAuditAction, { category: string; level: Level }> 
   "admin-password-reset": { category: "passwords", level: "warning" },
   "two-factor-enabled": { category: "2fa", level: "info" },
   "two-factor-disabled": { category: "2fa", level: "warning" },
+  "two-factor-reset-by-admin": { category: "2fa", level: "warning" },
   "settings-updated": { category: "settings", level: "info" },
   "template-created": { category: "templates", level: "info" },
   "template-updated": { category: "templates", level: "info" },

@@ -15,6 +15,7 @@ export type AdminAuditAction =
   | "password-reset-completed"
   | "two-factor-enabled"
   | "two-factor-disabled"
+  | "two-factor-reset-by-admin"
   | "settings-updated"
   | "template-created"
   | "template-updated"

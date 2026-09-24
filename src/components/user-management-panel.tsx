@@ -6,6 +6,7 @@ import {
   LockKeyholeOpen,
   Mail,
   Shield,
+  ShieldOff,
   UserPlus2,
   UserRound,
   Users,
@@ -14,6 +15,7 @@ import { useRouter } from "next/navigation";
 
 import {
   adminResetPasswordAction,
+  adminResetTwoFactorAction,
   clearUserLoginLockoutAction,
   createUserAction,
 } from "@/app/auth-actions";
@@ -21,6 +23,7 @@ import { updateUserGroupsAction } from "@/app/group-management-actions";
 import { useActionFlashFeedback } from "@/components/task-toast-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
 import {
   Dialog,
   DialogContent,
@@ -228,6 +231,48 @@ function UserClearLockoutButton({ user }: { user: ManagedUserSummary }) {
   );
 }
 
+function UserResetTwoFactorButton({ user }: { user: ManagedUserSummary }) {
+  const [state, formAction, isPending] = useActionState(
+    adminResetTwoFactorAction,
+    initialBasicActionState,
+  );
+
+  useActionFlashFeedback(state, {
+    errorTitle: "2FA reset failed",
+    successTitle: "2FA reset",
+  });
+  useRefreshOnSuccess(state.status);
+
+  return (
+    <Form action={formAction} title="Reset two-factor authentication">
+      <input name="userId" type="hidden" value={user.id} />
+      <ConfirmSubmitButton
+        className="h-auto rounded-md p-1.5 text-zinc-500 hover:text-rose-300"
+        confirmLabel="Reset 2FA"
+        consequences={[
+          "Their authenticator secret and recovery codes are deleted.",
+          "All of their active sessions are signed out.",
+          "They can sign in with their password alone until they enroll 2FA again.",
+        ]}
+        description={
+          <>
+            Reset two-factor authentication for{" "}
+            <span className="text-zinc-200">{user.name || user.email}</span>? Only do this after
+            confirming their identity through another channel.
+          </>
+        }
+        disabled={isPending}
+        pending={isPending}
+        title="Reset two-factor authentication"
+        variant="ghost"
+      >
+        <ShieldOff className="h-3.5 w-3.5" />
+        <span className="sr-only">Reset 2FA</span>
+      </ConfirmSubmitButton>
+    </Form>
+  );
+}
+
 function UserGroupsCell({
   user,
   allGroups,
@@ -371,9 +416,13 @@ function UserGroupsCell({
 }
 
 export function UserManagementPanel({
+  canResetTwoFactor,
+  currentUserId,
   users,
   groups,
 }: {
+  canResetTwoFactor: boolean;
+  currentUserId: string;
   users: ManagedUserSummary[];
   groups: UserGroup[];
 }) {
@@ -580,6 +629,9 @@ export function UserManagementPanel({
                   <div className="mt-2 md:mt-0 flex md:justify-end gap-1">
                     <UserClearLockoutButton user={user} />
                     <UserResetPasswordButton user={user} />
+                    {canResetTwoFactor && user.hasTwoFactor && user.id !== currentUserId && (
+                      <UserResetTwoFactorButton user={user} />
+                    )}
                   </div>
                 </li>
               ))}
