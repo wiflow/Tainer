@@ -48,8 +48,11 @@ async function readStore(): Promise<ApiTokenStore> {
     const raw = await readFile(await resolveDataFilePath(DATA_FILE), "utf8");
     const parsed = JSON.parse(raw) as Partial<ApiTokenStore>;
     return { tokens: Array.isArray(parsed.tokens) ? parsed.tokens : [] };
-  } catch {
-    return { tokens: [] };
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException | null)?.code === "ENOENT") {
+      return { tokens: [] };
+    }
+    throw error;
   }
 }
 
