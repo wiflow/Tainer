@@ -292,9 +292,7 @@ export function EnvVarsEditorCard({
         try {
           const suggestion = JSON.parse(payload) as EnvEntry;
           addSuggestedEntry(suggestion);
-        } catch {
-          // Ignore malformed drag payloads.
-        }
+        } catch {}
       }}
     >
       <Card

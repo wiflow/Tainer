@@ -154,7 +154,6 @@ const OPERATION_WINDOW_MS = 5 * 60_000;
 const operationCounts = new Map<string, { count: number; firstOp: number }>();
 
 function checkOperationRateLimit(userId: string) {
-  // Prune expired entries to prevent unbounded map growth
   const cutoff = Date.now() - OPERATION_WINDOW_MS;
   for (const [key, entry] of operationCounts) {
     if (entry.firstOp < cutoff) operationCounts.delete(key);
@@ -353,7 +352,6 @@ export async function createLxcAction(
       params.set("tags", buildTagsWithTag("", poolTagSlug));
     }
 
-    // Stamp template metadata so we can detect outdated containers later
     const deploymentTemplateId = String(formData.get("deploymentTemplateId") ?? "").trim();
     const deploymentTemplateName = String(formData.get("deploymentTemplateName") ?? "").trim();
     const deploymentTemplateVersion = String(formData.get("deploymentTemplateVersion") ?? "").trim();
@@ -368,7 +366,6 @@ export async function createLxcAction(
       params.set("ssh-public-keys", localSshKey.publicKey);
     }
 
-    // Fetch the base image file info for version tracking
     const imageInfo = await getTemplateFileInfo(node, ostemplate).catch(() => null);
 
     const meta: TainerMeta = {
@@ -417,10 +414,8 @@ export async function createLxcAction(
     waitForTask(node, upid)
       .then(async () => {
         try {
-          // Read env vars the image set during installation
           const imageEnv = await getContainerEnvText(node, Number(vmid));
 
-          // Cache the image's own env for future auto-fill
           if (imageEnv.trim()) {
             await saveImageEnv(ostemplate, imageEnv, {
               aliases: [ostemplate.split("/").at(-1) ?? ""],
@@ -429,7 +424,6 @@ export async function createLxcAction(
             });
           }
 
-          // Merge: image defaults first, then template/user env overrides
           const merged = hasEnv ? mergeEnvText(imageEnv, envText) : imageEnv;
 
           if (merged.trim()) {
@@ -447,13 +441,10 @@ export async function createLxcAction(
         }
       })
       .then(async () => {
-        // Auto-install debsecan in Debian/Ubuntu containers for CVE scanning.
-        // Runs after start so the container has networking.
         if (shouldStart) {
           try {
             const { runNodeRootCommand } = await import("@/lib/proxmox-host");
 
-            // Wait a few seconds for networking to come up inside the container
             await new Promise((r) => setTimeout(r, 5000));
 
             await runNodeRootCommand(
@@ -463,7 +454,6 @@ export async function createLxcAction(
             );
             console.log(`[post-create] Installed debsecan in CT ${vmid}`);
           } catch (error) {
-            // Best-effort — don't fail the deployment
             console.error(`[post-create] debsecan install in CT ${vmid} failed:`, error instanceof Error ? error.message : error);
           }
         }
@@ -604,13 +594,6 @@ const SCSIHW_EDIT_VALUES = new Set([
 ]);
 const VGA_EDIT_REGEX = /^[a-zA-Z0-9_,=+-]{1,64}$/;
 
-/**
- * Generalized deployment edit action. Accepts any subset of:
- *   hostname / name, description, cores, memoryMb, swapMb (LXC), sockets (VM),
- *   cpuType, machine, scsihw, vga (VM)
- * Blank fields are left unchanged so the dialog can submit partial updates.
- * The tainerMeta block appended to the Proxmox description is preserved.
- */
 export async function updateDeploymentConfigAction(
   _previousState: ProxmoxActionState,
   formData: FormData,
@@ -640,7 +623,6 @@ export async function updateDeploymentConfigAction(
 
     const { node, vmid, type } = decodeDeploymentId(deploymentId);
 
-    // Each field is optional. Empty = "leave alone".
     const parsePositiveInt = (value: string, label: string, min: number, max: number) => {
       const trimmed = value.trim();
       if (!trimmed) return null;
@@ -697,7 +679,6 @@ export async function updateDeploymentConfigAction(
       changedFields.push(`name=${hostnameRaw}`);
     }
 
-    // Description needs to be preserved alongside Tainer's metadata block.
     if (descriptionProvided) {
       const detail = await getDeploymentDetail(deploymentId);
       const meta = detail?.tainerMeta ?? null;
@@ -1159,7 +1140,6 @@ export async function recreateFromTemplateAction(
 
     const { node, vmid } = decodeDeploymentId(deploymentId);
 
-    // Load the current template (latest version)
     const template = await getDeploymentTemplate(templateId);
     if (!template) {
       return {
@@ -1170,7 +1150,6 @@ export async function recreateFromTemplateAction(
       };
     }
 
-    // Load current container config so we can preserve settings
     const detail = await getDeploymentDetail(deploymentId);
     if (!detail) {
       return {
@@ -1181,20 +1160,16 @@ export async function recreateFromTemplateAction(
       };
     }
 
-    // Stop → delete → recreate chain runs in background
     const wasRunning = detail.rawStatus === "running";
 
-    // Stop if running
     if (wasRunning) {
       const stopUpid = await runContainerLifecycleAction(node, vmid, "stop");
       await waitForTask(node, stopUpid);
     }
 
-    // Delete the old container
     const deleteUpid = await deleteContainer(node, vmid);
     await waitForTask(node, deleteUpid);
 
-    // Build new container params preserving the old config
     const params = new URLSearchParams();
     params.set("vmid", String(vmid));
     params.set("ostemplate", template.sourceVolid);
@@ -1211,7 +1186,6 @@ export async function recreateFromTemplateAction(
       params.set("net0", `name=eth0,bridge=${template.bridge},ip=dhcp`);
     }
 
-    // Stamp with new metadata
     const meta: TainerMeta = {
       templateId: template.id,
       templateName: template.name,
@@ -1221,14 +1195,11 @@ export async function recreateFromTemplateAction(
     const userDescription = stripTainerMeta(detail.description);
     params.set("description", buildDescription(userDescription, meta));
 
-    // Create the new container
     const createUpid = await createContainer(node, params);
 
-    // Post-create: apply env vars and optionally start
     waitForTask(node, createUpid)
       .then(async () => {
         try {
-          // Restore env vars from the old container
           if (detail.envText.trim()) {
             const updateParams = new URLSearchParams();
             updateParams.set("env", envTextToString(detail.envText));

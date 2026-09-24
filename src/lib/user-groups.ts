@@ -255,7 +255,7 @@ async function runMigration(): Promise<void> {
   const existing = await hasAnyGroups();
   if (existing) return;
 
-  // Lazy imports to avoid circular dependency
+  // Imported lazily to avoid a circular dependency.
   const { listSites } = await import("@/lib/site-store");
 
   const sites = await listSites();
@@ -284,7 +284,7 @@ async function runMigration(): Promise<void> {
     siteAccess: allSiteAccess,
   });
 
-  // Direct auth store mutation to avoid circular deps
+  // Imported lazily to avoid a circular dependency.
   const { migrateUsersToGroups } = await import("@/lib/auth");
   await migrateUsersToGroups(adminGroup.id, operatorGroup.id);
 }

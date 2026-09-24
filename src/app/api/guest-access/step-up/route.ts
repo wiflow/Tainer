@@ -8,8 +8,7 @@ function validateOrigin(request: Request) {
   if (!origin) return; // non-browser client, SameSite cookies still protect
   try {
     const originUrl = new URL(origin);
-    // Use x-forwarded-host (reverse proxy) or Host header instead of request.url,
-    // which may reflect the internal server address behind a proxy.
+    // request.url can be the internal address behind a reverse proxy.
     const expectedHost =
       request.headers.get("x-forwarded-host") ||
       request.headers.get("host") ||

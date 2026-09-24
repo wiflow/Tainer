@@ -15,8 +15,7 @@ export const runtime = "nodejs";
 
 const MAX_BODY_BYTES = 1024 * 1024;
 
-// Saved chats are strictly per-user — every function below scopes by the
-// session's user id, so one user can never list, read, or delete another's.
+// Every handler here must scope by the session user id so chats stay private.
 
 export async function GET(request: Request) {
   const session = await getCurrentSession();

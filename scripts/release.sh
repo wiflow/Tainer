@@ -1,23 +1,5 @@
 #!/usr/bin/env bash
-#
-# Cut a new Tainer release.
-#
-# Usage:
-#   scripts/release.sh                # interactive: prompts for version
-#   scripts/release.sh 1.2.0          # non-interactive: tag as v1.2.0
-#
-# What it does (in order):
-#   1. Refuses if the working tree is dirty
-#   2. Finds the previous tag (git describe --tags --abbrev=0)
-#   3. Lists every commit since that tag, so you can verify coverage
-#   4. Prints the current [Unreleased] block from CHANGELOG.md
-#   5. Asks you to confirm the new version
-#   6. Atomically rewrites CHANGELOG.md:
-#        [Unreleased] -> [X.Y.Z] - YYYY-MM-DD
-#        + new empty [Unreleased] section above it
-#   7. git commit -m "Release vX.Y.Z" + git tag vX.Y.Z
-#
-# Push with:  git push origin main && git push origin vX.Y.Z
+# Usage: scripts/release.sh [X.Y.Z]
 
 set -euo pipefail
 
@@ -25,8 +7,6 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_ROOT"
 
 CHANGELOG="$REPO_ROOT/CHANGELOG.md"
-
-# ── Sanity checks ──
 
 if [[ ! -f "$CHANGELOG" ]]; then
   echo "❌ CHANGELOG.md not found at $CHANGELOG" >&2
@@ -38,8 +18,6 @@ if ! git diff --quiet || ! git diff --cached --quiet; then
   git status --short
   exit 1
 fi
-
-# ── Identify previous version ──
 
 PREV_TAG="$(git describe --tags --abbrev=0 2>/dev/null || true)"
 
@@ -53,8 +31,6 @@ else
   GIT_RANGE="$PREV_TAG..HEAD"
 fi
 
-# ── Show commits since previous tag ──
-
 echo ""
 echo "── $RANGE_LABEL ──"
 if [[ -n "$GIT_RANGE" ]]; then
@@ -63,8 +39,6 @@ else
   git log --oneline
 fi
 
-# ── Show current [Unreleased] block ──
-
 echo ""
 echo "── Current [Unreleased] in CHANGELOG.md ──"
 awk '
@@ -72,8 +46,6 @@ awk '
   capture && /^## \[/ { capture = 0 }
   capture { print }
 ' "$CHANGELOG"
-
-# ── Decide version ──
 
 NEW_VERSION="${1:-}"
 if [[ -z "$NEW_VERSION" ]]; then
@@ -102,10 +74,6 @@ if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
   exit 1
 fi
 
-# ── Rewrite CHANGELOG.md ──
-
-# Replace the first occurrence of `## [Unreleased]` with the new version
-# header, then prepend a fresh empty [Unreleased] section above it.
 TMP="$(mktemp)"
 awk -v ver="$NEW_VERSION" -v today="$TODAY" '
   BEGIN { replaced = 0 }
@@ -126,8 +94,6 @@ awk -v ver="$NEW_VERSION" -v today="$TODAY" '
 ' "$CHANGELOG" > "$TMP"
 
 mv "$TMP" "$CHANGELOG"
-
-# ── Commit and tag ──
 
 git add "$CHANGELOG"
 git commit -m "Release ${NEW_TAG}"

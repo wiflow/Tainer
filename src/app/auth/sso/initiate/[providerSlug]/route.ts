@@ -12,9 +12,7 @@ import {
 export const dynamic = "force-dynamic";
 
 function buildRedirectUri(request: NextRequest, providerSlug: string): string {
-  // Use the same origin resolution as the callback so the redirect_uri
-  // sent to the IdP matches exactly what the callback constructs (the IdP
-  // strict-compares these). APP_URL > x-forwarded-* > Host header.
+  // Must match the callback's redirect_uri exactly; IdPs strict-compare it.
   const origin = getPublicOrigin(request.headers, request.url);
   return `${origin}/auth/sso/callback/${providerSlug}`;
 }

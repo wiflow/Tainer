@@ -36,16 +36,6 @@ export type StorageBoxSiteState = {
   hetznerError: string | null;
 };
 
-// Card-grid catalogue of third-party integrations Tainer exposes on the
-// /integrations page. Visual style is borrowed from the cnblocks
-// integrations-section demo (right-hand grid only — the left text
-// column is dropped because the page already has its own heading).
-//
-// Each card reflects the live store state via a status badge. The
-// phpIPAM card is interactive: clicking opens a dialog with the
-// existing IpamForm (save / test / remove). Other cards are render-
-// only "Coming soon" placeholders so the grid doesn't look empty.
-
 type IntegrationStatus = "configured" | "available" | "coming-soon";
 
 type Integration = {

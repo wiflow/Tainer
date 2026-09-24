@@ -18,7 +18,7 @@ import { ensureSiteConfig } from "@/lib/site-context";
 import { resolveSiteConfigBySlug } from "@/lib/site-resolver";
 import { cn } from "@/lib/utils";
 
-// Avoid `force-dynamic` here — it silently disables the unstable_cache below.
+// Avoid `force-dynamic` here; it silently disables the unstable_cache below.
 type ImagesPageQuery = {
   name?: string;
   namespace?: string;

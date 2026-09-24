@@ -27,9 +27,6 @@ export async function GET() {
     message?: string;
   }> = {};
 
-  // Run all checks in parallel with a per-site 5s timeout
-  // Return results keyed by BOTH site.id and site.slug so callers can
-  // look up by whichever key they have.
   const bySlug: typeof results = {};
 
   await Promise.all(

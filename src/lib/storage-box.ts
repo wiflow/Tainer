@@ -15,19 +15,8 @@ import { resolveSiteDataFilePathFromContext } from "@/lib/site-data";
 import { runSshCommand } from "@/lib/ssh-command";
 import { createStoreMutator, writeJsonFileAtomically } from "@/lib/store-utils";
 
-/**
- * Hetzner Storage Box integration — off-site backup target.
- *
- * All SSH-based Storage Box services (SSH, SFTP, SCP, rsync) listen on
- * port 23. The box offers no shell: commands from a whitelist (ls, mkdir,
- * rm, df, install-ssh-key, …) are executed directly, so every remote call
- * here uses `raw` mode. Transfers run on the Proxmox node that holds the
- * archive; the panel only orchestrates.
- */
-
 export const STORAGE_BOX_SSH_PORT = 23;
 
-/** Panel- and node-side host key handling for *.your-storagebox.de. */
 const BOX_HOST_KEY_OPTIONS = ["-o", "StrictHostKeyChecking=accept-new"];
 
 const HOST_PATTERN = /^[a-z0-9][a-z0-9.-]{2,253}$/i;
@@ -42,22 +31,16 @@ export type StorageBoxConfig = {
   host: string;
   username: string;
   passwordEncrypted: string;
-  /** Remote base directory (single path segment) for offloaded archives. */
   basePath: string;
-  /** OpenSSH-format public key installed on the box for transfers. */
   publicKey: string | null;
   privateKeyEncrypted: string | null;
   keyInstalled: boolean;
   cifsStorageId: string | null;
-  /** rsync --bwlimit in KiB/s; 0 = unlimited. */
+  /** rsync --bwlimit in KiB/s, 0 means unlimited. */
   bandwidthLimitKbps: number;
-  /** Encrypt archives with AES-256 before they leave the node. */
   encryptEnabled: boolean;
-  /** Random passphrase for openssl enc, sealed. */
   encryptionKeyEncrypted: string | null;
-  /** Hetzner Console API token (Bearer), sealed. Enables box management. */
   hetznerTokenEncrypted: string | null;
-  /** The box's numeric id on api.hetzner.com, matched by hostname. */
   hetznerBoxId: number | null;
   lastTestedAt: string | null;
   lastTestOk: boolean | null;
@@ -72,7 +55,7 @@ export type StorageBoxUsage = {
   raw: string;
 };
 
-/** Secret-free view for pages and client components. */
+/** Must stay secret-free: it is passed to client components. */
 export type StorageBoxSummary = {
   configured: boolean;
   host: string;
@@ -87,7 +70,6 @@ export type StorageBoxSummary = {
   lastTestedAt: string | null;
   lastTestOk: boolean | null;
   lastTestMessage: string;
-  /** Process-local transfer state for the UI. */
   queueDepth: number;
   currentTransfer: string | null;
 };
@@ -154,8 +136,6 @@ function validateRemoteSegment(value: string, label: string) {
   return value;
 }
 
-/* ── Config store ─────────────────────────────────────────────────────────── */
-
 async function readStore(): Promise<StorageBoxStore> {
   try {
     const raw = await readFile(
@@ -221,8 +201,6 @@ export async function getStorageBoxSummary(): Promise<StorageBoxSummary> {
   };
 }
 
-/* ── Offload log ──────────────────────────────────────────────────────────── */
-
 async function readLog(): Promise<OffloadLogStore> {
   try {
     const raw = await readFile(
@@ -261,12 +239,9 @@ async function appendLogEntry(entry: Omit<OffloadLogEntry, "id" | "at">) {
   });
 }
 
-/* ── Off-site index ───────────────────────────────────────────────────────── */
-
 export type OffsiteIndexEntry = {
   vmid: number;
   offloadedAt: string;
-  /** sha256 comparison between node and box succeeded. */
   verified: boolean;
   encrypted: boolean;
   sizeBytes: number | null;
@@ -297,13 +272,10 @@ async function writeIndex(store: OffsiteIndexStore) {
 
 const mutateIndex = createStoreMutator("storage-box-index", readIndex, writeIndex);
 
-/** Archive-name → entry map for off-site badges in backup lists. */
 export async function getOffsiteIndex(): Promise<Record<string, OffsiteIndexEntry>> {
   const store = await readIndex();
   return store.archives;
 }
-
-/* ── Box SSH plumbing ─────────────────────────────────────────────────────── */
 
 type BoxCredentials = {
   host: string;
@@ -327,7 +299,7 @@ async function resolveBoxCredentials(): Promise<BoxCredentials> {
   };
 }
 
-/** Run a whitelisted command on the box (no shell — raw mode). */
+/** The box has no shell, so only its whitelisted commands run, in raw mode. */
 async function runBoxCommand(
   credentials: BoxCredentials,
   remoteCommand: string,
@@ -346,7 +318,7 @@ async function runBoxCommand(
   });
 }
 
-/** `mkdir` each missing path level; the box's mkdir has no -p flag. */
+/** The box's mkdir has no -p flag. */
 async function ensureRemoteDirectory(credentials: BoxCredentials, remotePath: string) {
   const segments = remotePath.split("/").filter(Boolean);
   let current = "";
@@ -362,7 +334,6 @@ async function ensureRemoteDirectory(credentials: BoxCredentials, remotePath: st
 }
 
 function parseDfOutput(output: string): StorageBoxUsage {
-  // Expected df-style output; numbers are 1K blocks on Hetzner boxes.
   for (const line of output.split("\n").slice(1)) {
     const columns = line.trim().split(/\s+/);
     if (columns.length >= 3) {
@@ -376,13 +347,10 @@ function parseDfOutput(output: string): StorageBoxUsage {
   return { raw: output.trim(), totalBytes: null, usedBytes: null };
 }
 
-/* ── Connect / test ───────────────────────────────────────────────────────── */
-
 function generateBoxKeyPair(comment: string) {
   const { privateKey, publicKey } = generateKeyPairSync("ed25519");
 
-  // OpenSSH public key line from the SPKI DER: the raw ed25519 key is the
-  // final 32 bytes. Wire format: string "ssh-ed25519" + string key.
+  // The raw ed25519 key is the last 32 bytes of the SPKI DER.
   const der = publicKey.export({ format: "der", type: "spki" });
   const rawKey = der.subarray(der.length - 32);
   const typeLabel = Buffer.from("ssh-ed25519");
@@ -394,7 +362,6 @@ function generateBoxKeyPair(comment: string) {
   ]);
 
   return {
-    // OpenSSH ≥ 7.8 accepts PKCS#8 PEM private keys directly.
     privateKeyPem: privateKey.export({ format: "pem", type: "pkcs8" }).toString(),
     publicKeyLine: `ssh-ed25519 ${wire.toString("base64")} ${comment}`,
   };
@@ -418,11 +385,8 @@ export async function connectStorageBox(input: {
   const site = getActiveSiteConfig();
   const passwordCredentials: BoxCredentials = { host, password, privateKey: null, username };
 
-  // 1. Prove the credentials work at all.
   const dfOutput = await runBoxCommand(passwordCredentials, "df");
 
-  // 2. Generate a dedicated transfer key and install it via the box's
-  //    built-in `install-ssh-key` helper (reads the key from stdin).
   const comment = `tainer-offsite-${site.siteSlug}`;
   const keyPair = generateBoxKeyPair(comment);
   let keyInstalled = false;
@@ -442,7 +406,6 @@ export async function connectStorageBox(input: {
     console.error("[storage-box] SSH key installation failed, staying on password auth:", err);
   }
 
-  // 3. Create the base directory.
   await ensureRemoteDirectory(passwordCredentials, basePath);
 
   const timestamp = new Date().toISOString();
@@ -479,8 +442,7 @@ export async function connectStorageBox(input: {
           ...config,
           cifsStorageId: existing.cifsStorageId,
           createdAt: existing.createdAt,
-          // Keep the original encryption key: replacing it would orphan every
-          // already-encrypted remote archive.
+          // Replacing the key would orphan every already-encrypted remote archive.
           encryptionKeyEncrypted: existing.encryptionKeyEncrypted ?? config.encryptionKeyEncrypted,
           hetznerBoxId: existing.hetznerBoxId ?? null,
           hetznerTokenEncrypted: existing.hetznerTokenEncrypted ?? null,
@@ -491,13 +453,6 @@ export async function connectStorageBox(input: {
   return getStorageBoxSummary();
 }
 
-/* ── Hetzner Console API token ────────────────────────────────────────────── */
-
-/**
- * Seal a Hetzner Console API token and match the connected box by hostname.
- * The token enables management (services, snapshots, usage) via
- * api.hetzner.com — see hetzner-storage-api.ts.
- */
 export async function setHetznerApiToken(token: string): Promise<{ boxId: number; boxName: string }> {
   const config = await getStorageBoxConfig();
   if (!config) throw new Error("Connect the Storage Box first.");
@@ -509,8 +464,7 @@ export async function setHetznerApiToken(token: string): Promise<{ boxId: number
     throw new Error("The token is valid but no Storage Boxes are visible to it.");
   }
 
-  // Match by hostname: the box `server` is uXXXXX.your-storagebox.de and
-  // sub-account hosts share the main account's prefix.
+  // Sub-account hosts share the main account's uXXXXX prefix.
   const hostPrefix = config.host.split(".")[0].split("-")[0].toLowerCase();
   const match =
     boxes.find((box) => (box.server ?? "").toLowerCase() === config.host) ??
@@ -546,7 +500,6 @@ export async function clearHetznerApiToken(): Promise<void> {
   });
 }
 
-/** Decrypted token + box id, or null when the API is not connected. */
 export async function getHetznerApiContext(): Promise<{ token: string; boxId: number } | null> {
   const config = await getStorageBoxConfig();
   if (!config?.hetznerTokenEncrypted || !config.hetznerBoxId) return null;
@@ -610,15 +563,12 @@ export async function markCifsStorageRegistered(storageId: string | null): Promi
   });
 }
 
-/* ── Remote listing ───────────────────────────────────────────────────────── */
-
 export type RemoteArchive = {
   name: string;
   vmid: number;
   remoteDir: string;
 };
 
-/** Enumerate offloaded archives under basePath/<siteSlug>/<vmid>/. */
 export async function listRemoteArchives(): Promise<RemoteArchive[]> {
   const config = await getStorageBoxConfig();
   if (!config) return [];
@@ -634,7 +584,7 @@ export async function listRemoteArchives(): Promise<RemoteArchive[]> {
       .map((s) => s.trim())
       .filter((s) => /^\d+$/.test(s));
   } catch {
-    return []; // site directory does not exist yet
+    return [];
   }
 
   const archives: RemoteArchive[] = [];
@@ -649,14 +599,11 @@ export async function listRemoteArchives(): Promise<RemoteArchive[]> {
         archives.push({ name, remoteDir, vmid: Number(vmidName) });
       }
     } catch {
-      // unreadable vmid dir — skip
     }
   }
 
   return archives.sort((a, b) => b.name.localeCompare(a.name));
 }
-
-/* ── Offload (node → box) ─────────────────────────────────────────────────── */
 
 const globalForOffload = globalThis as typeof globalThis & {
   __tainerOffloadQueue?: Promise<void>;
@@ -665,11 +612,6 @@ const globalForOffload = globalThis as typeof globalThis & {
   __tainerLastReconcileAt?: number;
 };
 
-/**
- * Serialize transfers process-wide: one WAN copy at a time, mirroring the
- * backup engine's one-VM-at-a-time rule. The site context captured at
- * enqueue time propagates into the continuation (AsyncLocalStorage).
- */
 function enqueueTransfer(job: () => Promise<void>): void {
   const queue = globalForOffload.__tainerOffloadQueue ?? Promise.resolve();
   globalForOffload.__tainerOffloadActive = (globalForOffload.__tainerOffloadActive ?? 0) + 1;
@@ -691,11 +633,6 @@ export function getCurrentTransferLabel(): string | null {
   return globalForOffload.__tainerCurrentTransfer ?? null;
 }
 
-/**
- * Copy the newest archive of a VM on the given storage to the Storage Box,
- * verify it by sha256, then prune remote copies beyond `remoteRetentionCount`
- * (0 keeps all). Fire-and-forget: the transfer runs on the offload queue.
- */
 export async function scheduleArchiveOffload(input: {
   node: string;
   vmid: number;
@@ -725,8 +662,6 @@ export async function scheduleArchiveOffload(input: {
       archiveName = newest.volid.split("/").pop() ?? newest.volid;
       validateRemoteSegment(archiveName, "archive name");
 
-      // Reconcile may race a fresh backup: skip if this exact archive is
-      // already indexed as verified.
       const index = await readIndex();
       if (index.archives[archiveName]?.verified) return;
 
@@ -805,9 +740,7 @@ async function pruneRemoteArchives(
   keepCount: number,
   vmid: number,
 ) {
-  // vzdump file names embed the timestamp, so lexicographic order is
-  // chronological within one VMID directory (the .enc suffix doesn't
-  // change relative order between distinct timestamps).
+  // vzdump names embed the timestamp, so lexicographic order is chronological.
   const names = (await runBoxCommand(credentials, `ls ${shellSingleQuote(remoteDir)}`))
     .split(/\s+/)
     .map((s) => s.trim())
@@ -842,21 +775,6 @@ async function pruneRemoteArchives(
 
 const KEY_BOUNDARY = "-----TAINER-KEY-BOUNDARY-----";
 
-/**
- * Run the transfer on the Proxmox node with the transfer key (and, when
- * encrypting, the sealed data key), both delivered over stdin and written to
- * root-only temp files for the duration of the command.
- *
- * Push, plaintext:  rsync (+bwlimit), then sha256 on both ends.
- * Push, encrypted:  openssl | tee(sha256 of the encrypted stream) | ssh dd,
- *                   then compare with the box's sha256sum. No rsync resume
- *                   in this mode — the whole stream restarts on failure.
- * Pull, plaintext:  rsync back.
- * Pull, encrypted:  ssh dd | openssl -d into the target path.
- *
- * Returns whether the sha256 comparison succeeded (pulls return true — a
- * corrupt pull fails vzdump restore loudly anyway).
- */
 async function transferFromNode(input: {
   bandwidthLimitKbps: number;
   credentials: BoxCredentials;
@@ -884,7 +802,6 @@ async function transferFromNode(input: {
   const remoteSpec = `${destination}:${input.remotePath}`;
   const q = shellSingleQuote;
 
-  // Split the stdin bundle into the ssh key and (optionally) the data key.
   const stdinBundle = input.encryptionKey
     ? `${credentials.privateKey.trim()}\n${KEY_BOUNDARY}\n${input.encryptionKey}\n`
     : `${credentials.privateKey.trim()}\n`;
@@ -924,7 +841,6 @@ async function transferFromNode(input: {
     payload = `rsync --inplace --timeout=120${bwlimit} -e ${q(`ssh ${sshOptions}`)} ${q(remoteSpec)} ${q(input.localPath)}`;
   }
 
-  // bash for pipefail + process substitution; keys always removed.
   const remoteCommand = `${splitPrelude} && bash -c ${q(payload)}; rc=$?; ${cleanup}; exit $rc`;
 
   try {
@@ -941,15 +857,8 @@ async function transferFromNode(input: {
   }
 }
 
-/* ── Reconciliation ───────────────────────────────────────────────────────── */
-
 const RECONCILE_INTERVAL_MS = 60 * 60 * 1000;
 
-/**
- * Backfill offloads lost to restarts: for every offload-enabled policy, the
- * newest local archive per VMID must be verified in the off-site index.
- * Rate-limited per process; called from the backup engine tick.
- */
 export async function reconcileOffloads(
   policies: { id: string; name: string; storage: string; offloadEnabled: boolean; offloadRetentionCount: number }[],
 ): Promise<void> {
@@ -995,12 +904,6 @@ export async function reconcileOffloads(
   }
 }
 
-/* ── Retrieve (box → node) ────────────────────────────────────────────────── */
-
-/**
- * Pull an offloaded archive back onto a node's file-based backup storage so
- * Proxmox can restore from it natively. Returns the local path written.
- */
 export async function retrieveArchive(input: {
   archiveName: string;
   vmid: number;
@@ -1029,8 +932,6 @@ export async function retrieveArchive(input: {
   const localPath = `${target.path.replace(/\/+$/, "")}/dump/${archiveName}`;
   const credentials = await resolveBoxCredentials();
 
-  // Encrypted uploads live remotely as <name>.enc; the pull decrypts back to
-  // the plain vzdump archive Proxmox expects.
   const index = await readIndex();
   const encrypted = index.archives[archiveName]?.encrypted ?? false;
   if (encrypted && !config.encryptionKeyEncrypted) {

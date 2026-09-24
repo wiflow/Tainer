@@ -56,15 +56,6 @@ async function writeStore(store: Store): Promise<void> {
 
 const mutateStore = createStoreMutator("lldp-events", readStore, writeStore);
 
-/**
- * Generate one event per (chassis, port) pair that appeared in `next` but not
- * in `prev` (link-up), and one for every pair in `prev` that's missing from
- * `next` (link-down). Returns an empty list when nothing changed.
- *
- * `prev` is null on the very first push from an agent — we deliberately
- * suppress the storm of "fake link-up" events that would otherwise fire,
- * since we have no evidence the link was previously down.
- */
 export function diffNeighbors(
   prev: LldpNeighbor[] | null,
   next: LldpNeighbor[],
@@ -146,10 +137,6 @@ export async function recordLldpLinkEvents(input: {
   });
 }
 
-/**
- * Read events for the given site, most recent first. Caller can optionally
- * filter to a specific chassis.
- */
 export async function listLldpEventsForSite(
   siteId: string,
   options?: { chassisId?: string; limit?: number },

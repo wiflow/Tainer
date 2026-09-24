@@ -125,7 +125,6 @@ export function GroupForm({
         <Form action={formAction} className="space-y-5">
           {isEditing && <input name="groupId" type="hidden" value={group!.id} />}
 
-          {/* Hidden fields for computed values */}
           <input name="isAdmin" type="hidden" value={String(isAdmin)} />
           <input
             name="globalPermissions"
@@ -145,7 +144,6 @@ export function GroupForm({
             ) : null,
           )}
 
-          {/* Name */}
           <label className="block rounded-md border border-white/5 bg-[#111113] px-4 py-3">
             <span className="text-[13px] font-medium text-zinc-200">Name</span>
             <input
@@ -158,7 +156,6 @@ export function GroupForm({
             />
           </label>
 
-          {/* Description */}
           <label className="block rounded-md border border-white/5 bg-[#111113] px-4 py-3">
             <span className="text-[13px] font-medium text-zinc-200">Description</span>
             <textarea
@@ -170,7 +167,6 @@ export function GroupForm({
             />
           </label>
 
-          {/* Admin toggle */}
           <div className="rounded-md border border-white/5 bg-[#111113] px-4 py-3">
             <label className="flex items-center gap-3">
               <input
@@ -190,7 +186,6 @@ export function GroupForm({
 
           {!isAdmin && (
             <>
-              {/* Global permissions */}
               <div className="rounded-md border border-white/5 bg-[#111113] px-4 py-3">
                 <p className="text-[13px] font-medium text-zinc-200">Global permissions</p>
                 <p className="mt-0.5 text-[12px] text-zinc-500">
@@ -213,7 +208,6 @@ export function GroupForm({
                 </div>
               </div>
 
-              {/* Site access */}
               <div className="rounded-md border border-white/5 bg-[#111113] px-4 py-3">
                 <p className="text-[13px] font-medium text-zinc-200">Site access</p>
                 <p className="mt-0.5 text-[12px] text-zinc-500">

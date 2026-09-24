@@ -146,7 +146,6 @@ export async function clearAllActiveAlerts(): Promise<AlertRuntimeEntry[]> {
 
     for (const entry of Object.values(store.alerts)) {
       if (entry.active) {
-        // Snapshot before mutation
         cleared.push({ ...entry });
         entry.active = false;
         entry.lastResolvedAt = nowIso;
@@ -162,7 +161,6 @@ export async function clearSingleAlert(key: string): Promise<AlertRuntimeEntry |
     const entry = store.alerts[key];
     if (!entry || !entry.active) return null;
 
-    // Snapshot before mutation
     const snapshot = { ...entry };
     entry.active = false;
     entry.lastResolvedAt = new Date().toISOString();

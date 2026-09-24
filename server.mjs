@@ -447,7 +447,7 @@ async function proxmoxPasswordLogin(config) {
             const result = {
               ticket: parsed.data.ticket,
               csrfToken: parsed.data.CSRFPreventionToken || "",
-              expiresAt: Date.now() + 2 * 60 * 60_000, // 2h, matches PVE ticket lifetime
+              expiresAt: Date.now() + 2 * 60 * 60_000, // Matches the Proxmox ticket lifetime.
             };
             const sitePrefix = `${config.siteId || "__env__"}::`;
             for (const key of pveAuthCacheMap.keys()) {
@@ -726,7 +726,7 @@ async function createConsoleSession(config, session, deploymentId) {
   const deployment = await authorizeConsoleDeployment(config, deploymentId);
   const { target, type } = deployment;
 
-  // API tokens can't authenticate to termproxy/vncproxy, so we need password-based login here
+  // Proxmox API tokens cannot use termproxy/vncproxy, so this needs a password login.
   const pveAuth = await proxmoxPasswordLogin(config);
 
   const useTerm = type === "lxc";
@@ -905,9 +905,7 @@ async function migrateLegacySiteOnBoot() {
       if (store.legacyImportedEnvSiteId || (store.sites && store.sites.length > 0)) {
         needsMigration = false;
       }
-    } catch {
-      // file doesn't exist yet, that's fine
-    }
+    } catch {}
 
     if (!needsMigration) return;
 
@@ -991,10 +989,10 @@ async function migrateLegacySiteOnBoot() {
       const dst = path.join(siteDataDir, f);
       try {
         await access(src);
-        try { await access(dst); continue; } catch { /* target doesn't exist, proceed */ }
+        try { await access(dst); continue; } catch {}
         try { await rename(src, dst); } catch { await copyFile(src, dst); }
         console.log(`[server.mjs] Moved ${f} → sites/${siteId}/`);
-      } catch { /* source doesn't exist */ }
+      } catch {}
     }
 
     console.log("[server.mjs] Migration complete.");
@@ -1015,8 +1013,6 @@ const server = createServer(async (req, res) => {
   } else {
     delete req.headers["x-tainer-peer-ip"];
   }
-
-  // "/" is now handled by the Next.js overview map page (src/app/page.tsx).
 
   if (requestUrl.pathname === "/api/proxmox/console-ticket") {
     await handleConsoleTicketRequest(req, res, requestUrl);
@@ -1161,7 +1157,6 @@ server.on("upgrade", async (req, socket, head) => {
         upstreamReady = true;
         console.log(`[console-debug] upstream OPEN for ${debugTag} (pending=${pendingClientMessages.length})`);
 
-        // flush buffered messages — client may send auth immediately on open before upstream is ready
         for (const msg of pendingClientMessages) {
           upstream.send(msg.data, { binary: msg.isBinary });
         }

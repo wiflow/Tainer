@@ -13,14 +13,6 @@ import type {
   LoadBalancerEventEntry,
 } from "@/lib/load-balancer/event-log";
 
-/**
- * Reuses the visual + interaction language of AuditLogViewer (search +
- * collapsible filter sidebar + framer-motion expand) but driven by load
- * balancer events instead of admin audit entries. Same patterns so the two
- * pages feel consistent: chevron rotates on expand, severity badge on the
- * left, expanded row shows full structured details.
- */
-
 const LEVEL_BADGE_VARIANT: Record<LbEventLevel, "info" | "warning" | "destructive"> = {
   info: "info",
   warning: "warning",

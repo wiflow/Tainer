@@ -89,7 +89,7 @@ export function XtermConsole({
 
         ws.onopen = () => {
           if (disposed) return;
-          // Proxmox termproxy auth: send "user:ticket\n" (trailing newline is critical)
+          // Termproxy requires the trailing newline after "user:ticket".
           ws?.send(`${user}:${ticket}\n`);
         };
 
@@ -110,7 +110,7 @@ export function XtermConsole({
 
               ws?.send(`1:${term.cols}:${term.rows}:`);
 
-              // Keepalive ping every 30 seconds (termproxy has 5-min timeout)
+              // Termproxy closes idle sessions after 5 minutes.
               pingInterval = setInterval(() => {
                 if (ws?.readyState === WebSocket.OPEN) {
                   ws.send("2");
@@ -120,8 +120,6 @@ export function XtermConsole({
             return;
           }
 
-          // Server-to-client: raw PTY output, NO protocol prefix.
-          // Write directly to the terminal.
           term.write(raw);
         };
 
@@ -136,14 +134,12 @@ export function XtermConsole({
           setState("error");
         };
 
-        // Forward terminal input to Proxmox: "0:LENGTH:DATA"
         term.onData((data) => {
           if (ws?.readyState === WebSocket.OPEN) {
             ws.send(`0:${utf8ByteLength(data)}:${data}`);
           }
         });
 
-        // Forward resize events: "1:COLS:ROWS:"
         term.onResize(({ cols, rows }) => {
           if (ws?.readyState === WebSocket.OPEN) {
             ws.send(`1:${cols}:${rows}:`);

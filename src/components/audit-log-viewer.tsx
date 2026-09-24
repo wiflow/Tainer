@@ -9,17 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { AdminAuditAction, AdminAuditEntry } from "@/lib/admin-audit-log";
 
-/**
- * Adapted from a "shadcn-ui interactive logs table" pattern but driven by
- * Tainer's actual AdminAuditEntry shape rather than a fake api-gateway dataset.
- * Preserved: search + expand-on-click + animated filter sidebar.
- * Replaced: synthetic level/service/duration/status fields with category +
- * level derived from the audit action, plus actor/target visibility.
- */
-
 type Level = "info" | "warning" | "destructive";
 
-/** Maps each audit action to a human-friendly category + a severity level. */
 const ACTION_META: Record<AdminAuditAction, { category: string; level: Level }> = {
   "user-created": { category: "users", level: "info" },
   "user-deleted": { category: "users", level: "destructive" },
@@ -295,7 +286,6 @@ export function AuditLogViewer({ entries }: { entries: AdminAuditEntry[] }) {
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
 
-  // Derive option lists from the data we actually have, not a hardcoded set.
   const categories = useMemo(
     () =>
       Array.from(new Set(entries.map((e) => actionMeta(e.action).category))).sort(),
@@ -307,7 +297,6 @@ export function AuditLogViewer({ entries }: { entries: AdminAuditEntry[] }) {
       const k = e.actorEmail || e.actorName || "system";
       counts.set(k, (counts.get(k) ?? 0) + 1);
     }
-    // Top 12 most-active actors so the panel stays readable on big logs.
     return Array.from(counts.entries())
       .sort((a, b) => b[1] - a[1])
       .slice(0, 12)
@@ -348,7 +337,6 @@ export function AuditLogViewer({ entries }: { entries: AdminAuditEntry[] }) {
 
   return (
     <div className="flex h-[calc(100vh-9rem)] min-h-[480px] flex-col overflow-hidden rounded-2xl border border-white/5 bg-[#0a0a0c]">
-      {/* Header */}
       <div className="flex items-center gap-2 border-b border-white/5 bg-[#111113] p-4">
         <div className="relative flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500" />
@@ -378,7 +366,6 @@ export function AuditLogViewer({ entries }: { entries: AdminAuditEntry[] }) {
         </span>
       </div>
 
-      {/* Body */}
       <div className="flex flex-1 overflow-hidden">
         <AnimatePresence initial={false}>
           {showFilters ? (

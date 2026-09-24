@@ -56,11 +56,7 @@ export async function issueLldpTokenAction(
       actorEmail: session.user.email,
     });
 
-    // Pull the SNMP community plaintext so the install snippet can bake it
-    // into /etc/tainer-lldp.env without the operator copy-pasting separately.
-    // Returns null when SNMP isn't configured for this site — empty string
-    // in the snippet means "SNMP polling disabled" and the poll script
-    // no-ops gracefully.
+    // An empty community in the snippet makes the poll script skip SNMP polling.
     const snmpCommunity = (await getSnmpCommunityForSite(siteConfig.siteId)) ?? "";
 
     recordAdminAudit({

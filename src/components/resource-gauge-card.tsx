@@ -27,8 +27,6 @@ function percentLabel(ratio: number | null) {
   return `${Math.round(ratio * 100)}%`;
 }
 
-/* ── Compact horizontal‑bar gauge used by the overview grid ── */
-
 export function ResourceGaugeCard({
   accentClassName,
   amountLabel,

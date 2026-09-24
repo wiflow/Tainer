@@ -1,14 +1,5 @@
 import "server-only";
 
-/**
- * Minimal client for the Hetzner Storage Box REST API (api.hetzner.com/v1).
- * Same auth pattern as the Hetzner Cloud API: `Authorization: Bearer <token>`
- * with a project-scoped token from the Hetzner Console.
- *
- * Only the surface the Integrations panel needs: box details + usage stats,
- * access-settings toggles, and snapshot management.
- */
-
 const API_BASE = "https://api.hetzner.com/v1";
 
 export type HetznerAccessSettings = {

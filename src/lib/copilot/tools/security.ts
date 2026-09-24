@@ -59,8 +59,6 @@ registerTool({
   describe: (args) => `Run a CVE scan on site ${String(args.siteSlug)}`,
   execute: async (args, ctx) => {
     const siteSlug = String(args.siteSlug ?? "");
-    // Enforce access + permission, then run (runCveScan re-resolves the site
-    // config and sets its own withSiteConfig context internally).
     return runInSiteWithPermission(ctx.session, siteSlug, "manage-security", async () => {
       const report = await runCveScan(siteSlug);
       return { verb: "cve-scan", ...leanCveReport(report) };

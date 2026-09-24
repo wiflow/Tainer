@@ -48,7 +48,6 @@ export function GroupMembersPanel({
         <CardTitle>Members</CardTitle>
       </CardHeader>
       <CardContent className="p-5 space-y-4">
-        {/* Current members */}
         {members.length === 0 ? (
           <p className="text-[13px] text-zinc-500">No members in this group yet.</p>
         ) : (
@@ -77,7 +76,6 @@ export function GroupMembersPanel({
           </div>
         )}
 
-        {/* Add users */}
         {nonMembers.length > 0 && (
           <div className="space-y-2 border-t border-white/5 pt-4">
             <p className="text-[12px] font-medium text-zinc-400">Add users</p>

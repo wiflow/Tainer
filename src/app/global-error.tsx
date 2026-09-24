@@ -2,11 +2,7 @@
 
 import { useEffect } from "react";
 
-/**
- * Last-resort boundary: the root layout itself threw, so this replaces the
- * whole document — no shared chrome, no globals.css. Styles are inline
- * because the stylesheet lives in the layout that just failed.
- */
+// Inline styles only: globals.css is loaded by the root layout, which is what failed.
 export default function GlobalError({
   error,
   reset,

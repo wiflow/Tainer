@@ -10,14 +10,6 @@ type Turn =
   | { role: "assistant"; text: string; toolCalls: ToolCallView[] }
   | { role: "error"; text: string };
 
-/**
- * Generate context-aware suggestions for the always-visible suggestion rack.
- * Drawn from (in priority order):
- *   1. The most recent tool result (e.g. after list_containers → "which is using most memory?")
- *   2. The current page (deployment-detail / network / etc.)
- *   3. The active site slug
- *   4. Defaults
- */
 export function generateSuggestions(
   turns: Turn[],
   pathname: string,
@@ -27,7 +19,6 @@ export function generateSuggestions(
     | (Turn & { role: "assistant" })
     | undefined;
 
-  // (1) Tool-result-driven suggestions
   if (lastAssistant?.toolCalls.length) {
     const lastTool = [...lastAssistant.toolCalls]
       .reverse()
@@ -107,7 +98,6 @@ export function generateSuggestions(
     }
   }
 
-  // (2) Path-driven (the user is looking at a specific page)
   const deploymentMatch = pathname.match(
     /^\/sites\/([^/]+)\/deployments\/([^/]+)$/,
   );
@@ -134,7 +124,6 @@ export function generateSuggestions(
     ];
   }
 
-  // (3) Site-aware defaults
   if (siteSlug) {
     return [
       `What's running on ${siteSlug}?`,
@@ -143,7 +132,6 @@ export function generateSuggestions(
     ];
   }
 
-  // (4) Bare defaults
   return [
     "What sites can I access?",
     "Walk me through Tainer's features",

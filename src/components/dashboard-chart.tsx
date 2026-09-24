@@ -18,7 +18,7 @@ interface DashboardChartProps {
   title: string;
   subtitle?: string;
   series: DashboardChartSeries[];
-  /** Unix-millisecond timestamps aligned 1:1 with each series' data array. */
+  /** Unix milliseconds, aligned 1:1 with each series data array. */
   categories: number[];
   colors?: string[];
   height?: number;
@@ -63,9 +63,6 @@ export function DashboardChart({
       stroke: { curve: "smooth", width: 2 },
       grid: { show: false },
       xaxis: {
-        // Datetime axis lets ApexCharts pick the right granularity (HH:mm
-        // for the 1h range, "dd MMM" for week/month) and auto-spaces the
-        // labels so they never collide. Categories are unix-ms timestamps.
         type: "datetime",
         categories,
         labels: {

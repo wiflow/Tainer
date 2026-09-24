@@ -21,11 +21,6 @@ import { cn } from "@/lib/utils";
 const inputClassName =
   "mt-1.5 w-full rounded-md border border-white/10 bg-zinc-900 px-3 py-2 text-[13px] text-zinc-200 outline-none transition-colors focus:border-zinc-500";
 
-/**
- * Instance-wide service tokens for automation (scripts, Terraform, CI).
- * Admin-only management; tokens themselves act as "operator" sessions with
- * exactly the granted per-site permissions.
- */
 export function ApiTokenPanel({
   tokens,
   sites,
@@ -35,7 +30,7 @@ export function ApiTokenPanel({
   tokens: ApiTokenSummary[];
   sites: { id: string; name: string }[];
   appOrigin: string;
-  /** Server-render timestamp — client render must stay pure (no Date.now()). */
+  /** Server render time, so client render stays pure without Date.now(). */
   now: number;
 }) {
   const [createState, createAction, isCreating] = useActionState(

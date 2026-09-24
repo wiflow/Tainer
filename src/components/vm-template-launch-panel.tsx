@@ -147,7 +147,6 @@ export function VmTemplateLaunchPanel({
             <input className={inputClassName} defaultValue={template.bridge} name="bridge" type="text" />
           </label>
 
-          {/* Hidden advanced fields from template */}
           <input name="vmTemplateId" type="hidden" value={template.id} />
           <input name="osType" type="hidden" value={template.osType} />
           <input name="machineType" type="hidden" value={template.machineType} />

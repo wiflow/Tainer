@@ -57,7 +57,6 @@ export function SetupForm() {
 
   return (
     <div className="space-y-6">
-      {/* Step indicator */}
       <div className="flex items-center gap-3">
         <div
           className={cn(
@@ -83,7 +82,6 @@ export function SetupForm() {
       </div>
 
       <Form action={bootstrapAction} className="space-y-6">
-        {/* Step 1: Admin account — hidden when on step 2 but stays in the DOM */}
         <div className={step === 1 ? "animate-slide-up space-y-6" : "hidden"}>
           <div>
             <h2 className="font-display text-xl font-bold tracking-tight text-zinc-50">
@@ -135,7 +133,6 @@ export function SetupForm() {
           </div>
         </div>
 
-        {/* Step 2: Proxmox connection */}
         <div className={step === 2 ? "animate-slide-up space-y-6" : "hidden"}>
           <div>
             <h2 className="font-display text-xl font-bold tracking-tight text-zinc-50">

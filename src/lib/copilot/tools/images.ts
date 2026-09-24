@@ -38,15 +38,10 @@ import {
   mergeEnvOverrides,
 } from "@/lib/copilot/tools/launch";
 
-// -- Search Docker Hub -------------------------------------------------------
-
 registerTool({
   name: "search_docker_images",
   category: "Templates",
   klass: "read",
-  // Docker Hub descriptions are public, third-party-authored text — the run
-  // loop fences them as untrusted data and flags follow-up approvals with a
-  // provenance warning.
   returnsExternalContent: true,
   description:
     "Search Docker Hub for images by name. Use this BEFORE pull_docker_image whenever you're not certain of the namespace — many popular projects are NOT official images (e.g. Pi-hole is 'pihole/pihole', not 'library/pihole'). Returns namespace, repository, description, and popularity so you can pick the right one.",
@@ -77,8 +72,6 @@ registerTool({
     };
   },
 });
-
-// -- Pull a Docker Hub image into a Proxmox CT-template storage ---------------
 
 registerTool({
   name: "pull_docker_image",
@@ -111,10 +104,6 @@ registerTool({
     }
 
     return runInSiteWithPermission(ctx.session, siteSlug, "manage-templates", async () => {
-      // Validate the image exists on Docker Hub BEFORE submitting the pull —
-      // the Proxmox pull runs as an async task, so a bad reference would
-      // otherwise fail out of sight. This also captures the image's default
-      // env vars for the create step.
       let envVars: string[] = [];
       try {
         envVars = await fetchImageEnvVars({ namespace, repository, tag });
@@ -137,8 +126,6 @@ registerTool({
 
       try {
         const upid = await pullOciRegistryTemplate(node, storage, reference);
-        // Cache the image's default env so create_container_from_image (and
-        // the UI) can preload it. Best-effort.
         if (envVars.length > 0) {
           const aliases = [
             ...new Set(
@@ -174,8 +161,6 @@ registerTool({
     });
   },
 });
-
-// -- Create an LXC container directly from a pulled image template -----------
 
 registerTool({
   name: "create_container_from_image",
@@ -307,9 +292,6 @@ registerTool({
         vmid,
       }).catch(() => {});
 
-      // Post-create: apply the image's cached default env (from
-      // pull_docker_image) merged with any overrides, then start. Runs in the
-      // background — the create result returns immediately with the password.
       void waitForTask(node, upid)
         .then(async () => {
           const baseEnv = await getImageEnv(templateVolid).catch(() => "");
@@ -359,8 +341,6 @@ registerTool({
   },
 });
 
-// -- Download an ISO from a URL into a Proxmox storage ----------------------
-
 registerTool({
   name: "download_iso",
   category: "Templates",
@@ -382,7 +362,6 @@ registerTool({
     if (!node || !storage || !rawUrl) throw new Error("node, storage, and url are required.");
 
     return runInSiteWithPermission(ctx.session, siteSlug, "manage-templates", async () => {
-      // SSRF + allowlist guard (honours TAINER_DOWNLOAD_URL_ALLOWLIST).
       const url = await assertSafeDownloadUrl(rawUrl);
       const derived = String(args.filename ?? "").trim() || url.split("/").pop() || "download.iso";
       const filename = derived.endsWith(".iso") ? derived : `${derived}.iso`;
@@ -404,8 +383,6 @@ registerTool({
     });
   },
 });
-
-// -- Create a VM from an ISO ------------------------------------------------
 
 const ALLOWED_OS_TYPES = ["l26", "win11", "win10", "win8", "other"];
 
@@ -455,7 +432,6 @@ registerTool({
       if (!vmidStr) throw new Error("Couldn't allocate a VMID.");
       const vmid = Number(vmidStr);
 
-      // Same param recipe the create-VM page uses.
       const params = new URLSearchParams();
       params.set("vmid", vmidStr);
       params.set("name", name);

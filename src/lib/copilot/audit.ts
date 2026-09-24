@@ -13,12 +13,6 @@ type AuditInput = {
   detail?: string;
 };
 
-/**
- * Every copilot tool-use lifecycle event lands in the admin audit log.
- * Read-class auto-runs do NOT audit individually (they'd flood the log);
- * the message itself is audited once at copilot-message-sent. Write,
- * destructive, and admin tools always audit on approval and execution.
- */
 export async function recordCopilotAudit(input: AuditInput): Promise<void> {
   const verb = ({
     approved: "approved",

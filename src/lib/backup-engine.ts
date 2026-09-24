@@ -24,7 +24,7 @@ import {
 import { reconcileOffloads, scheduleArchiveOffload } from "@/lib/storage-box";
 import { extractManagedTagSlugs } from "@/lib/tag-utils";
 
-// In-flight state is stored on globalThis so it survives Next.js HMR without losing progress
+// Kept on globalThis so in-flight state survives Next.js HMR.
 type InFlightVm = {
   node: string;
   policyId: string;
@@ -198,8 +198,6 @@ async function pollInFlightVm(state: BackupEngineState): Promise<void> {
     });
 
     if (isSuccess && run.offloadEnabled) {
-      // Queues the copy on the serialized offload queue; the backup loop
-      // never waits on the WAN transfer.
       try {
         await scheduleArchiveOffload({
           node,
@@ -218,12 +216,10 @@ async function pollInFlightVm(state: BackupEngineState): Promise<void> {
     state.backingUpVmids.delete(vmid);
   } catch (err) {
     console.error(`[backup-engine] Failed to poll task ${upid}:`, err);
-    // Don't clear in-flight — will retry next tick
   }
 }
 
 async function advanceActiveRuns(state: BackupEngineState): Promise<void> {
-  // only one VM at a time
   if (state.inFlightVm) return;
 
   for (const [policyId, run] of state.activeRuns) {
@@ -235,7 +231,7 @@ async function advanceActiveRuns(state: BackupEngineState): Promise<void> {
 
     if (nextDeployment) {
       await startVmBackup(run, nextDeployment, state);
-      return; // one at a time
+      return;
     }
 
     if (run.completed.length >= run.pending.length || run.pending.length === 0) {
@@ -303,7 +299,6 @@ export async function runBackupTick(): Promise<{
     const policies = await listBackupPolicies();
     const now = Date.now();
 
-    // Hourly, rate-limited internally: backfill offloads lost to restarts.
     void reconcileOffloads(policies).catch((err) =>
       console.error("[backup-engine] Offload reconciliation error:", err),
     );

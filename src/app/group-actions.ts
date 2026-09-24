@@ -88,9 +88,7 @@ export async function createTagAction(
 
     try {
       await syncProxmoxManagedTagColor(getManagedTagValue(slug), color);
-    } catch {
-      // Non-fatal: tag is created locally even if Proxmox color sync fails
-    }
+    } catch {}
 
     revalidatePath(`/sites/${siteSlug}/tags`);
     revalidatePath(`/sites/${siteSlug}/deployments`);
@@ -151,9 +149,7 @@ export async function updateTagAction(
 
     try {
       await syncProxmoxManagedTagColor(getManagedTagValue(tag.slug), color);
-    } catch {
-      // Non-fatal: tag is updated locally even if Proxmox color sync fails
-    }
+    } catch {}
 
     revalidatePath(`/sites/${siteSlug}/tags`);
     revalidatePath(`/sites/${siteSlug}/deployments`);
@@ -229,9 +225,7 @@ export async function deleteTagAction(
 
     try {
       await removeProxmoxManagedTagColor(getManagedTagValue(tag.slug));
-    } catch {
-      // Non-fatal: tag is deleted locally even if Proxmox color cleanup fails
-    }
+    } catch {}
     const deleted = await deleteContainerTag(tagId);
     if (!deleted) {
       return {
@@ -497,20 +491,17 @@ export async function bulkSetEnvAction(
 
     let members;
     if (tagSlug === "__bulk_ids__" && deploymentIds) {
-      // Bulk operations panel passes explicit IDs
       const idSet = new Set(deploymentIds.split(",").filter(Boolean));
       members = deployments.filter((d) => idSet.has(d.id));
     } else {
       members = deployments.filter(
         (d) => hasManagedTag(d.tagList, tagSlug),
       );
-      // Filter by image if specified
       if (imageFilter) {
         members = members.filter((d) => d.templateName === imageFilter);
       }
     }
 
-    // Environment variables are only supported on LXC containers
     const lxcMembers = members.filter((d) => d.type !== "qemu");
     const vmSkipped = members.length - lxcMembers.length;
 
@@ -532,7 +523,6 @@ export async function bulkSetEnvAction(
         const { node, vmid } = decodeDeploymentId(member.id);
         const currentEnv = await getContainerEnvText(node, vmid);
 
-        // Parse current env into a map
         const envMap = new Map<string, string>();
         for (const line of currentEnv.split("\n")) {
           const trimmed = line.trim();
@@ -543,16 +533,13 @@ export async function bulkSetEnvAction(
           }
         }
 
-        // If "existing only" mode, skip containers that don't have this key
         if (existingOnly && !envMap.has(envKey)) {
           skipped++;
           continue;
         }
 
-        // Set/update the key
         envMap.set(envKey, envValue);
 
-        // Write back
         const newEnvText = Array.from(envMap)
           .map(([k, v]) => `${k}=${v}`)
           .join("\n");

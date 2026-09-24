@@ -58,12 +58,11 @@ export async function createDeploymentTemplateAction(
     }
 
     const templateIndex = await getTemplateAuthoringIndex();
-    // Try exact ID match first, then fall back to volid match (ID can change if node order differs)
+    // Fall back to a volid match because the ID changes when node order differs.
     let sourceTemplate =
       templateIndex.templates.find((template) => template.id === sourceTemplateId) ?? null;
 
     if (!sourceTemplate) {
-      // Decode the submitted ID to get the volid for fallback matching
       try {
         const decoded = JSON.parse(
           Buffer.from(sourceTemplateId, "base64url").toString("utf8")
@@ -71,9 +70,7 @@ export async function createDeploymentTemplateAction(
         if (decoded.volid && /^[a-zA-Z0-9._-]+:[a-zA-Z0-9._/-]+$/.test(decoded.volid)) {
           sourceTemplate = templateIndex.templates.find((t) => t.volid === decoded.volid) ?? null;
         }
-      } catch {
-        // Invalid ID format, continue with null
-      }
+      } catch {}
     }
 
     const rootfsTarget =

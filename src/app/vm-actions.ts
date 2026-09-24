@@ -243,8 +243,7 @@ export async function createVmAction(
       ? "order=ide0;scsi0;net0"
       : "order=scsi0;net0");
     params.set("vga", resolvedVgaType);
-    // Always enable the QEMU guest agent — required for CVE scanning
-    // and other guest management features.
+    // CVE scanning needs the QEMU guest agent.
     params.set("agent", "1");
     params.set("onboot", formData.get("onboot") ? "1" : "0");
 

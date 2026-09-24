@@ -247,8 +247,6 @@ let libraryInventoryInflight: Promise<DockerLibraryInventory> | null = null;
 let libraryInventoryInflightPath = "";
 
 async function getConfig(): Promise<DockerHubConfig> {
-  // Prefer the admin-set library path from app settings; fall back to the
-  // DOCKER_LIBRARY_PATH env var so existing env-based deployments keep working.
   let settingsPath = "";
   try {
     settingsPath = (await getAppSettings()).dockerLibraryPath;
@@ -582,7 +580,7 @@ async function downloadBlob(
   token: string,
   rootPath: string,
 ) {
-  const MAX_BLOB_SIZE_BYTES = 10 * 1024 * 1024 * 1024; // 10 GB
+  const MAX_BLOB_SIZE_BYTES = 10 * 1024 * 1024 * 1024;
 
   const outputPath = digestToPath(rootPath, digest);
 
@@ -1189,7 +1187,6 @@ export async function syncDockerImage(input: {
     const imageConfig = JSON.parse(configBlob) as OciImageConfig;
     envVars = imageConfig.config?.Env ?? [];
   } catch {
-    // Config read is best-effort
   }
 
   const meta: StoredArtifactMeta = {

@@ -1,5 +1,4 @@
 function sanitizeFileNameSegment(value: string): string {
-  // Strip path traversal characters and null bytes, keep only safe chars
   return value.replace(/[/\\.\0]/g, "_");
 }
 

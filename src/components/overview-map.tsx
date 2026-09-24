@@ -100,7 +100,6 @@ function SiteDetailView({
 
   return (
     <>
-      {/* Header with back arrow */}
       <div className="flex items-center gap-3 border-b border-white/[0.06] px-5 py-4">
         <button
           onClick={onBack}
@@ -120,7 +119,6 @@ function SiteDetailView({
         </div>
       </div>
 
-      {/* Stats row */}
       <div className="flex border-b border-white/[0.06]">
         <div className="flex flex-1 flex-col items-center py-3 border-r border-white/[0.06]">
           <span className="text-[10px] uppercase tracking-wider text-zinc-500">Nodes</span>
@@ -132,7 +130,6 @@ function SiteDetailView({
         </div>
       </div>
 
-      {/* Metrics */}
       <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
         {cluster ? (
           <>
@@ -168,7 +165,6 @@ function SiteDetailView({
         )}
       </div>
 
-      {/* Footer */}
       <div className="border-t border-white/[0.06] px-5 py-4">
         <Link
           href={`/sites/${site.slug}`}
@@ -197,7 +193,6 @@ function SitesListView({
 
   return (
     <>
-      {/* Header */}
       <div className="flex items-center justify-between border-b border-white/[0.06] px-5 py-4">
         <h3 className="text-[15px] font-semibold text-zinc-100">Sites</h3>
         <div className="flex items-center gap-3 text-[10px]">
@@ -214,7 +209,6 @@ function SitesListView({
         </div>
       </div>
 
-      {/* Stats row */}
       <div className="flex border-b border-white/[0.06]">
         <div className="flex flex-1 flex-col items-center py-3 border-r border-white/[0.06]">
           <span className="text-[10px] uppercase tracking-wider text-zinc-500">Sites</span>
@@ -230,7 +224,6 @@ function SitesListView({
         </div>
       </div>
 
-      {/* Search */}
       <div className="border-b border-white/[0.06] px-4 py-3">
         <div className="flex items-center gap-2 rounded-lg bg-white/[0.04] px-3 py-2">
           <Search className="h-3.5 w-3.5 text-zinc-500 shrink-0" />
@@ -249,7 +242,6 @@ function SitesListView({
         </div>
       </div>
 
-      {/* Sites list */}
       <div className="flex-1 overflow-y-auto">
         {filtered.length === 0 ? (
           <p className="px-5 py-8 text-center text-[11px] text-zinc-600">No sites found</p>
@@ -362,7 +354,6 @@ export function OverviewMap() {
         setData(json);
       }
     } catch {
-      // retry on next interval
     }
   }, []);
 

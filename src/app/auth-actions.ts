@@ -217,8 +217,6 @@ export async function loginAction(
   _previousState: LoginActionState,
   formData: FormData,
 ): Promise<LoginActionState> {
-  // Capture the email up-front so the catch-block audit entry can attribute
-  // a failed attempt even when `beginLogin` throws before we know the user.
   let attemptedEmail = "";
   let clientIp: string | undefined;
   let twoFactorStep = false;

@@ -92,7 +92,6 @@ export function BackupPolicyEditor({
     );
   }
 
-  // Close on successful create/delete
   const lastStatus = state.status;
   const lastDeleteStatus = deleteState.status;
   useEffect(() => {
@@ -103,7 +102,6 @@ export function BackupPolicyEditor({
     }
   }, [isNew, lastStatus, lastDeleteStatus, onClose]);
 
-  // Deduplicate storage pools by name
   const uniquePools = Array.from(
     new Map(healthyPools.map((p) => [p.storage, p])).values(),
   );
@@ -131,7 +129,6 @@ export function BackupPolicyEditor({
           <input name="siteSlug" type="hidden" value={siteSlug} />
           {!isNew && <input name="policyId" type="hidden" value={policy.id} />}
 
-          {/* Basics */}
           <div className="grid gap-4 lg:grid-cols-2">
             <label className="block">
               <span className="text-[12px] font-medium text-zinc-400">Policy name</span>
@@ -164,7 +161,6 @@ export function BackupPolicyEditor({
             <span className="text-[13px] font-medium text-zinc-200">Enabled</span>
           </label>
 
-          {/* Schedule & storage */}
           <div className="grid gap-4 lg:grid-cols-2">
             <label className="block rounded-md border border-white/5 bg-[#111113] px-4 py-3">
               <span className="text-[13px] font-medium text-zinc-200">Schedule</span>
@@ -205,7 +201,6 @@ export function BackupPolicyEditor({
             </label>
           </div>
 
-          {/* Backup settings */}
           <div className="grid gap-4 lg:grid-cols-3">
             <label className="block rounded-md border border-white/5 bg-[#111113] px-4 py-3">
               <span className="text-[13px] font-medium text-zinc-200">Compression</span>
@@ -252,7 +247,6 @@ export function BackupPolicyEditor({
             </label>
           </div>
 
-          {/* Off-site offload */}
           <div className="rounded-xl border border-white/5 bg-zinc-900/20 p-4 space-y-3">
             <label className="flex items-center gap-2 cursor-pointer">
               <input
@@ -286,7 +280,6 @@ export function BackupPolicyEditor({
             </label>
           </div>
 
-          {/* Scope */}
           <div className="rounded-xl border border-white/5 bg-zinc-900/20 p-4 space-y-3">
             <div>
               <p className="text-[13px] font-medium text-zinc-200">Scope</p>
@@ -349,7 +342,6 @@ export function BackupPolicyEditor({
             )}
           </div>
 
-          {/* Actions */}
           <div className="flex flex-wrap items-center gap-2 border-t border-white/5 pt-4">
             <Button disabled={isPending} type="submit">
               <Save className="h-3.5 w-3.5" />

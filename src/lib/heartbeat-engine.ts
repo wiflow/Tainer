@@ -289,9 +289,7 @@ async function checkNodeHealth(
         }
       }
     }
-  } catch {
-    // Node health check is best-effort; don't fail the whole heartbeat
-  }
+  } catch {}
 }
 
 async function sendHeartbeatWebhook(
@@ -328,7 +326,5 @@ async function sendHeartbeatWebhook(
 
   try {
     await dispatchWebhook(settings.webhookUrl, payload, settings.webhookKind);
-  } catch {
-    // Best effort
-  }
+  } catch {}
 }

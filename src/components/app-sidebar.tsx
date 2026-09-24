@@ -58,16 +58,6 @@ type SiteInfo = {
   countryCode: string | null;
 };
 
-/**
- * Render the per-site avatar in the switcher button as an SVG flag pulled
- * from flagcdn.com when the site is tagged with an ISO 3166-1 alpha-2
- * country code, falling back to the generic Box icon otherwise.
- *
- * flagcdn.com URLs follow `/{lowercase-code}.svg`. We deliberately use a
- * plain <img> rather than next/image: the assets are already small SVGs
- * (under 5KB), so the optimisation pipeline adds no value, and skipping
- * it avoids the remotePatterns config dance and Next's SVG-policy warnings.
- */
 function SiteAvatar({ site }: { site: SiteInfo | null | undefined }) {
   const code = normalizeCountryCode(site?.countryCode ?? null);
   if (code) {
@@ -139,13 +129,6 @@ export function AppSidebar({
   const pathname = usePathname();
   const router = useRouter();
 
-  // Resolve the active site:
-  //   1. URL path (when on a /sites/{slug}/... page) — most authoritative.
-  //   2. `tainer_site` cookie (last site the user visited) — preserves the
-  //      site selection across global admin pages (Users, Audit Log, etc.)
-  //      so coming back to a per-site page goes back to the same site
-  //      instead of jumping to whatever sites[0] happens to be.
-  //   3. First site as a final fallback.
   const pathSlug = pathname.match(/^\/sites\/([^/]+)/)?.[1] ?? "";
   const cookieSlug = Cookies.get("tainer_site") ?? "";
   const siteSlug =
@@ -155,8 +138,6 @@ export function AppSidebar({
     "";
   const effectiveSlug = siteSlug;
 
-  // Persist the active site whenever the URL tells us which one it is, so
-  // navigating to a global page later still remembers where the user was.
   useEffect(() => {
     if (pathSlug && pathSlug !== Cookies.get("tainer_site")) {
       Cookies.set("tainer_site", pathSlug, { path: "/", expires: 365 });
@@ -253,13 +234,6 @@ export function AppSidebar({
   const sidebarContent = (
     <>
       <div className="flex flex-1 flex-col overflow-y-auto px-3 py-4">
-
-        {/* ── Brand header ──
-            Uses the Tainer long wordmark (1890×715, ~2.64:1). The natural
-            ratio fills the sidebar width nicely; height is constrained
-            with `h-12 w-auto` so it doesn't dominate the column. The
-            previous reference (/tainer-wordmark.png) wasn't in public/,
-            so the tile rendered as the broken-image glyph. */}
         <div className="mb-2 flex items-start px-1 -mt-2">
           <Image
             alt="Tainer"
@@ -280,9 +254,6 @@ export function AppSidebar({
           </button>
         </div>
 
-        {/* Site switcher — first, because it scopes everything in the
-            "This site" zone below it. Anything above or below that zone is
-            global, and the ScopeLabel dividers say so. */}
         {sites.length > 0 && (
           <div className="relative mb-2" ref={switcherRef}>
             <div className="flex items-center gap-1">
@@ -358,7 +329,6 @@ export function AppSidebar({
           </div>
         )}
 
-        {/* Unavailable banner for current site */}
         {effectiveSlug && currentSiteHealth === "unreachable" && (
           <div className="mx-2 mb-4 flex items-center gap-2 rounded-md border border-rose-500/10 bg-rose-500/5 px-3 py-2">
             <WifiOff className="h-3.5 w-3.5 shrink-0 text-rose-400/60" />
@@ -366,10 +336,6 @@ export function AppSidebar({
           </div>
         )}
 
-        {/* Command palette affordance. The ⌘K listener lives in
-            CommandPalette; this is purely how anyone finds out it exists.
-            Clicking dispatches the same shortcut the listener is watching
-            for, so there's one code path to keep working. */}
         <div className="mx-2 mb-4 flex flex-col gap-1.5">
           <button
             className="flex items-center gap-2 rounded-md border border-white/5 bg-white/[0.02] px-3 py-2 text-left transition-colors hover:border-white/10 hover:bg-white/[0.05]"
@@ -387,10 +353,6 @@ export function AppSidebar({
             </kbd>
           </button>
 
-          {/* Opens the assistant panel rather than navigating — this used to
-              be a nav link to /settings/copilot, which meant the most
-              prominent item in the sidebar opened an admin config page
-              instead of Tainy. That page now lives under Platform. */}
           <button
             className="flex items-center gap-2 rounded-md border border-white/5 bg-white/[0.02] px-3 py-2 text-left transition-colors hover:border-white/10 hover:bg-white/[0.05]"
             onClick={() =>
@@ -408,23 +370,16 @@ export function AppSidebar({
           </button>
         </div>
 
-        {/* Everything from here to the "All sites" divider resolves to
-            /sites/<slug>/… — switching sites changes what these pages show. */}
         <ScopeLabel>{currentSite?.name ?? "This site"}</ScopeLabel>
 
-        {/* Sectioned nav. Each section auto-expands when its current route is
-            active; otherwise the user's last collapsed/expanded state from
-            localStorage wins. Default-open for first-time visitors is
-            controlled per-section below. */}
         <nav className="flex flex-col gap-3 mb-4">
-          {/* Workloads — primary day-to-day flow */}
           <NavSection
             defaultOpen={
               (effectiveSlug && pathname === `/sites/${effectiveSlug}`) ||
               isActive("/deployments") ||
               isActive("/backups") ||
               isActive("/tags") ||
-              true /* default open on first visit */
+              true
             }
             id="workloads"
             label="Workloads"
@@ -455,10 +410,6 @@ export function AppSidebar({
             />
           </NavSection>
 
-          {/* Reliability — per-site alerts + monitoring + security scans.
-              Heartbeat used to live here but is global (cluster connectivity
-              to all sites), so it moved up to the Platform section to keep
-              this section scope-homogeneous. */}
           <NavSection
             defaultOpen={
               isActive("/alerts") ||
@@ -504,7 +455,6 @@ export function AppSidebar({
             )}
           </NavSection>
 
-          {/* Library — templates and images, used while creating new things */}
           <NavSection
             defaultOpen={
               isActive("/templates") || isActive("/images") || isActive("/iso-images")
@@ -532,8 +482,6 @@ export function AppSidebar({
             />
           </NavSection>
 
-          {/* Site settings closes the site zone. It was previously reachable
-              only through the unlabelled gear beside the switcher. */}
           <NavLink
             active={isActive("/settings")}
             href={effectiveSlug ? `/sites/${effectiveSlug}/settings` : "/settings"}
@@ -541,7 +489,6 @@ export function AppSidebar({
             label="Site settings"
           />
 
-          {/* Nothing below this divider is affected by the site switcher. */}
           <ScopeLabel className="mt-1">All sites</ScopeLabel>
 
           <NavLink
@@ -551,13 +498,6 @@ export function AppSidebar({
             label="Overview"
           />
 
-          {/* Platform — admin-only, global concerns about the Tainer install
-              itself. Hosts everything that isn't scoped to one site: the list
-              of sites you've connected (Sites), cluster-connectivity health
-              (Heartbeat), external system connectors (Integrations), and the
-              record of platform changes (Audit Log). Order is "most-touched
-              first" — operators add/edit sites more often than they review
-              the audit log. */}
           {currentUser.role === "admin" && (
             <NavSection
               defaultOpen={
@@ -603,11 +543,6 @@ export function AppSidebar({
             </NavSection>
           )}
 
-          {/* Access — admin-only identity management.
-              Platform-level concerns (Sites, Heartbeat, Integrations, Audit
-              Log) moved up to the Platform section so this stays focused on
-              "who can do what" rather than mixing in "what the platform
-              itself is doing." */}
           {currentUser.role === "admin" && (
             <NavSection
               defaultOpen={
@@ -639,8 +574,6 @@ export function AppSidebar({
             </NavSection>
           )}
 
-          {/* Groups available to non-admins too. Show as a small flat link
-              under the sectioned nav rather than a one-item section. */}
           {currentUser.role !== "admin" && (
             <NavLink
               active={pathname.startsWith("/groups")}
@@ -653,12 +586,6 @@ export function AppSidebar({
 
       </div>
 
-      {/* Bottom Nav. Identity column gets full sidebar width on its
-          own row (so long names don't get truncated by inline icons),
-          but the role + version row is split between text on the left
-          and the action icons on the right — keeping the icons
-          visually close to the user info rather than orphaned on a
-          row of their own. */}
       <div className="p-3 border-t border-white/5">
         <div className="flex items-start gap-3 px-3 py-2">
           <div className="flex items-center justify-center w-8 h-8 rounded-full bg-zinc-800 border border-white/10 text-[11px] font-bold text-zinc-400 shrink-0">
@@ -721,7 +648,6 @@ export function AppSidebar({
 
   return (
     <>
-      {/* Mobile hamburger button */}
       <button
         className="fixed top-4 left-4 z-50 flex items-center justify-center w-10 h-10 rounded-lg border border-white/10 bg-zinc-900/90 text-zinc-300 backdrop-blur transition-colors hover:bg-zinc-800 hover:text-white cursor-pointer lg:hidden"
         onClick={() => setMobileOpen(true)}
@@ -731,7 +657,6 @@ export function AppSidebar({
         <Menu className="w-5 h-5" />
       </button>
 
-      {/* Mobile overlay */}
       {mobileOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden"
@@ -740,7 +665,6 @@ export function AppSidebar({
         />
       )}
 
-      {/* Mobile sidebar */}
       <aside
         aria-label="Main navigation"
         className={cn(
@@ -751,7 +675,6 @@ export function AppSidebar({
         {sidebarContent}
       </aside>
 
-      {/* Desktop sidebar */}
       <aside
         aria-label="Main navigation"
         className="hidden fixed inset-y-0 left-0 z-30 border-r border-white/5 bg-[#0a0a0a] lg:flex lg:w-[240px] lg:flex-col"
@@ -790,22 +713,6 @@ function NavLink({
   );
 }
 
-/**
- * Collapsible nav section. Header is a button with a chevron that rotates
- * 180° when expanded. Body slides open/closed via framer-motion height
- * animation, kept short (160ms) so it feels responsive, not animated-for-the-
- * sake-of-animation.
- *
- * State is persisted in localStorage keyed by `id`, so refreshing remembers
- * what the user had open. The section is also auto-expanded if it contains
- * the active route — the caller passes `defaultOpen` for that.
- */
-/**
- * The scope divider. The sidebar has always been split into site-scoped and
- * global routes, but nothing said so — you couldn't tell that switching sites
- * changes what Backups shows and leaves Audit Log alone. This makes that
- * boundary visible without adding another level of nesting.
- */
 function ScopeLabel({
   children,
   className,
@@ -836,8 +743,7 @@ function NavSection({
 }) {
   const storageKey = `tainer_nav_section_${id}`;
 
-  // Initial state must match server-render (defaultOpen) to avoid hydration
-  // mismatch. localStorage value is read in an effect after mount.
+  // localStorage is read after mount so the first render matches the server.
   const [open, setOpen] = useState(defaultOpen);
   const [hydrated, setHydrated] = useState(false);
 
@@ -846,16 +752,10 @@ function NavSection({
       const stored = localStorage.getItem(storageKey);
       if (stored === "1") setOpen(true);
       else if (stored === "0") setOpen(false);
-      // If not stored, keep defaultOpen.
-    } catch {
-      /* ignore */
-    }
+    } catch {}
     setHydrated(true);
   }, [storageKey]);
 
-  // Re-open the section whenever the active route falls inside it (e.g.
-  // user clicks a link that's collapsed via search/cmd-k). defaultOpen
-  // changing is the signal.
   useEffect(() => {
     if (defaultOpen && !open) setOpen(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -866,9 +766,7 @@ function NavSection({
       const next = !current;
       try {
         localStorage.setItem(storageKey, next ? "1" : "0");
-      } catch {
-        /* ignore */
-      }
+      } catch {}
       return next;
     });
   }

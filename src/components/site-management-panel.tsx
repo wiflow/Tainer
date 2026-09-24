@@ -196,7 +196,7 @@ function EditSiteForm({ site, onClose }: { site: SiteInfo; onClose: () => void }
         </label>
 
         <div className="flex items-center gap-3">
-          {/* Hidden field ensures "full" is sent when checkbox is unchecked */}
+          {/* Unchecked checkboxes are not submitted, so this sends "full" by default. */}
           <input type="hidden" name="tlsMode" value="full" />
           <input
             className="h-4 w-4 rounded border-white/[0.1] bg-white/[0.02]"

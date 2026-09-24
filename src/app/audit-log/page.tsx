@@ -12,9 +12,6 @@ export default async function AuditLogPage() {
   if (!session) redirect("/login");
   if (session.user.role !== "admin") redirect("/");
 
-  // Cap at 1000 entries — the file holds up to 5000 but rendering all of them
-  // bloats the page payload and hurts initial paint. Filter UI handles search
-  // within the loaded set; if someone needs deep history we can add a paginator.
   const entries = await getAdminAuditLog(1000);
 
   return (

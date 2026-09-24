@@ -404,7 +404,6 @@ export function DeploymentEditButton({
           <input name="deploymentId" type="hidden" value={deployment.id} />
           <input name="digest" type="hidden" value={deployment.digest} />
 
-          {/* Header */}
           <DialogHeader className="gap-1 border-b border-white/5 bg-gradient-to-b from-white/[0.03] to-transparent px-6 pt-6 pb-5">
             <div className="mb-3 inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-zinc-300 shadow-inner">
               <Settings2 className="h-4 w-4" />
@@ -418,7 +417,6 @@ export function DeploymentEditButton({
             </DialogDescription>
           </DialogHeader>
 
-          {/* Tabs */}
           <div className="flex items-center gap-1 border-b border-white/5 bg-black/30 px-4 pt-3">
             {tabs.map((t) => {
               const active = tab === t.key;
@@ -444,7 +442,6 @@ export function DeploymentEditButton({
             })}
           </div>
 
-          {/* Body */}
           <div className="max-h-[60vh] space-y-4 overflow-y-auto px-6 py-5">
             {tab === "general" && (
               <div className="space-y-3">
@@ -608,7 +605,6 @@ export function DeploymentEditButton({
             )}
           </div>
 
-          {/* Footer */}
           <DialogFooter className="border-white/5 bg-black/30 px-6 py-4">
             <Button
               className="gap-1.5 bg-transparent text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
@@ -646,5 +642,4 @@ export function DeploymentEditButton({
   );
 }
 
-// Back-compat alias so older imports still work.
 export const DeploymentResourceEditButton = DeploymentEditButton;

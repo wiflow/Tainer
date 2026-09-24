@@ -58,7 +58,7 @@ export function formatUptime(seconds?: number | null) {
   return `${minutes}m`;
 }
 
-// new URL(path, base) drops the base path when path starts with "/", so concatenate manually
+// new URL(path, base) drops the base path when path starts with "/".
 export function buildProxmoxUrl(apiPath: string, baseUrl: string): URL {
   const base = new URL(baseUrl);
   const prefix = base.pathname.replace(/\/+$/, "");

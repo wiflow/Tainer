@@ -65,7 +65,6 @@ export async function authenticateMobileRequest(
   return { ok: true, session };
 }
 
-// Site slug comes from X-Site-Slug header (preferred) or ?site= query param.
 export async function withMobileSiteContext<T>(
   request: Request,
   session: AuthSession,

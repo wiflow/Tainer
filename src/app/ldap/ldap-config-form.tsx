@@ -30,10 +30,7 @@ export function LdapConfigForm({
   onSaved,
 }: {
   config: LdapConfigPublic | null;
-  /** Optional — if provided, a Cancel button is rendered that calls back. */
   onCancel?: () => void;
-  /** Optional — called after a successful save / delete so the parent can
-   * close the form view and return to its list/manager. */
   onSaved?: () => void;
 }) {
   const [saveState, saveAction, isSaving] = useActionState(
@@ -62,10 +59,6 @@ export function LdapConfigForm({
     successTitle: "LDAP removed",
   });
 
-  // Bubble save / delete success back up to the parent manager so it can
-  // close this form and return to the provider list. We only fire on
-  // requestId changes so the same success doesn't re-trigger across
-  // re-renders.
   useEffect(() => {
     if (saveState.status === "success" && onSaved) onSaved();
   }, [saveState.status, saveState.requestId, onSaved]);
@@ -73,11 +66,6 @@ export function LdapConfigForm({
     if (deleteState.status === "success" && onSaved) onSaved();
   }, [deleteState.status, deleteState.requestId, onSaved]);
 
-  // Surface the "change password" UI only on demand. New deployments always
-  // show the password field; for existing configs we hide it behind a toggle
-  // so admins don't accidentally clobber the stored secret with an empty
-  // value (the server-side rule treats empty as "leave unchanged" but a
-  // visible empty field invites confusion).
   const [changePassword, setChangePassword] = useState(!config?.hasBindPassword);
 
   return (
@@ -249,10 +237,6 @@ export function LdapConfigForm({
           </p>
         </label>
 
-        {/* defaultRole stays in the data model for backward compatibility
-            but auto-provisioning always creates users as operators with
-            no group memberships (zero permissions / "guest read-only").
-            Admin promotion happens explicitly via /users group assignment. */}
         <input name="defaultRole" type="hidden" value="operator" />
 
         <div className="rounded-md border border-white/[0.05] bg-zinc-900/40 p-3">

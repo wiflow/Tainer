@@ -15,40 +15,24 @@ const DEFAULT_MODEL: CopilotModel = "smart";
 const MAX_OPERATOR_NOTES_LENGTH = 4000;
 const MAX_CUSTOM_MODEL_ID_LENGTH = 200;
 
-/**
- * Per-group restriction on which tool classes the copilot may use. Read
- * tools are always allowed; `allowWrite` covers write + admin klasses.
- * Absence of a policy for a group means "allow everything" — the feature
- * restricts, it doesn't grant (permissions still gate every call).
- */
 export type GroupToolPolicy = {
   allowWrite: boolean;
   allowDestructive: boolean;
 };
 
 type StoredSettings = {
-  /** Encrypted API key (AES-256-GCM under AUTH_SECRET). Null = no key set. */
+  /** AES-256-GCM ciphertext under AUTH_SECRET. */
   encryptedKey: string | null;
-  /** Last 4 chars of the plaintext key, for display only. */
   keyHint: string | null;
   model: CopilotModel;
-  /**
-   * OpenAI-compatible base URL override (e.g. "https://vllm.lan/v1" for a
-   * self-hosted model). Null = DeepInfra. https is required unless
-   * TAINER_COPILOT_ALLOW_INSECURE_ENDPOINT=true.
-   */
   baseUrl: string | null;
-  /** Model id sent to a custom endpoint. Ignored unless baseUrl is set. */
   customModelId: string | null;
-  /** Per-user daily budgets — the key is shared, the caps apply to each user. */
   dailyTokenBudget: number;
   dailyToolCallBudget: number;
   enabled: boolean;
-  /** Admin-authored operational notes injected into the system prompt. */
   operatorNotes: string;
-  /** Group id → tool-class restriction. Missing id = no restriction. */
   groupPolicies: Record<string, GroupToolPolicy>;
-  /** USD per million tokens, for the usage panel's cost estimate. Null = hide. */
+  /** USD per million tokens. */
   costPerMInputUsd: number | null;
   costPerMOutputUsd: number | null;
   updatedAt: string;
@@ -132,8 +116,6 @@ function toPublic(stored: StoredSettings): CopilotSettings {
     hasKey: Boolean(stored.encryptedKey),
     keyHint: stored.keyHint,
     model: stored.model,
-    // On a custom endpoint the operator's model id wins; the fast/smart
-    // presets only mean something on DeepInfra.
     modelId:
       stored.baseUrl && stored.customModelId
         ? stored.customModelId
@@ -151,13 +133,7 @@ function toPublic(stored: StoredSettings): CopilotSettings {
   };
 }
 
-/**
- * Validate a copilot endpoint override. Deny-by-default: only https URLs
- * pass unless the operator explicitly sets
- * TAINER_COPILOT_ALLOW_INSECURE_ENDPOINT=true (plain http exposes the API
- * key and all cluster data in the prompts to the network path).
- * Returns the normalised URL, or throws with an operator-readable message.
- */
+// Plain http would expose the API key and cluster data, so it needs an explicit opt-in.
 export function validateCopilotBaseUrl(raw: string): string {
   const trimmed = raw.trim().replace(/\/+$/, "");
   let url: URL;
@@ -198,7 +174,6 @@ export async function getCopilotApiKey(): Promise<string | null> {
 export type CopilotSettingsInput = {
   apiKey?: string | null;
   model?: CopilotModel;
-  /** Already validated with validateCopilotBaseUrl. Null clears the override. */
   baseUrl?: string | null;
   customModelId?: string | null;
   dailyTokenBudget?: number;
@@ -253,7 +228,6 @@ export async function saveCopilotSettings(
       const clean: Record<string, GroupToolPolicy> = {};
       for (const [groupId, policy] of Object.entries(input.groupPolicies)) {
         if (!policy || typeof policy !== "object") continue;
-        // Only persist actual restrictions — an all-allow entry is the default.
         if (policy.allowWrite !== false && policy.allowDestructive !== false) continue;
         clean[groupId] = {
           allowWrite: policy.allowWrite !== false,
@@ -321,7 +295,6 @@ export async function recordCopilotUsage(
   outputTokens: number,
   toolCalls: number,
 ): Promise<void> {
-  // Drop the entry if nothing happened — keeps the usage table small.
   if (inputTokens <= 0 && outputTokens <= 0 && toolCalls <= 0) return;
 
   await mutateStore((store) => {
@@ -335,8 +308,6 @@ export async function recordCopilotUsage(
     entry.outputTokens += Math.max(0, outputTokens);
     entry.toolCalls += Math.max(0, toolCalls);
 
-    // Prune entries older than 30 days to keep the file bounded. Budgets
-    // are daily anyway — historical usage is just for display.
     const cutoff = new Date();
     cutoff.setUTCDate(cutoff.getUTCDate() - 30);
     const cutoffDay = cutoff.toISOString().slice(0, 10);
@@ -344,12 +315,6 @@ export async function recordCopilotUsage(
   });
 }
 
-/**
- * Resolve the effective tool-class policy for a user. Read tools are never
- * restricted. Admins are exempt (they can already do everything in the UI).
- * With multiple groups the most restrictive answer wins — a restriction
- * applied to any of the user's groups holds even if another group has none.
- */
 export async function getGroupToolPolicyForUser(user: {
   role: string;
   groupIds: string[];
@@ -378,7 +343,6 @@ export type CopilotUserUsageSummary = {
   monthToolCalls: number;
 };
 
-/** Per-user aggregates over the rolling 30-day usage log, for the admin panel. */
 export async function listCopilotUsageSummaries(): Promise<CopilotUserUsageSummary[]> {
   const store = await readStore();
   const today = currentUtcDay();

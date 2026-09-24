@@ -109,7 +109,6 @@ export default async function UpdatesPage({
   const summary = await withSiteConfig(siteConfig, () =>
     getClusterUpdates(),
   );
-  // Strip /api2/json suffix to get the Proxmox web UI base URL
   const proxmoxBaseUrl = siteConfig.apiUrl.replace(/\/api2\/?.*$/, "");
 
   const upToDateNodes = summary.nodes.filter((n) => n.totalUpdates === 0 && !n.error);
@@ -120,7 +119,6 @@ export default async function UpdatesPage({
         <CheckForUpdatesButton />
       </div>
 
-      {/* Stat cards */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
           icon={<Package className="w-3.5 h-3.5" />}
@@ -145,7 +143,6 @@ export default async function UpdatesPage({
         />
       </div>
 
-      {/* Per-node sections */}
       {summary.nodes.map((node) => (
         <NodeSection key={node.node} node={node} proxmoxBaseUrl={proxmoxBaseUrl} />
       ))}

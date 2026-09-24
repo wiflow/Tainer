@@ -53,12 +53,10 @@ export function BulkOperationsPanel({
   const [envValue, setEnvValue] = useState("");
   const [existingOnly, setExistingOnly] = useState(false);
 
-  // Derive unique options from deployment data
   const uniqueImages = useMemo(() => [...new Set(deployments.map((d) => d.templateName))].sort(), [deployments]);
   const uniqueNodes = useMemo(() => [...new Set(deployments.map((d) => d.node))].sort(), [deployments]);
   const uniqueStatuses = useMemo(() => [...new Set(deployments.map((d) => d.rawStatus))].sort(), [deployments]);
 
-  // Filter deployments by conditions
   const matched = useMemo(
     () => conditions.length > 0 ? deployments.filter((d) => matchesConditions(d, conditions)) : [],
     [deployments, conditions],
@@ -131,7 +129,6 @@ export function BulkOperationsPanel({
         </div>
       </CardHeader>
       <CardContent className="space-y-5 p-5">
-        {/* Conditions */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <p className="text-[12px] font-medium uppercase tracking-wider text-zinc-500">
@@ -199,7 +196,6 @@ export function BulkOperationsPanel({
           )}
         </div>
 
-        {/* Action */}
         {conditions.length > 0 && matched.length > 0 && (
           <div className="space-y-3 border-t border-white/5 pt-5">
             <p className="text-[12px] font-medium uppercase tracking-wider text-zinc-500">
@@ -234,7 +230,6 @@ export function BulkOperationsPanel({
               })}
             </div>
 
-            {/* Env action form */}
             {action === "env" && (
               <EnvActionForm
                 matched={matched}
@@ -248,7 +243,6 @@ export function BulkOperationsPanel({
               />
             )}
 
-            {/* Lifecycle action form */}
             {action !== "env" && (
               <LifecycleActionForm matched={matched} command={action} />
             )}
@@ -284,10 +278,8 @@ function EnvActionForm({
   return (
     <Form action={formAction} className="space-y-3">
       <input name="siteSlug" type="hidden" value={siteSlug} />
-      {/* Pass matched deployment IDs so the server can target them directly */}
       <input name="deploymentIds" type="hidden" value={matched.map((d) => d.id).join(",")} />
       <input name="existingOnly" type="hidden" value={existingOnly ? "true" : "false"} />
-      {/* tagSlug not needed — we pass explicit IDs */}
       <input name="tagSlug" type="hidden" value="__bulk_ids__" />
 
       <p className="text-[11px] text-zinc-600">Environment variables are only applied to LXC containers. VMs in the selection will be skipped.</p>
@@ -351,7 +343,6 @@ function LifecycleActionForm({
       <input name="siteSlug" type="hidden" value={siteSlug} />
       <input name="deploymentIds" type="hidden" value={matched.map((d) => d.id).join(",")} />
       <input name="command" type="hidden" value={command} />
-      {/* Signal that we're using explicit IDs, not a tag slug */}
       <input name="groupSlug" type="hidden" value="__bulk_ids__" />
 
       {state.status === "success" && <p className="mb-2 text-[13px] text-emerald-400">{state.message}</p>}

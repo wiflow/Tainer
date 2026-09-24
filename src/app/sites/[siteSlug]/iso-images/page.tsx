@@ -11,7 +11,7 @@ import { requireSitePageAccess } from "@/lib/page-guard";
 import { ensureSiteConfig } from "@/lib/site-context";
 import { resolveSiteConfigBySlug } from "@/lib/site-resolver";
 
-// Avoid `force-dynamic` here — it silently disables the unstable_cache below.
+// Avoid `force-dynamic` here; it silently disables the unstable_cache below.
 const getIsoImagesPageData = unstable_cache(
   async (siteSlug: string) => {
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
@@ -78,7 +78,6 @@ export default async function IsoImagesPage({
         />
       </div>
 
-      {/* Proxmox ISO images */}
       <SectionPanel
         title="Proxmox storage"
         description="ISO images currently stored in your Proxmox cluster. These can be selected when creating a VM."
@@ -108,7 +107,6 @@ export default async function IsoImagesPage({
         )}
       </SectionPanel>
 
-      {/* Local Samba share ISOs */}
       {libraryConfigured && (
         <SectionPanel
           title="Local Samba share"

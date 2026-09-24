@@ -176,7 +176,6 @@ export function DeploymentBackupCard({
         </div>
       </CardHeader>
       <CardContent className="space-y-4 p-5">
-        {/* Summary stats */}
         <div className="grid grid-cols-3 gap-3">
           <div className="rounded-xl border border-white/5 bg-black/40 p-3">
             <p className="text-[11px] text-zinc-500">Last backup</p>
@@ -202,7 +201,6 @@ export function DeploymentBackupCard({
           </div>
         </div>
 
-        {/* Protection reasons */}
         {coverage.protectionReasons.length > 0 && (
           <div className="rounded-lg border border-white/5 bg-black/20 p-3">
             <p className="mb-2 text-[12px] font-medium text-zinc-400">Protection notes</p>
@@ -231,7 +229,6 @@ export function DeploymentBackupCard({
           </div>
         )}
 
-        {/* Recent backup archives (most recent 8) */}
         {archives.length > 0 && (
           <div>
             <p className="mb-2 text-[12px] font-medium text-zinc-400">
@@ -269,7 +266,6 @@ export function DeploymentBackupCard({
           </div>
         )}
 
-        {/* Backup Now button */}
         {isAdmin && (
           <Form action={formAction}>
             <input name="siteSlug" type="hidden" value={siteSlug} />

@@ -7,7 +7,7 @@ out
 dist
 coverage
 
-# Source backup (not needed)
+# Source backup
 src_backup
 
 # Environment files
@@ -17,14 +17,14 @@ src_backup
 .env.production.local
 .env.development.local
 
-# Data directory (mounted as volume)
+# Data directory
 data
 
 # Git
 .git
 .gitignore
 
-# AI assistant configs
+# Local tooling
 .claude
 CLAUDE.md
 
@@ -41,7 +41,7 @@ CLAUDE.md
 docs
 mobile
 
-# Scripts (deployment, not needed in image)
+# Scripts
 scripts
 
 # TypeScript build caches

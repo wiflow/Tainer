@@ -1,32 +1,5 @@
 #!/usr/bin/env bash
-#
-# Deploy Tainer to the onsite server (Docker-based)
-#
-# Usage:
-#   VM_HOST=host ./scripts/deploy-onsite.sh                         # build + deploy
-#   VM_HOST=host ENV_FILE=.env.onsite ./scripts/deploy-onsite.sh    # deploy + push env file
-#
-# SSH uses key auth unless DEPLOY_PASSWORD is set (then sshpass is used).
-# The server's host key must already be in ~/.ssh/known_hosts: connect once
-# with plain ssh and verify the fingerprint before the first deploy.
-#
-# First-time setup on the server:
-#   1. SSH in and install Docker + Docker Compose:
-#        curl -fsSL https://get.docker.com | sh
-#        sudo usermod -aG docker tainer
-#   2. Create the app directory:
-#        ssh tainer@<VM_HOST> "mkdir -p /home/tainer/tainer"
-#   3. (Optional) Create .env.onsite locally for environment variables
-#
-# How it works:
-#   1. Rsyncs source to a build directory on the server
-#   2. Builds the Docker image natively on the server (correct arch)
-#   3. Pushes docker-compose.yml and optional .env file
-#   4. Runs `docker compose up -d` to start/restart the container
-#   5. Verifies healthcheck
-#
-# The data directory at ~/.tainer is bind-mounted into the container
-# so existing state (users, sessions, settings) is preserved.
+# Usage: VM_HOST=host [ENV_FILE=.env.onsite] [DEPLOY_PASSWORD=...] ./scripts/deploy-onsite.sh
 
 set -euo pipefail
 
@@ -40,8 +13,6 @@ APP_DIR="/home/tainer/tainer"
 BUILD_DIR="/home/tainer/tainer-build"
 DATA_DIR="/home/tainer/.tainer"
 CADDY_DATA_DIR="/home/tainer/.tainer-caddy"
-# Public hostname users connect to — also used for HTTPS cert SAN and as APP_URL.
-# Defaults to VM_HOST.
 TAINER_HOSTNAME="${TAINER_HOSTNAME:-${VM_HOST}}"
 ENV_FILE="${ENV_FILE:-}"
 DEPLOY_PASSWORD="${DEPLOY_PASSWORD:-}"
@@ -51,8 +22,7 @@ if [[ -z "${VM_HOST}" ]]; then
   exit 1
 fi
 
-# ── SSH setup ──
-
+# Host keys must already be in ~/.ssh/known_hosts; verify the fingerprint with plain ssh.
 SSH_CMD=(ssh -o StrictHostKeyChecking=yes)
 SCP_CMD=(scp -o StrictHostKeyChecking=yes)
 export RSYNC_RSH="ssh -o StrictHostKeyChecking=yes"
@@ -74,8 +44,6 @@ remote() {
 
 echo "=== Deploying Tainer (Docker) to ${VM_USER}@${VM_HOST} ==="
 
-# ── Step 1: Sync source to server ──
-
 echo ""
 echo "── Syncing source to ${VM_HOST}:${BUILD_DIR} ──"
 rsync -az --delete \
@@ -87,35 +55,21 @@ rsync -az --delete \
   --exclude .env.onsite \
   ./ "${VM_USER}@${VM_HOST}:${BUILD_DIR}/"
 
-# ── Step 2: Build image on server (native arch) ──
-
 echo ""
 echo "── Building Docker image on server ──"
 remote "cd ${BUILD_DIR} && docker build -t ${IMAGE_FULL} ."
-
-# ── Step 3: Push docker-compose.yml + Caddyfile ──
 
 echo ""
 echo "── Configuring docker-compose + Caddy reverse proxy ──"
 remote "mkdir -p ${APP_DIR} ${DATA_DIR} ${CADDY_DATA_DIR}"
 
-# Ensure data dir ownership matches container user (uid 1001).
+# uid 1001 is the tainer user inside the image.
 if [[ -n "${DEPLOY_PASSWORD}" ]]; then
   printf '%s\n' "${DEPLOY_PASSWORD}" | remote "sudo -S -p '' chown -R 1001:1001 ${DATA_DIR}"
 else
   "${SSH_CMD[@]}" -t "${VM_USER}@${VM_HOST}" "sudo chown -R 1001:1001 ${DATA_DIR}"
 fi
 
-# Caddy reverse proxy:
-#   - Listens on 80 + 443 publicly.
-#   - Cert mode auto-detected:
-#       * If ${CADDY_CERTS_DIR}/cert.pem and key.pem both exist on the host,
-#         use them (bring-your-own cert from corporate AD CA, etc.).
-#       * Otherwise fall back to `tls internal` — Caddy's own self-signed CA.
-#         Browsers warn the first time per device; accept once.
-#   - Responds on both the hostname and the bare IP so old IP-based bookmarks
-#     keep working with HTTPS.
-#   - HTTP requests get auto-redirected to HTTPS (Caddy's default behaviour).
 CADDY_CERTS_DIR="${APP_DIR}/certs"
 remote "mkdir -p ${CADDY_CERTS_DIR}"
 
@@ -128,10 +82,7 @@ else
   TLS_DIRECTIVE="tls internal"
 fi
 
-# Dedupe site addresses when TAINER_HOSTNAME and VM_HOST are the same
-# string (typical for IP-only lab deploys). Caddy v2.11 rejects the
-# handshake with `TLS alert: internal error` when a site block lists the
-# same address twice — listing it once works fine.
+# Caddy 2.11 fails the TLS handshake when a site block lists an address twice.
 if [[ "${TAINER_HOSTNAME}" == "${VM_HOST}" ]]; then
   CADDY_SITE_ADDRESSES="${TAINER_HOSTNAME}"
 else
@@ -140,13 +91,9 @@ fi
 
 remote "cat > ${APP_DIR}/Caddyfile" <<CADDYFILE
 {
-  # ACME email for self-signed mode is unused but Caddy expects a value.
+  # Unused in self-signed mode, but Caddy expects a value.
   email admin@${TAINER_HOSTNAME}
-  # Caddy v2.11 with a bare-IP site address rejects the TLS handshake
-  # with "alert internal error" unless default_sni is set — even when
-  # the client's SNI exactly matches the site address. Setting it
-  # explicitly to the primary hostname is a no-op when SNI matches
-  # normally, and unblocks the IP-only path otherwise.
+  # Caddy 2.11 rejects TLS on a bare IP site address unless default_sni is set.
   default_sni ${TAINER_HOSTNAME}
 }
 
@@ -155,19 +102,12 @@ ${CADDY_SITE_ADDRESSES} {
   encode zstd gzip
 
   reverse_proxy tainer:3000 {
-    # Surface the original host/proto so Tainer's OIDC redirect-URI
-    # builder and IP-allowlists see the real client + scheme rather
-    # than the docker network's internal IP. Caddy auto-sets
-    # X-Forwarded-* by default; we override Host explicitly so
-    # upstream code that reads `host` (not x-forwarded-host) gets
-    # the right value.
     header_up Host {host}
   }
 }
 CADDYFILE
 
-# Generate docker-compose.yml: only caddy publishes ports. It reaches
-# tainer:3000 over the compose network, so plain HTTP is never exposed.
+# Only caddy publishes ports, so plain HTTP to tainer is never exposed.
 remote "cat > ${APP_DIR}/docker-compose.yml" <<COMPOSE
 services:
   tainer:
@@ -192,42 +132,28 @@ services:
     restart: unless-stopped
 COMPOSE
 
-# ── Step 4: Push .env file if provided ──
-
 if [[ -n "${ENV_FILE}" && -f "${ENV_FILE}" ]]; then
   echo ""
   echo "── Pushing environment file ${ENV_FILE} ──"
   "${SCP_CMD[@]}" "${ENV_FILE}" "${VM_USER}@${VM_HOST}:${APP_DIR}/.env.local"
 fi
 
-# Step 4b: Re-attach the env_file directive whenever a .env.local exists on
-# the server — whether we just pushed it or it was placed there out-of-band
-# (e.g. AUTH_SECRET written manually). The compose file is regenerated from
-# scratch above, so without this re-attach a deploy invoked with no
-# ENV_FILE silently strips the env_file binding and the container restarts
-# without AUTH_SECRET, locking everyone out.
+# The compose file is regenerated above, so re-attach .env.local or AUTH_SECRET is lost.
 if remote "test -f ${APP_DIR}/.env.local"; then
   echo ""
   echo "── Detected ${APP_DIR}/.env.local — wiring env_file into docker-compose ──"
-  # The block must indent under `tainer:` — careful with the heredoc whitespace.
   remote "sed -i '/^  tainer:/a\\    env_file:\\n      - .env.local' ${APP_DIR}/docker-compose.yml"
 fi
-
-# ── Step 5: Start / restart container ──
 
 echo ""
 echo "── Starting container ──"
 remote "cd ${APP_DIR} && docker compose up -d --force-recreate --remove-orphans"
-
-# ── Step 6: Verify ──
 
 echo ""
 echo "── Waiting for health check ──"
 sleep 8
 
 remote "cd ${APP_DIR} && docker compose ps --format 'table {{.Name}}\t{{.Status}}\t{{.Ports}}'"
-# Target the tainer service explicitly — `ps -q` with no service returns the
-# caddy container too, and `docker logs` refuses multiple ids.
 remote "docker logs \$(cd ${APP_DIR} && docker compose ps -q tainer) 2>&1 | tail -5"
 
 echo ""

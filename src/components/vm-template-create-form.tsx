@@ -65,7 +65,6 @@ export function VmTemplateCreateForm({
       <CardContent className="p-5">
         <Form action={formAction} className="space-y-6">
           <input name="siteSlug" type="hidden" value={siteSlug} />
-          {/* Template identity */}
           <div>
             <p className="text-[12px] font-medium uppercase tracking-[0.15em] text-zinc-500 mb-3">Template</p>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -84,7 +83,6 @@ export function VmTemplateCreateForm({
             </label>
           </div>
 
-          {/* Node + ISO */}
           <div>
             <p className="text-[12px] font-medium uppercase tracking-[0.15em] text-zinc-500 mb-3">Source</p>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -112,7 +110,6 @@ export function VmTemplateCreateForm({
             </div>
           </div>
 
-          {/* Hardware */}
           <div>
             <p className="text-[12px] font-medium uppercase tracking-[0.15em] text-zinc-500 mb-3">Hardware</p>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -140,7 +137,6 @@ export function VmTemplateCreateForm({
             </div>
           </div>
 
-          {/* Storage */}
           <div>
             <p className="text-[12px] font-medium uppercase tracking-[0.15em] text-zinc-500 mb-3">Storage</p>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -161,7 +157,6 @@ export function VmTemplateCreateForm({
             </div>
           </div>
 
-          {/* Network & Advanced */}
           <div>
             <p className="text-[12px] font-medium uppercase tracking-[0.15em] text-zinc-500 mb-3">Network &amp; Advanced</p>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -196,12 +191,10 @@ export function VmTemplateCreateForm({
             </div>
           </div>
 
-          {/* Hidden fields for ISO info (populated by JS when ISO is selected) */}
           <input name="isoFileName" type="hidden" value="" />
           <input name="isoStorage" type="hidden" value="" />
           <input name="vgaType" type="hidden" value="std" />
 
-          {/* Options */}
           <div className="grid gap-3 sm:grid-cols-3">
             <label className="flex items-center gap-2 rounded-md border border-white/5 bg-[#111113] px-4 py-3 text-[13px] text-zinc-300 sm:col-span-3">
               <input defaultChecked name="accessReady" type="checkbox" />

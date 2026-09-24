@@ -219,7 +219,6 @@ export function CopilotSettingsPanel() {
         }
       >
         <div className="grid gap-4">
-          {/* API key */}
           <div>
             <span className="flex items-center gap-1.5">
               <label className="text-[12px] font-medium text-zinc-300 flex items-center gap-1.5">
@@ -288,7 +287,6 @@ export function CopilotSettingsPanel() {
             )}
           </div>
 
-          {/* Model */}
           <div>
             <span className="flex items-center gap-1.5">
               <label className="text-[12px] font-medium text-zinc-300">Model</label>
@@ -329,7 +327,6 @@ export function CopilotSettingsPanel() {
             )}
           </div>
 
-          {/* Custom endpoint */}
           <div>
             <span className="flex items-center gap-1.5">
               <label className="text-[12px] font-medium text-zinc-300 flex items-center gap-1.5">
@@ -371,7 +368,6 @@ export function CopilotSettingsPanel() {
             ) : null}
           </div>
 
-          {/* Budgets */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <span className="flex items-center gap-1.5">
@@ -428,7 +424,6 @@ export function CopilotSettingsPanel() {
             </div>
           </div>
 
-          {/* Cost estimation */}
           {(isAdmin || settings.costPerMInputUsd !== null || settings.costPerMOutputUsd !== null) && (
             <div>
               <span className="flex items-center gap-1.5">
@@ -466,7 +461,6 @@ export function CopilotSettingsPanel() {
             </div>
           )}
 
-          {/* Operator notes */}
           <div>
             <span className="flex items-center gap-1.5">
               <label className="text-[12px] font-medium text-zinc-300">Operator notes</label>

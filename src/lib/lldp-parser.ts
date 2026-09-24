@@ -2,24 +2,8 @@ import "server-only";
 
 import type { LldpNeighbor } from "@/lib/lldp-types";
 
-/**
- * Tolerant parser for the JSON output of `lldpcli show neighbors -f json0`.
- *
- * `-f json0` is the stable variant: every field is wrapped in an array even
- * when it has one element. This parser also accepts the older `-f json`
- * shape (objects instead of single-element arrays) so an agent shipped at a
- * different time still works.
- *
- * Anything it can't recognise is dropped silently. Anything malformed
- * doesn't throw — callers receive an empty `neighbors` list and the ingest
- * endpoint stores the empty snapshot (legitimate state: the node is up but
- * has no LLDP neighbours).
- */
+// Accepts both `lldpcli -f json0` (fields wrapped in arrays) and the older `-f json` shape.
 export function parseLldpcliJson(raw: unknown): LldpNeighbor[] {
-  // lldpcli's `json0` format wraps the top-level `lldp` value in a single-
-  // element array (`{"lldp": [{...}]}`), while the older `json` format uses
-  // an object directly (`{"lldp": {...}}`). Accept either — unwrap the array
-  // if present, then fall back to treating it as an object.
   const lldpRaw = pickObject(raw)?.["lldp"];
   const lldp = pickObject(lldpRaw) ?? pickObject(toArray(lldpRaw)[0]);
   if (!lldp) return [];
@@ -45,8 +29,6 @@ export function parseLldpcliJson(raw: unknown): LldpNeighbor[] {
     const vlanEntries = toArray(iface["vlan"]);
     const vlanId = parseVlanId(vlanEntries);
 
-    // Each interface usually has exactly one chassis and one port from the
-    // last neighbour — but we iterate to be safe with multi-neighbour cases.
     const pairCount = Math.max(chassisEntries.length, portEntries.length, 1);
     for (let i = 0; i < pairCount; i++) {
       const chassis = pickObject(chassisEntries[i]) ?? pickObject(chassisEntries[0]);
@@ -98,11 +80,6 @@ function pickString(v: unknown): string | null {
   return null;
 }
 
-/**
- * lldpcli wraps scalar fields as `[{"value": "..."}]` in json0 mode and
- * `{"value": "..."}` in json mode. Some fields are bare strings. Walk
- * defensively.
- */
 function pickFirstValue(v: unknown): string | null {
   if (v == null) return null;
   if (typeof v === "string") return v;
@@ -130,7 +107,6 @@ function pickNumber(v: unknown): number | null {
 
 function pickIdValue(v: unknown): string | null {
   if (v == null) return null;
-  // `id` is typically `[{ "type": "mac", "value": "..." }]` in json0.
   if (Array.isArray(v)) {
     for (const item of v) {
       const r = pickIdValue(item);

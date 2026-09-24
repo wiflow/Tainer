@@ -5,7 +5,6 @@ import { ArrowRightIcon, Container } from "lucide-react";
 export function HeroSection() {
 	return (
 		<section className="mx-auto w-full max-w-5xl overflow-hidden pt-16">
-			{/* Shades */}
 			<div
 				aria-hidden="true"
 				className="absolute inset-0 size-full overflow-hidden"

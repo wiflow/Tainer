@@ -1,10 +1,5 @@
 import type { EwmaState } from "./types";
 
-/**
- * Update the EWMA (Exponentially Weighted Moving Average) latency for a node.
- * Formula: L_new = (alpha * currentSample) + ((1 - alpha) * L_old)
- * First sample is used directly as the initial value.
- */
 export function updateEwma(
   current: EwmaState | undefined,
   node: string,

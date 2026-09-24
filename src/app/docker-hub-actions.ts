@@ -290,9 +290,6 @@ export async function pullOciTemplateAction(
 function normalizeOciReference(raw: string): string {
   const trimmed = raw.trim();
 
-  // skopeo treats the first path segment as a Docker Hub namespace unless it
-  // contains a '.' or ':' — remember the protocol so we can add the default
-  // port later to force host recognition for bare hostnames.
   const hadHttps = /^https:\/\//i.test(trimmed);
   const hadHttp = /^http:\/\//i.test(trimmed);
 
@@ -316,13 +313,12 @@ function normalizeOciReference(raw: string): string {
     }
   }
 
-  // A colon in the first segment is a port, not a tag separator
   const firstSlash = ref.indexOf("/");
   if (firstSlash !== -1 && !ref.slice(firstSlash).includes(":")) {
     ref = `${ref}:latest`;
   }
 
-  // OCI Distribution Spec requires lowercase path segments; preserve host casing and tag.
+  // OCI requires lowercase repository paths; host and tag keep their case.
   const colonIdx = ref.lastIndexOf(":");
   const slashIdx = ref.indexOf("/");
   if (slashIdx !== -1 && colonIdx > slashIdx) {
@@ -336,8 +332,7 @@ function normalizeOciReference(raw: string): string {
     ref = `${host}${path}`;
   }
 
-  // Bare hostnames (no '.' or ':') look like Docker Hub namespaces to skopeo;
-  // appending the default port forces it to treat the segment as a registry host.
+  // skopeo reads a bare hostname as a Docker Hub namespace unless it has a port.
   const hostPart = ref.slice(0, ref.indexOf("/") === -1 ? ref.length : ref.indexOf("/"));
   if ((hadHttps || hadHttp) && !hostPart.includes(".") && !hostPart.includes(":")) {
     const defaultPort = hadHttps ? "443" : "80";

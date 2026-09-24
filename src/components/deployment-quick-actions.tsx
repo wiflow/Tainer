@@ -97,7 +97,6 @@ function MigratePopover({
     return () => document.removeEventListener("mousedown", handleClick);
   }, [open]);
 
-  // Close after successful submit
   useEffect(() => {
     if (state.status === "success") {
       queueMicrotask(() => setOpen(false));
@@ -181,13 +180,6 @@ export function DeploymentQuickActions({
 
   const [pendingCommand, setPendingCommand] = useState<ExtendedAction | null>(null);
 
-  // Once a lifecycle task succeeds we KNOW the outcome (stop → stopped,
-  // start → running) — flip the buttons immediately instead of waiting the
-  // several seconds a full server re-render takes. It's a harmless no-op
-  // once the server catches up; the timer bounds how long a genuinely
-  // divergent server state could be masked. When a DeploymentStatusProvider
-  // wraps us (detail page header, list rows), the value is shared so the
-  // status badge/dot flips in the same instant.
   const statusCtx = useOptionalDeploymentStatus();
   const [localOptimistic, setLocalOptimistic] = useState<string | null>(null);
   const optimisticStatus = statusCtx ? statusCtx.optimistic : localOptimistic;
@@ -210,11 +202,7 @@ export function DeploymentQuickActions({
     activeState.status === "success" ? activeState.task?.upid : null;
   const isTaskRunning = currentUpid ? activeTaskUpids.has(currentUpid) : false;
 
-  // The task-toast provider registers the UPID in `activeTaskUpids` one render
-  // AFTER the action state arrives, so "upid present but not in the set" also
-  // occurs at the start of a task's life. Only treat it as completion once
-  // we've actually observed the task running — otherwise the spinner clears
-  // (and refreshes fire) seconds before the container has stopped.
+  // UPIDs reach activeTaskUpids one render late; only a task seen running counts as done.
   const seenTaskRunningRef = useRef(false);
 
   useEffect(() => {
@@ -245,9 +233,6 @@ export function DeploymentQuickActions({
         } else if (finishedCommand === "stop" || finishedCommand === "shutdown") {
           setOptimisticStatus("stopped");
         }
-        // The toast provider handles cache invalidation and staggered
-        // follow-up refreshes on task completion; this only covers the
-        // no-task case and snaps the row out of its pending state.
         router.refresh();
       });
     }

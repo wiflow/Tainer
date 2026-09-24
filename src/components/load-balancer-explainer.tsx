@@ -1,15 +1,6 @@
 import { ChevronRight } from "lucide-react";
 
-/**
- * Collapsed "how does this work" summary for the load balancer page.
- * Static server component — native <details> keeps it collapsible with no
- * client JS.
- *
- * Deliberately short: the per-setting detail now lives in the ⓘ tooltips on
- * the controls themselves, so this only has to carry the shape of the loop.
- * The full write-up is docs/load-balancer.md; keep the two in sync when
- * behaviour changes.
- */
+// Keep in sync with docs/load-balancer.md.
 
 const STEPS: { title: string; body: string }[] = [
   {

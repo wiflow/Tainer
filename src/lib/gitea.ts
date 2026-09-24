@@ -80,8 +80,7 @@ export function buildGiteaOciReference(
 
   let host = parsed.hostname;
 
-  // Hostnames without dots (e.g. "infra-repository") are ambiguous to skopeo — adding
-  // the explicit port forces it to treat this as a self-hosted registry, not a Docker Hub path.
+  // skopeo treats a dotless hostname as a Docker Hub path unless a port is given.
   if (!host.includes(".") && !host.includes(":")) {
     const defaultPort = parsed.protocol === "https:" ? "443" : "80";
     if (!parsed.port) {
@@ -219,7 +218,6 @@ export async function getGiteaOverview(input?: {
       `/packages/${encodeURIComponent(config.owner)}?${params.toString()}`,
     );
 
-    // Group by package name — the API returns one entry per version
     const packageMap = new Map<string, { tags: string[]; latest: GiteaPackageResponse }>();
 
     for (const version of versions) {
@@ -290,7 +288,7 @@ export async function getGiteaPackageDetail(
       `/packages/${encodeURIComponent(config.owner)}?${params.toString()}`,
     );
 
-    // q is a prefix/substring search, so filter to exact name matches
+    // The q parameter matches substrings, so filter to exact names.
     const matched = versions.filter((v) => v.name === name);
 
     if (matched.length === 0) {

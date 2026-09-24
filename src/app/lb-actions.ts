@@ -55,7 +55,6 @@ function toContainerMigrationMode(formData: FormData, key: string): ContainerMig
   return "never";
 }
 
-/** Parse "22:00-06:00, 12:00-13:00" into migration windows; bad ranges are dropped. */
 function toMigrationWindows(formData: FormData, key: string): MigrationWindow[] {
   const windows: MigrationWindow[] = [];
   for (const range of toStringList(formData, key)) {
@@ -100,10 +99,6 @@ function toClampedInteger(
   return Math.round(toClampedNumber(formData, key, fallback, min, max));
 }
 
-/**
- * Compute a whole-cluster rebalance plan and save it as a draft for the
- * admin to review. Nothing migrates until the draft is explicitly applied.
- */
 export async function computeRebalancePlanAction(
   _previousState: BasicActionState,
   formData: FormData,
@@ -204,7 +199,6 @@ export async function computeRebalancePlanAction(
   }
 }
 
-/** Apply a draft plan — the observer executes it one validated move at a time. */
 export async function applyRebalancePlanAction(
   _previousState: BasicActionState,
   formData: FormData,
@@ -259,11 +253,6 @@ export async function applyRebalancePlanAction(
   }
 }
 
-/**
- * Cancel or dismiss a plan. Drafts and finished plans are removed; an
- * active plan stops queuing new moves (an already in-flight migration
- * finishes in Proxmox — it cannot be recalled).
- */
 export async function cancelRebalancePlanAction(
   _previousState: BasicActionState,
   formData: FormData,
@@ -422,8 +411,6 @@ export async function applyLbPresetAction(
     requireSitePermission(session, siteConfig.siteId, "manage-settings");
 
     return await withSiteConfig(siteConfig, async () => {
-      // Merge-only: the preset touches its bundle of migration knobs and the
-      // enabled flag; every Advanced-mode setting outside it survives.
       await saveLoadBalancerSettings({
         ...preset.overrides,
         enabled: toBoolean(formData, "enabled"),

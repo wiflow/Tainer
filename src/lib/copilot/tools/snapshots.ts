@@ -132,7 +132,6 @@ registerTool({
   }),
   describe: (args) =>
     `ROLL BACK ${String(args.deploymentId)} to snapshot "${String(args.snapshotName)}"`,
-  // Typed confirmation = the snapshot name. Stops accidental rollbacks.
   confirmString: (args) => String(args.snapshotName ?? ""),
   execute: async (args, ctx) => {
     const siteSlug = String(args.siteSlug ?? "");
@@ -141,8 +140,6 @@ registerTool({
 
     return runInSiteWithPermission(ctx.session, siteSlug, "manage-snapshots", async () => {
       const { node, vmid, type } = decodeDeploymentId(deploymentId);
-      // Validate the snapshot exists — Proxmox would also reject, but a
-      // clearer error helps the model recover.
       const snapshots = await listSnapshots(node, vmid, type);
       if (!snapshots.some((s) => s.name === snapshotName)) {
         throw new Error(

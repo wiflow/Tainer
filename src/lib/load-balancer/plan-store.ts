@@ -5,13 +5,6 @@ import { readFile } from "node:fs/promises";
 import { resolveSiteDataFilePathFromContext } from "@/lib/site-data";
 import { createStoreMutator, writeJsonFileAtomically } from "@/lib/store-utils";
 
-/**
- * Per-site persisted rebalance plan. One plan at a time: a draft is a
- * preview the admin can apply or discard; an applied ("active") plan is
- * executed by the observer one move at a time, each re-validated against
- * live cluster state, surviving Tainer restarts mid-plan.
- */
-
 export type PlanMoveStatus = "queued" | "migrating" | "done" | "failed" | "skipped";
 
 export type RebalancePlanMove = {
@@ -72,7 +65,6 @@ export async function getRebalancePlan(): Promise<RebalancePlan | null> {
   return store.plan;
 }
 
-/** Replaces any existing plan — the previous draft/terminal plan is dropped. */
 export async function saveRebalancePlan(plan: RebalancePlan): Promise<RebalancePlan> {
   return mutateStore((store) => {
     store.plan = plan;

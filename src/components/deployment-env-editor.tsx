@@ -139,7 +139,6 @@ export function DeploymentEnvEditor({
             <input name="digest" type="hidden" value={deployment.digest} />
             <input name="envText" type="hidden" value={envText} />
 
-            {/* Existing variables */}
             {entries.length > 0 ? (
               <div className="space-y-2">
                 <p className="text-[12px] font-medium text-zinc-500">
@@ -196,7 +195,6 @@ export function DeploymentEnvEditor({
               </div>
             )}
 
-            {/* Add new variable */}
             {deployment.configAccessible && (
               <div className="rounded-md border border-dashed border-white/10 bg-zinc-900/20 px-4 py-3">
                 <p className="mb-2 text-[12px] font-medium text-zinc-500">

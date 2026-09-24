@@ -1,13 +1,4 @@
 #!/usr/bin/env bash
-#
-# Show what has accumulated since the last release tag, with a coverage check.
-#
-# For each commit since the last vX.Y.Z tag:
-#   ✓ green  — touched CHANGELOG.md (documented)
-#   ✗ red    — touched src/ but did NOT touch CHANGELOG.md (likely missing)
-#   ·  gray   — internal-only (scripts, docs, config); changelog optional
-#
-# Read-only — never modifies anything.
 
 set -euo pipefail
 
@@ -15,8 +6,6 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_ROOT"
 
 CHANGELOG="$REPO_ROOT/CHANGELOG.md"
-
-# ── Colour setup (auto-disabled when not a TTY or NO_COLOR set) ──
 
 if [[ -t 1 && -z "${NO_COLOR:-}" ]]; then
   C_RESET='\033[0m'
@@ -36,8 +25,6 @@ fi
 
 hdr() { printf "${C_BOLD}${C_CYAN}── %s ──${C_RESET}\n" "$1"; }
 
-# ── Identify previous tag ──
-
 PREV_TAG="$(git describe --tags --abbrev=0 2>/dev/null || true)"
 
 if [[ -z "$PREV_TAG" ]]; then
@@ -49,8 +36,6 @@ else
   RANGE="$PREV_TAG..HEAD"
   RANGE_LABEL="since $PREV_TAG"
 fi
-
-# ── Coverage table ──
 
 hdr "Commits $RANGE_LABEL — coverage check"
 
@@ -105,8 +90,6 @@ else
 fi
 printf "${C_GRAY}%d internal${C_RESET}\n" "$internal_count"
 
-# ── Files touched ──
-
 echo ""
 hdr "Files touched $RANGE_LABEL"
 if [[ -n "$RANGE" ]]; then
@@ -116,8 +99,6 @@ if [[ -n "$RANGE" ]]; then
 else
   echo "(no previous tag — full history would be too noisy)"
 fi
-
-# ── Current [Unreleased] section ──
 
 echo ""
 hdr "Current [Unreleased] in CHANGELOG.md"

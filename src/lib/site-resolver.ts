@@ -36,9 +36,7 @@ export async function resolveSiteConfig(
   }
 
   const request = (async () => {
-    // Support both auth schemas:
-    //   - New: username + passwordEncrypted
-    //   - Legacy: tokenId + tokenSecretEncrypted (API token auth)
+    // Legacy sites store tokenId and tokenSecretEncrypted instead of a username and password.
     const payload = site.payload as Record<string, unknown>;
     const encryptedField =
       (payload.passwordEncrypted as string | undefined) ??

@@ -3,15 +3,6 @@ import "server-only";
 import { getClusterStatusFingerprint, withSiteConfig } from "@/lib/proxmox";
 import { resolveSiteConfigBySlug } from "@/lib/site-resolver";
 
-/**
- * Per-site change watcher behind the /api/events SSE stream. One upstream
- * poll loop per site regardless of how many browsers are connected: while a
- * site has subscribers, the cluster's status fingerprint is polled every few
- * seconds and a change notification is fanned out to every subscriber. The
- * loop stops as soon as the last subscriber disconnects, so an idle Tainer
- * costs Proxmox nothing.
- */
-
 const POLL_INTERVAL_MS = 4_000;
 
 type SiteWatcher = {
@@ -45,13 +36,11 @@ async function poll(siteSlug: string, watcher: SiteWatcher) {
         try {
           notify();
         } catch {
-          // A broken subscriber must not stop the fan-out.
         }
       }
     }
     watcher.fingerprint = fingerprint;
   } catch {
-    // Proxmox unreachable — keep the last fingerprint and retry next tick.
   } finally {
     watcher.polling = false;
   }
@@ -74,7 +63,6 @@ export function subscribeToSiteEvents(
     created.timer = setInterval(() => {
       void poll(siteSlug, created);
     }, POLL_INTERVAL_MS);
-    // Prime the fingerprint immediately so the first real change is caught.
     void poll(siteSlug, created);
   }
 

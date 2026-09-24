@@ -46,7 +46,6 @@ export function BackupRestoreButton({
 
   const isDisabled = isPending || !node || !storage;
 
-  // No deployment context — simple single-action button (e.g. global backups page).
   if (currentVmid == null) {
     return (
       <Form action={formAction}>
@@ -69,7 +68,6 @@ export function BackupRestoreButton({
     );
   }
 
-  // Deployment context — show a choice between new container and replace.
   if (!choosing) {
     return (
       <Button

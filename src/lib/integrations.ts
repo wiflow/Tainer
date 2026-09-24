@@ -6,16 +6,6 @@ import { resolveDataFilePath } from "@/lib/app-data";
 import { decryptText, encryptText } from "@/lib/crypto";
 import { createStoreMutator, writeJsonFileAtomically } from "@/lib/store-utils";
 
-/**
- * Single global store for third-party integrations configured via the GUI.
- * Currently holds the phpIPAM connection. Modeled as a record keyed by
- * integration type so future entries (NetBox, etc.) slot in without
- * touching the ipam-specific call sites.
- *
- * The API token is encrypted at rest with the same AES-256-GCM helpers
- * that protect IDP client secrets and TOTP seeds.
- */
-
 const DATA_FILE = "integrations.json";
 
 export const DEFAULT_IPAM_TIMEOUT_MS = 3_500;
@@ -26,7 +16,6 @@ export type PhpIpamIntegration = {
   enabled: boolean;
   /** phpIPAM server root, e.g. https://ipam.example.com (no trailing /api). */
   serverUrl: string;
-  /** API app name (the segment after /api/ in phpIPAM API URLs). */
   appId: string;
   /** Encrypted via crypto.ts; never returned to the UI. */
   encryptedToken: string;
@@ -45,7 +34,7 @@ export type PhpIpamIntegrationInput = {
   enabled: boolean;
   serverUrl: string;
   appId: string;
-  /** Plaintext — encrypted before storage. Empty string = leave existing. */
+  /** Plaintext; an empty string keeps the stored token. */
   token: string;
   tlsInsecure: boolean;
   timeoutMs: number;

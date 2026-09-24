@@ -83,7 +83,6 @@ export function DeploymentTemplateLaunchPanel({
       ? `${template.hostnamePrefix}-${nextId}`
       : template.hostnamePrefix || template.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
 
-  // Merge image defaults with template env (template overrides)
   const defaultEnv = imageEnv
     ? mergeEnvText(imageEnv, template.envText)
     : template.envText;

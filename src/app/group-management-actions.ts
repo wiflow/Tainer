@@ -29,16 +29,7 @@ import {
 
 const enforceRateLimit = createRateLimiterOrThrow("group-management", 20, 5 * 60_000);
 
-/**
- * Operations that touch an admin group — creating one, flipping `isAdmin`
- * on / off, or assigning a user into one — are role-changes in disguise:
- * `updateUserGroups` derives `user.role` from `groups.some(g => g.isAdmin)`,
- * so anyone permitted to do these things can promote themselves (or anyone
- * else) to admin. The `manage-groups` permission is intended for shuffling
- * non-privileged group membership, so we gate the privileged shape behind
- * the admin role explicitly. Without this, an operator with `manage-groups`
- * can chain create-admin-group + assign-self into a full takeover.
- */
+// Admin group membership sets user.role, so manage-groups alone must not grant it.
 function requireAdminForPrivilegedGroupOp(session: AuthSession): void {
   if (session.user.role !== "admin") {
     throw new Error(
@@ -145,9 +136,6 @@ export async function updateGroupAction(
     const description = String(formData.get("description") ?? "").trim();
     const isAdmin = formData.get("isAdmin") === "true";
 
-    // Either editing an existing admin group or flipping a non-admin group
-    // to admin requires admin role — both shapes can promote whoever's
-    // already in the group (or future members) to admin.
     if (isAdmin || existing.isAdmin) {
       requireAdminForPrivilegedGroupOp(session);
     }
@@ -246,10 +234,6 @@ export async function updateUserGroupsAction(
       .map((id) => id.trim())
       .filter(Boolean);
 
-    // Resolve the requested groups so we can check whether any of them
-    // would promote the target user to admin. `updateUserGroups` derives
-    // role from `groups.some(g => g.isAdmin)`, so an admin-group assignment
-    // IS a role change and must be gated on admin role.
     const allGroups = await listUserGroups();
     const requestedGroups = allGroups.filter((g) => groupIds.includes(g.id));
     const wouldGrantAdmin = requestedGroups.some((g) => g.isAdmin);
@@ -294,9 +278,6 @@ export async function updateUserGroupsAction(
 function parseSiteAccessFromFormData(formData: FormData): SiteAccessEntry[] {
   const entries: SiteAccessEntry[] = [];
 
-  // Site access is encoded as:
-  // site-{siteId}-enabled = "true"
-  // site-{siteId}-permissions = "create-deployments,manage-deployments,..."
   const siteIds = new Set<string>();
 
   for (const [key] of formData.entries()) {

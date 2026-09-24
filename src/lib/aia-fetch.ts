@@ -1,8 +1,5 @@
 import "server-only";
 
-// Node.js doesn't fetch missing intermediate CA certs from the AIA extension like browsers do.
-// This module replicates that behaviour by walking the AIA chain.
-
 import * as tls from "node:tls";
 import * as https from "node:https";
 import * as http from "node:http";
@@ -26,7 +23,7 @@ function getSystemRootCerts(): X509Certificate[] {
 }
 
 const cache = new Map<string, { pems: string[]; fetchedAt: number; ttl: number }>();
-const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+const CACHE_TTL_MS = 60 * 60 * 1000;
 const TIMEOUT_CACHE_TTL_MS = 2 * 60 * 1000;
 const CHAIN_TIMEOUT_MS = 15_000;
 const MAX_REDIRECTS = 3;
@@ -34,10 +31,7 @@ const MAX_CERT_BYTES = 64 * 1024;
 
 const inflight = new Map<string, Promise<string[]>>();
 
-// `ca` option replaces the default trust store, so we must merge system roots with intermediates.
-// Returns [] when nothing is found so callers can skip the `ca` override entirely.
-// Fetched certificates are only returned when they chain up to a system root or to one of
-// `extraRootsPem`; they are never trust anchors themselves.
+// Fetched certificates are returned only if they chain to a system root or extraRootsPem.
 export async function getExtraCaCerts(
   hostname: string,
   port: number | string,
@@ -131,7 +125,7 @@ async function fetchChain(
   return [];
 }
 
-// Returns the CA certificate named in `cert`'s AIA extension, only if it actually signed `cert`.
+// Returns the issuer only if it verifiably signed `cert`.
 export async function fetchIssuerCert(cert: X509Certificate): Promise<X509Certificate | null> {
   for (const url of extractCaIssuerUrls(cert)) {
     try {
@@ -141,9 +135,7 @@ export async function fetchIssuerCert(cert: X509Certificate): Promise<X509Certif
       if (candidate.ca && isSignedBy(cert, candidate)) {
         return candidate;
       }
-    } catch {
-      // Try next URL
-    }
+    } catch {}
   }
   return null;
 }
@@ -175,8 +167,6 @@ export function getLeafCert(
   });
 }
 
-// X509Certificate.infoAccess is a newline-separated string like:
-//   "OCSP - URI:http://...\nCA Issuers - URI:http://..."
 function extractCaIssuerUrls(cert: X509Certificate): string[] {
   const info = cert.infoAccess;
   if (!info) return [];
@@ -256,14 +246,11 @@ function parsePemCerts(bundle: string): X509Certificate[] {
   for (const block of bundle.match(PEM_CERT_REGEX) ?? []) {
     try {
       certs.push(new X509Certificate(block));
-    } catch {
-      // Skip unparseable entries
-    }
+    } catch {}
   }
   return certs;
 }
 
-// AIA endpoints usually serve DER (.cer/.crt), sometimes PEM. Only a single certificate is accepted.
 function toPem(data: Buffer): string | null {
   const str = data.toString("utf8");
 
@@ -285,7 +272,6 @@ function toPem(data: Buffer): string | null {
     }
     const pem = `-----BEGIN CERTIFICATE-----\n${lines.join("\n")}\n-----END CERTIFICATE-----`;
 
-    // Validate it parses
     new X509Certificate(pem);
     return pem;
   } catch {

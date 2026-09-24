@@ -6,8 +6,7 @@ const registry = new Map<string, ToolDefinition>();
 
 export function registerTool(tool: ToolDefinition): void {
   if (registry.has(tool.name)) {
-    // Tool registration is import-time and idempotent — the same module can
-    // import the tools file multiple times in dev with HMR. Last write wins.
+    // HMR can re-import the tools file in dev, so a duplicate name replaces the old tool.
     registry.delete(tool.name);
   }
   registry.set(tool.name, tool);

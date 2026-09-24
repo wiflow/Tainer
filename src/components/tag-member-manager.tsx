@@ -154,7 +154,6 @@ export function TagMemberManager({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4 p-5">
-        {/* Current members */}
         {members.length > 0 ? (
           <div className="space-y-2">
             <p className="text-[12px] font-medium text-zinc-500">
@@ -177,7 +176,6 @@ export function TagMemberManager({
           </div>
         )}
 
-        {/* Add member section */}
         {nonMembers.length > 0 && (
           <AddMemberForm tagSlug={tagSlug} nonMembers={nonMembers} />
         )}

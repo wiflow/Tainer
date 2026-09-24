@@ -177,8 +177,7 @@ registerTool({
       }
 
       const { node, vmid } = decodeDeploymentId(deploymentId);
-      // detail.rootfs is a Proxmox volume spec like "local-lvm:vm-101-disk-0,size=8G";
-      // the storage id is the part before the first colon.
+      // rootfs is a Proxmox volume spec like "local-lvm:vm-101-disk-0,size=8G".
       const rootfsStorage = detail.rootfs.includes(":") ? detail.rootfs.split(":")[0] : "";
       const storage = requestedStorage || rootfsStorage;
       if (!storage) throw new Error("Couldn't determine target storage — pass storage explicitly.");

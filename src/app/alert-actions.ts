@@ -217,7 +217,6 @@ export async function clearAllActiveAlertsAction(
     requireSitePermission(session, siteConfig.siteId, "manage-alerts");
     const clearedEntries = await clearAllActiveAlerts();
 
-    // Record a resolved notification for each cleared alert
     for (const entry of clearedEntries) {
       const duration = durationMinutesSince(entry.firstObservedAt);
       await recordNotification({

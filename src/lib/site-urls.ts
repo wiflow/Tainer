@@ -22,7 +22,6 @@ export const siteBackupsUrl = (slug: string) => siteUrl(slug, "backups");
 export const siteAlertsUrl = (slug: string) => siteUrl(slug, "alerts");
 export const siteSettingsUrl = (slug: string) => siteUrl(slug, "settings");
 
-// Example: `/sites/primary/deployments/abc` → `/sites/staging/deployments/abc`
 export function analogousRouteForSite(
   currentPath: string,
   targetSlug: string,

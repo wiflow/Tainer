@@ -9,11 +9,7 @@ import { runInSite, siteSlugSchema } from "@/lib/copilot/tools/helpers";
 registerTool({
   name: "scan_deployment_ports",
   category: "Diagnostics",
-  // klass=read so it auto-runs without an approval card — port scanning is
-  // not destructive, just a probe. We gate it on admin role inside execute
-  // to match the existing /api/proxmox/port-scan route's policy (port-scan
-  // uses pct-exec/SSH under the hood, so it's a privileged operation
-  // regardless of the read/write classification).
+  // Auto-runs as a read tool, but port scanning uses pct exec, so execute requires admin.
   klass: "read",
   description:
     "Scan an LXC container for open TCP ports and identify the services running on them (e.g. Grafana on 3000, SSH on 22, PostgreSQL on 5432). Returns a list of {port, service, url} entries. Admin-only. Use this when the user asks 'what services are running on X?' or 'where can I reach the web UI of Y?'.",

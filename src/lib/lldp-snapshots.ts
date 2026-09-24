@@ -22,7 +22,6 @@ const MAX_NEIGHBORS_PER_SNAPSHOT = 512;
 
 type Store = {
   schemaVersion: 1;
-  /** Keyed by siteId. */
   sites: Record<string, LldpSiteSnapshots>;
 };
 
@@ -52,7 +51,6 @@ const mutateStore = createStoreMutator("lldp-snapshots", readStore, writeStore);
 
 function normalizeChassisId(raw: string): string {
   const trimmed = raw.trim();
-  // Heuristic: looks like a MAC if 12 hex chars with optional separators.
   const hex = trimmed.replace(/[:.\- ]/g, "").toLowerCase();
   if (/^[0-9a-f]{12}$/.test(hex)) {
     return hex.match(/.{2}/g)!.join(":");
@@ -101,16 +99,6 @@ export async function clearLldpSnapshotsForSite(siteId: string): Promise<void> {
   });
 }
 
-/**
- * Derive the topology graph from the latest snapshot per agent host.
- *
- * Aggregation rules (deliberately simple):
- *   - One device per remote chassisId.
- *   - Device fields take the most-recently-seen non-null value.
- *   - Each remote portId becomes one entry on the device; the local-side
- *     endpoint is the most recent observation.
- *   - Capabilities are union'd across observations.
- */
 export function deriveTopology(snapshots: LldpSiteSnapshots): LldpTopology {
   const devices = new Map<string, LldpDevice>();
   const edges: LldpTopologyEdge[] = [];

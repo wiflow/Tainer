@@ -21,12 +21,7 @@ import {
 
 export const dynamic = "force-dynamic";
 
-/**
- * Build a URL anchored to the public origin (APP_URL / forwarded headers),
- * NOT request.url. Inside Docker `request.url` is often `http://0.0.0.0:3000/...`
- * which is the bind socket, not the public URL — using that for redirects
- * sends users to a broken URL.
- */
+// Inside Docker request.url is the bind socket (0.0.0.0:3000), not the public origin.
 function publicUrl(request: NextRequest, path: string): URL {
   return new URL(path, getPublicOrigin(request.headers, request.url));
 }
@@ -35,8 +30,6 @@ function loginRedirect(request: NextRequest, error: string): NextResponse {
   const url = publicUrl(request, "/login");
   url.searchParams.set("sso_error", error);
   const response = NextResponse.redirect(url);
-  // Always clear the in-flight cookie on error so a stale state can't get
-  // reused.
   response.cookies.delete(OIDC_FLOW_COOKIE);
   return response;
 }
@@ -61,8 +54,6 @@ export async function GET(
     return loginRedirect(request, "unknown_provider");
   }
 
-  // The IdP may redirect with `error` if the user denied consent or something
-  // went wrong upstream. Surface that directly rather than trying to grant.
   const idpError = request.nextUrl.searchParams.get("error");
   if (idpError) {
     const description = request.nextUrl.searchParams.get("error_description") ?? idpError;
@@ -81,15 +72,7 @@ export async function GET(
     return loginRedirect(request, "Sign-in session does not match the provider.");
   }
 
-  // Build a plain URL instance pointing at the public origin (not 0.0.0.0:3000)
-  // and pass that to openid-client. Two reasons to do this rather than reuse
-  // request.nextUrl:
-  //   1. NextURL extends URL but openid-client v6 sometimes fails the
-  //      `instanceof URL` check across module boundaries when Next bundles
-  //      its URL global separately. A plain new URL() always passes.
-  //   2. request.nextUrl.origin can be the docker bind (0.0.0.0:3000) when
-  //      sitting behind a reverse proxy without trust-proxy config — that
-  //      breaks the redirect_uri match on the token endpoint.
+  // openid-client v6 can fail its instanceof URL check on NextURL, so pass a plain URL.
   const callbackUrl = publicUrl(
     request,
     request.nextUrl.pathname + request.nextUrl.search,
@@ -99,12 +82,6 @@ export async function GET(
   try {
     claims = await completeOidcAuthorization(provider, flowState, callbackUrl);
   } catch (error) {
-    // openid-client v6 raises ResponseBodyError when the IdP returns an
-    // OAuth error response from the token endpoint (e.g. invalid_grant,
-    // redirect_uri_mismatch, invalid_client) and AuthorizationResponseError
-    // when the authorization response itself is malformed. Both carry
-    // structured fields that are FAR more useful to display than the
-    // generic "server responded with an error in the response body".
     let detail: string;
     let logBody: unknown = error;
 
@@ -168,9 +145,6 @@ export async function GET(
     return response;
   }
 
-  // Audit trail. Distinguishes provisioned (first-ever SSO login → user
-  // created) from regular SSO sign-ins so an admin can spot a flood of
-  // unexpected new accounts.
   recordAdminAudit({
     action: result.provisioned ? "sso-user-provisioned" : "sso-login",
     actorEmail: result.user.email,
@@ -181,8 +155,6 @@ export async function GET(
       : `Signed in via ${provider.name}`,
   }).catch(() => {});
 
-  // Send the user back where they came from. Cookie has been set by
-  // signInWithSso → createSession.
   const home = publicUrl(request, "/");
   let target = publicUrl(request, sanitizeReturnTo(flowState.returnTo));
   if (target.origin !== home.origin) target = home;

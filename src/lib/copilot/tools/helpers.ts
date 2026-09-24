@@ -11,11 +11,6 @@ import { resolveSiteConfigBySlug } from "@/lib/site-resolver";
 import { listEnabledSites } from "@/lib/site-store";
 import type { ToolParamSchema } from "@/lib/copilot/types";
 
-/**
- * Resolve the site config for `siteSlug`, enforcing that the calling user
- * has access to it. Throws on missing/forbidden sites. The agent surfaces
- * the error text back to the user.
- */
 export async function resolveSiteForUser(session: AuthSession, siteSlug: string) {
   if (!siteSlug || typeof siteSlug !== "string") {
     throw new Error("siteSlug is required.");
@@ -28,8 +23,6 @@ export async function resolveSiteForUser(session: AuthSession, siteSlug: string)
 
   const config = await resolveSiteConfigBySlug(trimmed);
 
-  // Block sites the user has no access to. `requireSiteAccess` admin-passes
-  // automatically; this is the same guard every UI route uses.
   requireSiteAccess(session, config.siteId);
 
   return config;
@@ -55,11 +48,6 @@ export async function runInSiteWithPermission<T>(
   return withSiteConfig(config, fn);
 }
 
-/**
- * Returns site slugs the user can see. Used to inject context into the
- * system prompt so the model doesn't ask "which site?" when there's only
- * one accessible.
- */
 export async function listAccessibleSites(session: AuthSession) {
   const sites = await listEnabledSites();
   if (session.user.role === "admin") return sites;
@@ -83,7 +71,6 @@ export function siteSlugSchema(extra: Record<string, unknown> = {}): ToolParamSc
   };
 }
 
-/** Strip large/uninteresting fields from a deployment for chat context. */
 export type LeanDeployment = {
   id: string;
   vmid: number;

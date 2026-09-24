@@ -35,7 +35,6 @@ export function DiagnosticsPanel({ report }: { report: DiagnosticReport }) {
 
   return (
     <div className="space-y-6">
-      {/* Summary */}
       <div className="flex flex-wrap items-center gap-3">
         {report.issues.length === 0 ? (
           <div className="flex items-center gap-2 text-emerald-400">
@@ -70,7 +69,6 @@ export function DiagnosticsPanel({ report }: { report: DiagnosticReport }) {
         </div>
       </div>
 
-      {/* Issues */}
       {report.issues.length > 0 && (
         <Card className="overflow-hidden rounded-2xl">
           <CardHeader className="border-b border-white/5">

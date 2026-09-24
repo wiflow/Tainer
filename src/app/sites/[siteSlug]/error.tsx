@@ -4,11 +4,6 @@ import { useEffect } from "react";
 
 import { ErrorState } from "@/components/error-state";
 
-/**
- * Site-scoped boundary. Most failures here are the Proxmox API being
- * unreachable or a credential that stopped working, so the copy points at
- * the site's own settings rather than a generic retry.
- */
 export default function SiteError({
   error,
   reset,

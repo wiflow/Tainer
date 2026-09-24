@@ -34,7 +34,6 @@ export function IsoDownloadForm({
 
   const [url, setUrl] = useState("");
 
-  // Auto-derive filename from URL
   const derivedFilename = url ? (url.split("/").pop()?.split("?")[0] || "") : "";
 
   return (

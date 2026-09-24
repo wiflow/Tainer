@@ -11,10 +11,7 @@ import { parseTainerMeta } from "@/lib/tainer-meta";
 import { getProxmoxTagColorSpec } from "@/lib/tag-utils";
 import { buildProxmoxUrl, formatBytes, formatUptime, titleFromTemplateFile } from "@/lib/utils";
 
-// Two mechanisms for per-request config:
-// 1. React.cache() — works across layout → page → server-action in App Router
-// 2. AsyncLocalStorage — for API routes that don't have a React async dispatcher
-
+// React.cache covers App Router renders; AsyncLocalStorage covers API routes.
 const siteConfigALS = new AsyncLocalStorage<ResolvedSiteConfig>();
 
 const getRequestConfigHolder = cache((): { config: ResolvedSiteConfig | null } => ({
@@ -29,7 +26,6 @@ export function withSiteConfig<T>(
   config: ResolvedSiteConfig,
   fn: () => T | Promise<T>,
 ): Promise<T> {
-  // Set both so the config is reachable regardless of how fn executes.
   setSiteConfigForRequest(config);
   return siteConfigALS.run(config, () => Promise.resolve(fn()));
 }
@@ -142,7 +138,6 @@ type ProxmoxLxcConfigResponse = {
   searchdomain?: string;
   swap?: number | string;
   tags?: string;
-  // Mount point fields (mp0..mpN) are dynamic keys
   [key: string]: unknown;
 };
 
@@ -259,7 +254,6 @@ type ProxmoxNodeStatusResponse = {
     total?: number;
     used?: number;
   };
-  /** PSI (Pressure Stall Information) — exposed by Proxmox VE 9+. */
   pressure?: {
     cpu?: ProxmoxPsiEntry;
     io?: ProxmoxPsiEntry;
@@ -379,12 +373,7 @@ export type LiveStoragePool = {
   usedBytes: number | null;
 };
 
-/**
- * 10-second-average PSI stall percentages for a node (PVE 9+). "some" =
- * share of time at least one task stalled on the resource; "full" = share
- * of time ALL non-idle tasks stalled (memory/io only). Null when the node
- * doesn't report PSI (PVE 8 or older kernels).
- */
+/** 10-second average PSI stall percentages; null before PVE 9. */
 export type NodePressure = {
   cpuSomeAvg10: number | null;
   memorySomeAvg10: number | null;
@@ -399,7 +388,6 @@ export type LiveNodeMetrics = {
   memoryTotalBytes: number | null;
   memoryUsedBytes: number | null;
   node: string;
-  /** Only populated by getNodesWithPerNodeLatency (load-balancer path). */
   pressure?: NodePressure | null;
   rootfsTotalBytes: number | null;
   rootfsUsedBytes: number | null;
@@ -457,8 +445,6 @@ export type ContainerResourceUsage = {
 
 export type LiveDeploymentDetail = LiveDeployment & {
   configAccessible: boolean;
-  // Raw numeric values pulled directly from Proxmox config — used by editors.
-  // cores: CPU cores; memoryConfiguredMb/swapConfiguredMb: values in MB as Proxmox stores them.
   coresConfigured: number | null;
   memoryConfiguredMb: number | null;
   swapConfiguredMb: number | null;
@@ -472,7 +458,6 @@ export type LiveDeploymentDetail = LiveDeployment & {
   ostemplate: string;
   resourceUsage: ContainerResourceUsage | null;
   rootfs: string;
-  // VM-specific fields
   vmCpuType?: string;
   vmSockets?: number;
   vmMachineType?: string;
@@ -535,11 +520,6 @@ type SafeResult<T> = {
 
 const PROXMOX_NODE_NAME_REGEX = /^[a-zA-Z0-9]([a-zA-Z0-9._-]{0,61}[a-zA-Z0-9])?$/;
 const PROXMOX_STORAGE_NAME_REGEX = /^[a-zA-Z0-9._-]{1,63}$/;
-// Bumped from 1.5s -> 10s. The previous TTL meant even concurrent renders within
-// a single page load couldn't share cached Proxmox GET responses. 10s is a safe
-// staleness for operational dashboards (longer than any single render hierarchy,
-// shorter than the 30s scheduler tick that updates background state). Mutations
-// still call `invalidateProxmoxGetCache` explicitly where needed.
 const PROXMOX_GET_CACHE_TTL_MS = 10_000;
 const TEMPLATE_CONTENT_INDEX_TTL_MS = 10_000;
 const TASK_UPID_DETAILS_REGEX = /^UPID:([^:]+):[0-9A-Fa-f]+:[0-9A-Fa-f]+:([0-9A-Fa-f]+):([^:]+):([^:]*):([^:]+):$/;
@@ -552,21 +532,19 @@ const IGNORED_DEPLOYMENT_TASK_TYPES = new Set([
 const proxmoxGetCache = new Map<string, { expiresAt: number; value: unknown }>();
 const proxmoxGetInflight = new Map<string, Promise<unknown>>();
 
-// Per-site auth circuit breaker: after consecutive 401s, fail fast instead of
-// waiting for Proxmox's 3-second brute-force delay on every request.
-const AUTH_CIRCUIT_BREAKER_THRESHOLD = 3; // trips after N consecutive 401s
-const AUTH_CIRCUIT_BREAKER_COOLDOWN_MS = 60_000; // retry after 60s
+// Proxmox delays each failed login by 3 seconds, so repeated 401s fail fast.
+const AUTH_CIRCUIT_BREAKER_THRESHOLD = 3;
+const AUTH_CIRCUIT_BREAKER_COOLDOWN_MS = 60_000;
 const authCircuitBreaker = new Map<string, { trippedAt: number; consecutiveFailures: number }>();
 
 function checkAuthCircuitBreaker(siteId: string): boolean {
   const state = authCircuitBreaker.get(siteId);
   if (!state || state.consecutiveFailures < AUTH_CIRCUIT_BREAKER_THRESHOLD) return false;
   if (Date.now() - state.trippedAt > AUTH_CIRCUIT_BREAKER_COOLDOWN_MS) {
-    // Cooldown expired — allow one retry
     state.consecutiveFailures = 0;
     return false;
   }
-  return true; // circuit is open — block the request
+  return true;
 }
 
 function recordAuthSuccess(siteId: string) {
@@ -742,7 +720,6 @@ function validatePositiveInteger(value: number, label: string) {
 
 let tlsWarningLogged = false;
 
-// TODO: remove once all deployments are migrated to multi-site config
 function getLegacyEnvConfig(): ResolvedSiteConfig | null {
   const url = process.env.PROXMOX_URL;
   const username = process.env.PROXMOX_USERNAME;
@@ -787,7 +764,7 @@ function getLegacyEnvConfig(): ResolvedSiteConfig | null {
 }
 
 function sanitizeProxmoxMessage(message: string): string {
-  // Strip credentials BEFORE truncating to avoid leakage.
+  // Strip credentials before truncating so no partial secret survives.
   return message
     .replace(/PVEAuthCookie=[^\s;]+/g, "[ticket]")
     .replace(/PVEAPIToken=[^\s]+/g, "[token]")
@@ -939,41 +916,20 @@ const TASK_PROGRESS_HINTS: Record<string, number> = {
   vzstop: 1,
 };
 
-// Per-site TLS options cache — avoids re-running AIA fetch + CA bundle
-// construction on every request. Corporate setups often have an internal root CA
-// AND need AIA intermediates; we combine both into one trust store.
 const tlsOptionsCache = new Map<string, { result: { rejectUnauthorized: boolean; ca?: string[] }; expiresAt: number; connectionKey: string }>();
 const tlsOptionsInflight = new Map<string, Promise<{ rejectUnauthorized: boolean; ca?: string[] }>>();
-const TLS_OPTIONS_CACHE_TTL_MS = 30 * 60_000; // 30 minutes
+const TLS_OPTIONS_CACHE_TTL_MS = 30 * 60_000;
 const TLS_OPTIONS_EMPTY_CACHE_TTL_MS = 2 * 60_000;
 
-// Keep-alive HTTPS / HTTP agents per site. Without these, every Proxmox call
-// opens a fresh TCP + TLS connection (~50-150ms of handshake on a LAN). The
-// deployments page can fire 90+ requests in parallel and was paying that cost
-// every time. With keep-alive, only the first request per socket pays the
-// handshake; subsequent requests reuse the connection.
-//
-// The agent is keyed by siteId. When TLS options refresh (every 30min), the
-// old agent's idle sockets are destroyed and a fresh agent is built — so cert
-// rotations propagate without restarting the server.
 const httpsAgentCache = new Map<string, { agent: https.Agent; expiresAt: number }>();
 const httpAgentCache = new Map<string, http.Agent>();
 const KEEP_ALIVE_AGENT_OPTS = {
   keepAlive: true,
   keepAliveMsecs: 5000,
-  // Bumped from 16 to 32. The deployments page can fan out 90+ parallel
-  // requests during a cold load; with maxSockets=16 most of them queued.
-  // 32 gives enough headroom that backgrounded ticks (load balancer, alerts)
-  // don't starve user-facing pages.
   maxSockets: 32,
   scheduling: "lifo" as const,
 };
 
-// Hard ceiling on any single Proxmox HTTP request. Without this a hung
-// endpoint can hold a socket forever — Node's default socket timeout doesn't
-// apply once the request has connected and Proxmox is just being slow to
-// respond. 15s is generous for legitimate calls; broken endpoints fail fast
-// instead of stalling the page that's waiting on them.
 const REQUEST_TIMEOUT_MS = 15_000;
 
 function getHttpsAgent(
@@ -983,7 +939,6 @@ function getHttpsAgent(
   const cached = httpsAgentCache.get(siteId);
   if (cached && cached.expiresAt > Date.now()) return cached.agent;
 
-  // Replace expired agent — close any idle sockets to avoid leaks.
   cached?.agent.destroy();
 
   const agent = new https.Agent({
@@ -1057,7 +1012,6 @@ async function buildTlsOptionsUncached(
     extras.push(config.tlsCustomCaPem);
   }
 
-  // Fetch missing intermediates from the cert chain via AIA
   try {
     const parsed = new URL(config.apiUrl);
     const aiaCerts = await getExtraCaCerts(
@@ -1068,9 +1022,7 @@ async function buildTlsOptionsUncached(
     if (aiaCerts.length > 0) {
       extras.push(...aiaCerts);
     }
-  } catch {
-    // Fall through — connect without AIA certs
-  }
+  } catch {}
 
   if (extras.length > 0) {
     const { rootCertificates } = await import("node:tls");
@@ -1097,7 +1049,6 @@ export async function getPveTicket(config: ResolvedSiteConfig): Promise<PveTicke
   const cacheKey = config.siteId;
   const connectionKey = getSiteConnectionKey(config);
   const cached = pveTicketCache.get(cacheKey);
-  // Return cached ticket if still valid (with 5-min safety buffer)
   if (cached && cached.connectionKey === connectionKey && cached.expiresAt > Date.now() + 5 * 60_000) {
     return cached;
   }
@@ -1160,7 +1111,7 @@ export async function getPveTicket(config: ResolvedSiteConfig): Promise<PveTicke
     const result: PveTicket = {
       ticket: data.ticket!,
       csrfToken: data.CSRFPreventionToken || "",
-      expiresAt: Date.now() + 2 * 60 * 60_000, // tickets are valid for 2h
+      expiresAt: Date.now() + 2 * 60 * 60_000,
     };
     pveTicketCache.set(cacheKey, { ...result, connectionKey });
     return result;
@@ -1190,7 +1141,6 @@ export function resetSiteConnection(siteId: string) {
 async function proxmoxRequest<T>(endpoint: string, options: RequestOptions = {}) {
   const config = getActiveSiteConfig();
 
-  // Circuit breaker: fail fast if this site has repeated auth failures
   if (checkAuthCircuitBreaker(config.siteId)) {
     throw new ProxmoxApiError(
       "Authentication failed — credentials may be invalid or expired. Requests paused to avoid delays. Will retry automatically.",
@@ -1200,8 +1150,7 @@ async function proxmoxRequest<T>(endpoint: string, options: RequestOptions = {})
 
   const method = options.method ?? "GET";
 
-  // Split inline query params from the path so the URL constructor doesn't
-  // percent-encode them into the pathname.
+  // Keep the query out of the URL constructor so it is not encoded into the path.
   const qIdx = endpoint.indexOf("?");
   const endpointPath = qIdx >= 0 ? endpoint.slice(0, qIdx) : endpoint;
   const endpointQuery = qIdx >= 0 ? endpoint.slice(qIdx + 1) : "";
@@ -1297,11 +1246,6 @@ async function proxmoxRequest<T>(endpoint: string, options: RequestOptions = {})
       reject(new ProxmoxApiError(error.message, endpoint));
     });
 
-    // Per-request timeout. Without this, a hung Proxmox endpoint (RRD on a
-    // loaded host, a flaky network path, a node that's gone unresponsive)
-    // ties up a keep-alive socket indefinitely. Pages that share that socket
-    // pool then queue waiting. 15s is generous — most calls finish in <1s,
-    // anything over that is broken.
     request.setTimeout(REQUEST_TIMEOUT_MS, () => {
       request.destroy();
       reject(new ProxmoxApiError(`Request timed out after ${REQUEST_TIMEOUT_MS}ms`, endpoint));
@@ -1808,10 +1752,8 @@ async function getRuntimeNetworkInfo(
   for (const iface of result.data) {
     if (iface.name === "lo") continue;
 
-    // inet field is like "10.0.0.5/24"
     if (iface.inet) {
       const [ip, prefix] = iface.inet.split("/");
-      // Parse gateway from net0 config (e.g. "name=eth0,bridge=vmbr0,gw=10.0.0.1,ip=dhcp")
       const net0Parts = (config?.net0 ?? "").split(",");
       const gwPart = net0Parts.find((p) => p.startsWith("gw="));
 
@@ -2105,7 +2047,7 @@ type ProxmoxRRDDataPoint = {
 };
 
 export type RRDChartData = {
-  /** Unix-millisecond timestamps; aligned 1:1 with the metric arrays. */
+  /** Unix milliseconds, aligned 1:1 with the metric arrays. */
   categories: number[];
   cpu: number[];
   memoryPercent: number[];
@@ -2139,7 +2081,7 @@ type ProxmoxGuestRrdPoint = {
 export type GuestMetricSeries = {
   timeframe: string;
   points: number;
-  /** Millisecond timestamps aligned with the percent series. */
+  /** Unix milliseconds, aligned with the percent series. */
   categories: number[];
   cpuPercent: { avg: number; peak: number; series: number[] };
   memPercent: { avg: number; peak: number; series: number[] };
@@ -2148,11 +2090,6 @@ export type GuestMetricSeries = {
   issue: string | null;
 };
 
-/**
- * Per-guest RRD time-series (CPU %, memory %, network throughput) for a
- * single container/VM, summarised into avg + peak plus a compact percent
- * series the copilot can reason about ("web01's memory trended up to 84%").
- */
 export async function getGuestRrdData(
   node: string,
   vmid: number,
@@ -2258,10 +2195,6 @@ export async function getClusterRRDData(
   const lengths = validResults.map((r) => r.data!.length);
   const minLength = Math.min(...lengths);
 
-  // Emit raw millisecond timestamps so the chart can use ApexCharts'
-  // datetime axis. The chart auto-picks the right label granularity per
-  // zoom level (HH:mm for 1h ranges, "dd MMM" for week/month) instead of
-  // relying on the server to pre-format and the client to thin the result.
   const categories: number[] = [];
   const cpu: number[] = [];
   const memoryPercent: number[] = [];
@@ -2296,7 +2229,6 @@ export async function getClusterRRDData(
     }).filter((v): v is number => v != null);
     storagePercent.push(storagePercents.length > 0 ? +((storagePercents.reduce((a, b) => a + b, 0) / storagePercents.length).toFixed(1)) : 0);
 
-    // Sum network across nodes, convert bytes → MB
     const netInSum = points.reduce((sum, p) => sum + (p.netin ?? 0), 0);
     const netOutSum = points.reduce((sum, p) => sum + (p.netout ?? 0), 0);
     netIn.push(Math.round(netInSum / 1024 / 1024));
@@ -2391,11 +2323,7 @@ async function listDeploymentsInternal(nodes: LiveNode[]) {
     }
   }
 
-  // Fetch config first, then conditionally fetch runtime IP. The /interfaces
-  // endpoint is SLOW (Proxmox introspects the live container) — easily 1-2s
-  // each. For containers with a static IP already in net0, we don't need it
-  // at all. Only DHCP / "manual" / missing-config containers actually need
-  // the runtime lookup.
+  // The /interfaces endpoint is slow, so only containers without a static IP use it.
   const configResults = await Promise.all(
     containers.map(async ({ node, container }) => {
       const config = await safeRequest<ProxmoxLxcConfigResponse>(
@@ -2976,11 +2904,6 @@ export async function getTemplateIndex() {
   issues.push(...nodeIssues);
   if (nextIdResult.issue) issues.push(nextIdResult.issue);
 
-  // The available-templates fetch needs the first target — but we don't have
-  // to wait for the WHOLE first batch before starting it. Chain it off the
-  // targets promise via .then() so it runs in parallel with templates and
-  // rootfs targets. Net: the slowest fetch dominates instead of (slowest first
-  // batch) + available-templates serially.
   const targetsPromise = listTemplateTargetsInternal(nodes);
   const availablePromise = targetsPromise.then((tr) =>
     listAvailableTemplatesInternal(tr.targets[0] ?? null),
@@ -3186,7 +3109,6 @@ async function getVmDetail(id: string): Promise<LiveDeploymentDetail | null> {
     ? await getVmRuntimeIp(node, vmid)
     : null;
 
-  // ide2 is typically cloud-init, ide0 is the installer media
   const isoVolid = extractVmIsoVolid(config);
   const isoFileName = isoVolid.split("/").at(-1) ?? "";
 
@@ -3313,7 +3235,6 @@ export function getBestNode(
 
     const freeMemory = (m.memoryTotalBytes ?? 0) - (m.memoryUsedBytes ?? 0);
     const freeCpu = 1 - (m.cpuRatio ?? 1);
-    // Weighted score: 70% memory, 30% CPU
     const score = freeMemory * 0.7 + freeCpu * 1e12 * 0.3;
 
     if (score > bestScore) {
@@ -4843,15 +4764,6 @@ export async function getClusterFirewallRules(): Promise<unknown[]> {
   return proxmoxRequest<unknown[]>("/cluster/firewall/rules") ?? [];
 }
 
-/**
- * Pull the raw `netN=...` strings out of a deployment's Proxmox config.
- * Returns the `node` the deployment runs on plus a map of `net0`, `net1`, ...
- * to their unparsed values. The caller is responsible for parsing the spec
- * via `parseNetSpec` in `lldp-deployment-path`.
- *
- * Used by the deployment-detail page to render the LLDP-derived "Network
- * path" card. Read-only, no Proxmox state mutation.
- */
 export async function getDeploymentNetSpecs(
   id: string,
 ): Promise<{ node: string; specs: Record<string, string> } | null> {
@@ -4871,14 +4783,6 @@ export async function getDeploymentNetSpecs(
   return { node, specs };
 }
 
-// ---------------------------------------------------------------------------
-// Node / cluster configuration setters (used by node-config snapshot restore)
-// ---------------------------------------------------------------------------
-
-/**
- * Append URLSearchParams from a plain object, skipping null/undefined and
- * coercing booleans to "0"/"1" (Proxmox API convention).
- */
 function appendParams(
   params: URLSearchParams,
   source: Record<string, unknown>,
@@ -4904,12 +4808,10 @@ function appendParams(
       params.set(key, value.join(","));
       continue;
     }
-    // Skip nested objects — Proxmox endpoints we touch here don't take them
-    // and silently passing `[object Object]` would corrupt config.
+    // Nested objects would be sent as "[object Object]" and corrupt the config.
   }
 }
 
-/** Read-only / derived fields returned by Proxmox that must not be sent back. */
 const NETWORK_IFACE_READONLY_KEYS: ReadonlySet<string> = new Set([
   "active",
   "exists",
@@ -4922,7 +4824,7 @@ const NETWORK_IFACE_READONLY_KEYS: ReadonlySet<string> = new Set([
 const STORAGE_READONLY_KEYS: ReadonlySet<string> = new Set([
   "digest",
   "storage",
-  "type", // type is immutable on PUT — only valid on POST
+  "type", // Proxmox rejects type on storage PUT.
 ]);
 
 export async function updateNodeDnsConfig(
@@ -4966,10 +4868,7 @@ export async function updateNodeTimeConfig(
   });
 }
 
-/**
- * Update an existing network interface on a node. Caller is responsible for
- * calling reloadNodeNetwork() afterwards to apply pending changes.
- */
+/** Changes stay pending until reloadNodeNetwork() applies them. */
 export async function updateNodeNetworkInterface(
   node: string,
   iface: string,
@@ -4982,8 +4881,7 @@ export async function updateNodeNetworkInterface(
   }
   const params = new URLSearchParams();
   appendParams(params, config, { skipKeys: NETWORK_IFACE_READONLY_KEYS });
-  // `type` is required by the API but should not be changed; pass it through
-  // if present in the snapshot so PUT validates correctly.
+  // The network PUT requires type even though it cannot change it.
   if (typeof config.type === "string" && config.type) {
     params.set("type", config.type);
   }
@@ -5013,7 +4911,6 @@ export async function createNodeNetworkInterface(
   });
 }
 
-/** Apply pending network changes (equivalent to `ifreload -a`). */
 export async function reloadNodeNetwork(node: string): Promise<string | null> {
   const safeNode = validateNodeName(node);
   return proxmoxRequest<string | null>(`/nodes/${safeNode}/network`, {
@@ -5021,7 +4918,6 @@ export async function reloadNodeNetwork(node: string): Promise<string | null> {
   });
 }
 
-/** Discard pending (un-applied) network changes. */
 export async function revertNodeNetworkChanges(node: string): Promise<unknown> {
   const safeNode = validateNodeName(node);
   return proxmoxRequest<unknown>(`/nodes/${safeNode}/network`, {
@@ -5094,12 +4990,6 @@ export async function deleteClusterFirewallRule(pos: number): Promise<unknown> {
   });
 }
 
-/**
- * Cheap change-detection fingerprint for the live-events watcher: node
- * statuses plus every guest's status, one list call per node and nothing
- * per-guest. Any lifecycle change (start/stop/migrate/create/delete)
- * changes the string.
- */
 export async function getClusterStatusFingerprint(): Promise<string> {
   const { nodes } = await getLiveNodeIndex();
   const parts: string[] = nodes
@@ -5125,8 +5015,6 @@ export async function getClusterStatusFingerprint(): Promise<string> {
   parts.push(...lists.flat().sort());
   return parts.join("|");
 }
-
-// --- Guest-level firewall (per container/VM) ---
 
 export type GuestFirewallRule = {
   pos: number;
@@ -5236,20 +5124,13 @@ export async function deleteGuestFirewallRule(
   });
 }
 
-// --- Load Balancer helpers ---
-
 export type GuestPenaltyData = {
   vmid: number;
   node: string;
   type: "lxc" | "qemu";
   failcnt?: number;
   cpuSteal?: number;
-  /**
-   * Guest-actual memory usage from the balloon driver (QEMU only,
-   * ballooninfo.total_mem - free_mem). Host-reported `mem` counts the full
-   * ballooned allocation, which can be several times what the guest really
-   * uses — balancing on it moves the wrong guests.
-   */
+  /** QEMU balloon usage; host-reported mem counts the whole ballooned allocation. */
   guestMemUsedBytes?: number;
 };
 

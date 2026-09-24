@@ -76,11 +76,6 @@ export type UpsertAnnotationInput = {
   actorEmail: string;
 };
 
-/**
- * Normalises inputs, validates the bounds, and either creates a fresh
- * annotation or merges with the existing one. Empty strings clear the
- * corresponding field (back to LLDP fallback).
- */
 export async function upsertLldpAnnotation(
   input: UpsertAnnotationInput,
 ): Promise<LldpDeviceAnnotation> {
@@ -111,8 +106,6 @@ export async function upsertLldpAnnotation(
       updatedAt: now,
       updatedBy: input.actorEmail,
     };
-    // If everything's blank, remove the annotation entirely so the row
-    // doesn't carry orphan metadata.
     if (!updated.friendlyName && !updated.portCountOverride && !updated.notes) {
       delete store.annotations[key];
     } else {

@@ -2,22 +2,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "@/lib/utils";
 
-/**
- * `Empty` is a vertical-stack primitive for empty / not-found / no-access
- * states. The shadcn-published version uses theme tokens (`text-foreground`,
- * `bg-muted` etc.) that resolve to a light palette without `<html class="dark">`,
- * which Tainer doesn't apply — so this version uses the project's hardcoded
- * dark-palette zinc/white tokens to stay consistent with the rest of the chrome.
- *
- *   <Empty>
- *     <EmptyHeader>
- *       <EmptyTitle>...</EmptyTitle>
- *       <EmptyDescription>...</EmptyDescription>
- *     </EmptyHeader>
- *     <EmptyContent>...action buttons...</EmptyContent>
- *   </Empty>
- */
-
+// Hardcoded dark palette because the app never sets the "dark" class shadcn tokens need.
 function Empty({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -47,9 +32,6 @@ const emptyMediaVariants = cva(
     variants: {
       variant: {
         default: "bg-transparent",
-        // The "icon" variant frames an icon in a soft tile. Translucent
-        // white-on-dark instead of the shadcn `bg-muted` token so it
-        // matches the rest of Tainer's surfaces.
         icon: "flex size-10 shrink-0 items-center justify-center rounded-lg bg-white/[0.06] text-zinc-200 [&_svg:not([class*='size-'])]:size-6",
       },
     },

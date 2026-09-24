@@ -18,13 +18,6 @@ async function loadOrCreateSecret(): Promise<Buffer> {
     return createHash("sha256").update(process.env.AUTH_SECRET.trim()).digest();
   }
 
-  // The auth secret is the crypto root for session cookies, mobile JWTs,
-  // 2FA secrets, and Proxmox credential encryption. In production we refuse
-  // to auto-generate it: silently writing the secret to the data volume
-  // means anyone who can read the volume (operator backup, snapshot leak,
-  // post-RCE) can mint admin sessions and decrypt every Proxmox password.
-  // Force operators to inject AUTH_SECRET as an env var instead — typically
-  // out-of-band, e.g. `openssl rand -base64 32` piped into a secrets store.
   if (process.env.NODE_ENV === "production") {
     throw new Error(
       "AUTH_SECRET is required in production. Generate one with " +
@@ -40,14 +33,11 @@ async function loadOrCreateSecret(): Promise<Buffer> {
     const secret = randomBytes(32);
     const filePath = await resolveDataFilePath("auth-secret.txt");
     await mkdir(getDataDirectoryPath(), { recursive: true });
-    // Use wx flag (exclusive create) to avoid race conditions on first boot.
-    // If another request already created the file, re-read it instead.
     try {
       await writeFile(filePath, `${secret.toString("base64")}\n`, { encoding: "utf8", flag: "wx" });
       await chmod(filePath, 0o600);
       return secret;
     } catch {
-      // Another concurrent request won the race; read their secret
       const raw = await readFile(filePath, "utf8");
       return Buffer.from(raw.trim(), "base64");
     }
@@ -57,7 +47,6 @@ async function loadOrCreateSecret(): Promise<Buffer> {
 export async function getAuthSecret() {
   if (cachedSecret) return cachedSecret;
 
-  // Serialize concurrent calls so only one initialization occurs
   if (!secretInitPromise) {
     secretInitPromise = loadOrCreateSecret().then((secret) => {
       cachedSecret = secret;

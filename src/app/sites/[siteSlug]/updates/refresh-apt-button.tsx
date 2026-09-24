@@ -44,7 +44,6 @@ export function UpgradeNodeButton({
   node: string;
   proxmoxBaseUrl: string;
 }) {
-  // Proxmox web UI shell URL for the node
   const shellUrl = `${proxmoxBaseUrl}/#v1:0:=node%2F${encodeURIComponent(node)}:4:::::`;
 
   return (

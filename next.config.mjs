@@ -1,8 +1,4 @@
-// Plain .mjs (not .ts) so the runtime stage doesn't have to ship the
-// typescript package (~23 MB) just to load this file at startup. Next.js
-// loads .mjs configs natively without transpilation. The TypeScript
-// surface this gives up is just the `NextConfig` type annotation, which
-// is purely advisory — typos here would surface at boot regardless.
+// Plain .mjs so the runtime image does not need the typescript package.
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {

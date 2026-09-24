@@ -48,8 +48,6 @@ export default async function LoadBalancerPage({
   const [settings, status, events, plan] = await Promise.all([
     withSiteConfig(siteConfig, () => getLoadBalancerSettings()),
     Promise.resolve(getLoadBalancerStatus(siteConfig.siteId)),
-    // listLbEvents reads the per-site JSON store; cap at 1000 for the UI
-    // so the page payload stays small. The file holds up to 10,000.
     withSiteConfig(siteConfig, () => listLbEvents(1000)),
     withSiteConfig(siteConfig, () => getRebalancePlan()),
   ]);

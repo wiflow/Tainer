@@ -41,12 +41,9 @@ import {
   generateSuggestions,
 } from "./copilot-suggestions";
 
-// -- Turn types --------------------------------------------------------------
-
 type AssistantTurn = {
   role: "assistant";
   text: string;
-  /** Model reasoning trace — shown collapsed, never sent back to the API. */
   reasoning?: string;
   toolCalls: ToolCallView[];
 };
@@ -64,10 +61,6 @@ function extractDeploymentId(pathname: string): string | null {
   return match?.[1] ?? null;
 }
 
-/**
- * Deployment ids are base64url-encoded JSON ({ node, vmid, type }) — decode
- * client-side so the context chip can say "CT 101 · pve1" without a fetch.
- */
 function decodeDeploymentBadge(id: string): { label: string; node: string } | null {
   try {
     const json = JSON.parse(atob(id.replace(/-/g, "+").replace(/_/g, "/"))) as {
@@ -90,11 +83,6 @@ function emptyAssistantTurn(): AssistantTurn {
   return { role: "assistant", text: "", reasoning: "", toolCalls: [] };
 }
 
-/**
- * Immutable update of a single tool call inside an assistant turn. Used by
- * both the optimistic state updater and the post-approval snapshot we feed
- * into /chat, so they always agree.
- */
 function replaceToolCall(
   turns: Turn[],
   turnIndex: number,
@@ -113,8 +101,6 @@ function replaceToolCall(
 
 type CopilotSite = { slug: string; name: string; countryCode: string | null };
 
-// -- Sidebar shell -----------------------------------------------------------
-
 export function CopilotSidebar({
   initiallyOpen = false,
   sites = [],
@@ -128,10 +114,6 @@ export function CopilotSidebar({
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Site override:
-  //   undefined → follow the URL (auto-detect)
-  //   null      → "All sites" (no site scope)
-  //   string    → pinned to that slug
   const [siteOverride, setSiteOverride] = useState<string | null | undefined>(
     undefined,
   );
@@ -145,21 +127,16 @@ export function CopilotSidebar({
     [deploymentId],
   );
 
-  // Whether the current page's deployment is attached as chat context. The
-  // chip in the header toggles this; navigating to a different deployment
-  // re-arms it.
   const [includeDeployment, setIncludeDeployment] = useState(true);
   useEffect(() => {
     setIncludeDeployment(true);
   }, [deploymentId]);
   const effectiveDeploymentId = includeDeployment ? deploymentId : null;
 
-  // Saved-chat state: null chatId = unsaved/new conversation.
   const [chatId, setChatId] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyChats, setHistoryChats] = useState<ChatSummary[] | null>(null);
 
-  // Effective site slug used for tool context.
   const siteSlug: string | null =
     siteOverride === undefined ? urlSiteSlug : siteOverride;
 
@@ -167,7 +144,6 @@ export function CopilotSidebar({
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  // Keyboard shortcuts: Cmd/Ctrl+J toggles, Esc closes.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "j") {
@@ -180,13 +156,11 @@ export function CopilotSidebar({
     return () => document.removeEventListener("keydown", onKey);
   }, [open]);
 
-  // Auto-scroll on new content.
   useEffect(() => {
     if (!scrollRef.current) return;
     scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [turns, streaming]);
 
-  // Focus input when opened.
   useEffect(() => {
     if (open) {
       const t = setTimeout(() => inputRef.current?.focus(), 80);
@@ -194,11 +168,6 @@ export function CopilotSidebar({
     }
   }, [open]);
 
-  // Accepts an optional `override` so callers that just mutated turns can pass
-  // the post-mutation array directly. Without this the function reads `turns`
-  // from the React closure — which is stale right after a setTurns call, so a
-  // just-approved tool would still look "awaiting-approval" and its
-  // tool_result would be filtered out, breaking the next /chat call.
   const buildHistoryForApi = useCallback((override?: Turn[]): ChatMessage[] => {
     const src = override ?? turns;
     const messages: ChatMessage[] = [];
@@ -206,9 +175,7 @@ export function CopilotSidebar({
       if (turn.role === "user") {
         messages.push({ role: "user", content: turn.text });
       } else if (turn.role === "assistant") {
-        // Every tool_use we emitted must have a matching tool_result in the
-        // following user message, including denied ones — the model API rejects
-        // unmatched ids. We synthesise an error result for denied tools.
+        // The model API rejects a tool_use without a matching tool_result, even for denied tools.
         const toolCalls: ChatToolCall[] = turn.toolCalls.map((tc) => ({
           id: tc.id,
           name: tc.name,
@@ -321,7 +288,6 @@ export function CopilotSidebar({
         updateActive((turn) => ({ ...turn, text: turn.text + event.text }));
         break;
       case "reasoning":
-        // Token-level deltas — append verbatim, no separators.
         updateActive((turn) => ({
           ...turn,
           reasoning: (turn.reasoning ?? "") + event.text,
@@ -414,8 +380,6 @@ export function CopilotSidebar({
       const tc = turn.toolCalls.find((c) => c.id === toolCallId);
       if (!tc?.token) return;
 
-      // Optimistic UI update — mark the gated call as running while /approve
-      // runs server-side.
       setTurns((prev) =>
         replaceToolCall(prev, turnIndex, toolCallId, (c) => ({ ...c, status: "running" })),
       );
@@ -433,11 +397,6 @@ export function CopilotSidebar({
         };
         if (!response.ok) throw new Error(json.error || `Request failed (${response.status})`);
 
-        // Build the canonical post-approval turns array up-front so we can
-        // both render it AND use it for the next /chat call. Pulling from the
-        // React closure would give us a stale snapshot — the tool would still
-        // look awaiting-approval and its tool_result would be filtered out,
-        // breaking the model API's tool-call ↔ tool-result pairing requirement.
         const nextTurns = replaceToolCall(turns, turnIndex, toolCallId, (c) => ({
           ...c,
           status: json.isError ? "error" : "done",
@@ -475,8 +434,6 @@ export function CopilotSidebar({
           body: JSON.stringify({ token: tc.token, decision: "deny" }),
         });
       } catch {
-        // Mark locally regardless — denial is a no-op server-side; if the
-        // network call dropped we still want the UI in a consistent state.
       }
       const nextTurns = replaceToolCall(turns, turnIndex, toolCallId, (c) => ({
         ...c,
@@ -484,15 +441,11 @@ export function CopilotSidebar({
         token: undefined,
       }));
       setTurns(nextTurns);
-      // Same stale-closure issue as onApprove — pass the freshly-built turns
-      // so the tool_result we synthesise for the denied call is included.
       await streamTurn(buildHistoryForApi(nextTurns));
     },
     [turns, buildHistoryForApi, streamTurn],
   );
 
-  // Auto-save the conversation whenever a turn finishes streaming. The id
-  // from the first save is reused so the whole conversation stays one chat.
   const chatIdRef = useRef<string | null>(null);
   chatIdRef.current = chatId;
   const prevStreamingRef = useRef(false);
@@ -517,7 +470,6 @@ export function CopilotSidebar({
           );
         }
       } catch {
-        // Persistence is best-effort — the live conversation is unaffected.
       }
     })();
   }, [streaming, turns]);
@@ -549,7 +501,6 @@ export function CopilotSidebar({
       setError(null);
       setHistoryOpen(false);
     } catch {
-      // leave the current conversation untouched
     }
   }, []);
 
@@ -560,7 +511,6 @@ export function CopilotSidebar({
           method: "DELETE",
         });
       } catch {
-        // list refresh below still reflects reality on next open
       }
       setHistoryChats((prev) => (prev ? prev.filter((c) => c.id !== id) : prev));
       if (chatId === id) setChatId(null);
@@ -700,12 +650,6 @@ export function CopilotSidebar({
               />
             ))}
           </AnimatePresence>
-          {/*
-            Shown whenever we're waiting on the model — including between
-            tool rounds, where the last turn already has content but the
-            model is composing its next step. Hidden only while a tool call
-            is visibly running (the plan view has its own spinner then).
-          */}
           {streaming &&
             !(
               turns[turns.length - 1]?.role === "assistant" &&
@@ -1088,8 +1032,6 @@ function TurnView({
     </motion.div>
   );
 }
-
-// -- Chat history -------------------------------------------------------------
 
 function chatTimeAgo(iso: string): string {
   const ms = Date.now() - new Date(iso).getTime();

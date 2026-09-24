@@ -69,8 +69,7 @@ export default async function BackupsPage({
 
   const [overview, settings, rootfsResult, backupPolicies, backupRuns, availableTags] = await getBackupsPageData(siteSlug);
 
-  // Storage Box state is read fresh (not through the cached loader): connect /
-  // test actions must reflect immediately.
+  // Read uncached so Storage Box connect and test actions show immediately.
   const storageBoxSiteConfig = await resolveSiteConfigBySlug(siteSlug);
   const [storageBoxSummary, offloadLog, storageConfigs, offsiteIndex] = await withSiteConfig(
     storageBoxSiteConfig,
@@ -141,7 +140,6 @@ export default async function BackupsPage({
     );
   }
 
-  // Calculate stats
   const totalCapacity = overview.backupStoragePools.reduce(
     (sum, p) => sum + (p.totalBytes ?? 0),
     0,
@@ -164,7 +162,6 @@ export default async function BackupsPage({
         )}
       </div>
 
-      {/* Stat cards */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
           icon={<CalendarClock className="w-3.5 h-3.5" />}
@@ -197,7 +194,6 @@ export default async function BackupsPage({
         title="API access notes"
       />
 
-      {/* Off-site backup — only once configured under /integrations */}
       {isAdmin && storageBoxSummary.configured && (
         <StorageBoxCard
           dirStorages={dirStorages}
@@ -208,7 +204,6 @@ export default async function BackupsPage({
         />
       )}
 
-      {/* Backup policies */}
       {isAdmin && (
         <BackupPoliciesList
           availableTags={availableTags}
@@ -217,10 +212,8 @@ export default async function BackupsPage({
         />
       )}
 
-      {/* Backup run history */}
       <BackupRunHistoryCard runs={backupRuns} />
 
-      {/* Backup storage pools */}
       <SectionPanel
         title="Backup storage"
         description="Storage pools configured for backup content. SMB/CIFS shares are backed up downstream by Veeam."
@@ -228,7 +221,6 @@ export default async function BackupsPage({
         <BackupStorageCards pools={overview.backupStoragePools} />
       </SectionPanel>
 
-      {/* Recent backup archives */}
       <SectionPanel
         title="Recent backup archives"
         description="Backup archives stored on Proxmox backup storage pools."
@@ -243,7 +235,6 @@ export default async function BackupsPage({
         />
       </SectionPanel>
 
-      {/* Unprotected workloads */}
       {overview.unprotectedVmids.length > 0 && (
         <SectionPanel
           title="Unprotected workloads"

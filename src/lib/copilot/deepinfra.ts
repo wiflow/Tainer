@@ -2,16 +2,11 @@ import "server-only";
 
 export const DEFAULT_OPENAI_BASE_URL = "https://api.deepinfra.com/v1/openai";
 
-/**
- * Resolve the chat-completions URL for an OpenAI-compatible base URL
- * ("https://host/v1" for vLLM/Ollama, DeepInfra's /v1/openai by default).
- */
 function chatCompletionsUrl(baseUrl: string | null | undefined): string {
   const base = (baseUrl || DEFAULT_OPENAI_BASE_URL).replace(/\/+$/, "");
   return `${base}/chat/completions`;
 }
 
-/** Self-hosted endpoints (vLLM, Ollama) often run without an API key. */
 function buildHeaders(apiKey: string | null): Record<string, string> {
   return {
     ...(apiKey ? { authorization: `Bearer ${apiKey}` } : {}),
@@ -24,7 +19,7 @@ export type OpenAiToolCall = {
   type: "function";
   function: {
     name: string;
-    /** JSON-encoded arguments string, as returned by the API. */
+    /** JSON-encoded string, as returned by the API. */
     arguments: string;
   };
 };
@@ -72,7 +67,6 @@ export type OpenAiResponse = {
     message: {
       role: "assistant";
       content: string | null;
-      /** Reasoning-model traces (DeepInfra surfaces these separately for some models). */
       reasoning_content?: string | null;
       tool_calls?: OpenAiToolCall[];
     };
@@ -103,9 +97,7 @@ async function throwApiError(response: Response): Promise<never> {
     if (typeof parsed.error === "string") summary = parsed.error;
     else if (parsed.error?.message) summary = parsed.error.message;
     else if (parsed.detail) summary = parsed.detail;
-  } catch {
-    // ignore — keep generic summary
-  }
+  } catch {}
   throw new DeepInfraApiError(summary, response.status, text);
 }
 
@@ -127,8 +119,6 @@ export async function callDeepInfra(
 
   return (await response.json()) as OpenAiResponse;
 }
-
-// -- Streaming ---------------------------------------------------------------
 
 export type DeepInfraStreamDelta =
   | { type: "content"; text: string }
@@ -158,12 +148,6 @@ type StreamChunk = {
   usage?: OpenAiUsage | null;
 };
 
-/**
- * Streaming chat completion. Yields content/reasoning deltas as they arrive
- * so the UI can render token-by-token; tool-call fragments are assembled
- * internally and returned (with usage and finish reason) as the generator's
- * final value.
- */
 export async function* streamDeepInfra(
   apiKey: string | null,
   body: OpenAiRequest,
@@ -188,8 +172,7 @@ export async function* streamDeepInfra(
   let reasoningContent = "";
   let finishReason = "stop";
   let usage: OpenAiUsage | null = null;
-  // Tool-call fragments arrive keyed by index; id/name come on the first
-  // fragment, argument text accumulates across the rest.
+  // Only a tool call's first fragment carries id and name; arguments accumulate.
   const toolCallAcc = new Map<number, { id: string; name: string; args: string }>();
 
   const reader = response.body!.getReader();

@@ -15,8 +15,6 @@ import {
   siteSlugSchema,
 } from "@/lib/copilot/tools/helpers";
 
-// Cap the address lists we hand to the model — a /22 pool has 1000+ entries
-// and the full list would blow the context for no benefit.
 const MAX_AVAILABLE_IN_LIST = 10;
 const MAX_AVAILABLE_IN_DETAIL = 50;
 const MAX_USED_IN_DETAIL = 50;
@@ -136,8 +134,7 @@ registerTool({
         throw new Error("change_deployment_ip supports LXC containers only.");
       }
 
-      // Re-validates availability server-side at execution time — the model's
-      // (or a stale approval card's) idea of "free" is not trusted.
+      // Availability is re-checked here because the approved address may no longer be free.
       const selection = await resolveIpPoolSelection(poolId, address);
 
       const params = new URLSearchParams();
@@ -170,9 +167,7 @@ registerTool({
         deployment = detail
           ? { id: detail.id, vmid: detail.vmid, name: detail.name, node: detail.node, ip: detail.ipAddress }
           : null;
-      } catch {
-        // non-fatal — result still carries the applied config
-      }
+      } catch {}
 
       return {
         ok: true,

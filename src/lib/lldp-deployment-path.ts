@@ -6,14 +6,8 @@ import {
   type ProxmoxNetworkInterface,
 } from "@/lib/proxmox";
 
-/**
- * One physical link from the Proxmox host bridge to an upstream switch port,
- * surfaced from the LLDP snapshot that observed it.
- */
 export type DeploymentNetworkHop = {
-  /** The physical NIC on the Proxmox host that participates in the bridge. */
   uplinkInterface: string;
-  /** Upstream device, if LLDP saw a neighbour on `uplinkInterface`. */
   remote: {
     chassisId: string;
     systemName: string | null;
@@ -24,13 +18,9 @@ export type DeploymentNetworkHop = {
 };
 
 export type DeploymentNetworkPathEntry = {
-  /** The container's `net0` / `net1` / etc. key. */
   netKey: string;
-  /** Bridge on the Proxmox host the interface attaches to. */
   bridge: string | null;
-  /** Other parameters parsed from the network spec (firewall, IP, etc.). */
   vlanTag: number | null;
-  /** All physical NICs on the bridge plus their LLDP-derived upstream port. */
   uplinks: DeploymentNetworkHop[];
 };
 
@@ -40,10 +30,6 @@ export type DeploymentNetworkPath = {
   freshestSnapshotAt: string | null;
 };
 
-/**
- * Parse one `netN=...` line from a Proxmox container/VM config. The string is
- * comma-separated `key=value` pairs (with some bare flags for QEMU).
- */
 export function parseNetSpec(spec: string): Record<string, string> {
   const out: Record<string, string> = {};
   for (const part of spec.split(",")) {
@@ -72,11 +58,6 @@ function findBridgeUplinks(
   return raw.split(/\s+/).filter(Boolean);
 }
 
-/**
- * Match a Proxmox node name to one of the agent hosts that has posted
- * snapshots for this site. PVE node names are usually short hostnames; agents
- * post `$(hostname)` which may be short or FQDN depending on system config.
- */
 function pickAgentHost(node: string, snapshots: LldpSiteSnapshots): string | null {
   if (snapshots.hosts[node]) return node;
   const shortNode = node.split(".")[0];
@@ -94,14 +75,6 @@ function findNeighbor(
   return neighbors.find((n) => n.localInterface === uplink) ?? null;
 }
 
-/**
- * Resolve the full chain { container netN → bridge → uplink NIC → switch + port }
- * for a deployment, using its config + node network config + LLDP snapshot.
- *
- * Returns null if the deployment has no network interfaces configured.
- * Returns entries with `uplinks: []` for bridges whose `bridge_ports` is
- * empty (e.g. an isolated host-only bridge with no upstream link).
- */
 export async function resolveDeploymentNetworkPath(input: {
   node: string;
   netConfig: Record<string, string | undefined>;

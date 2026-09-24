@@ -34,7 +34,6 @@ export async function updateRootfsDefaultsAction(
     requireSitePermission(session, siteConfig.siteId, "manage-settings");
 
     return await withSiteConfig(siteConfig, async () => {
-
     const defaultRootfsStorage = String(formData.get("defaultRootfsStorage") ?? "").trim();
 
     if (!defaultRootfsStorage) {
@@ -106,8 +105,6 @@ export async function updateDockerLibraryAction(
     return await withSiteConfig(siteConfig, async () => {
       const dockerLibraryPath = String(formData.get("dockerLibraryPath") ?? "").trim();
 
-      // Empty clears the override (falls back to the DOCKER_LIBRARY_PATH env
-      // var). A non-empty value must be an absolute, container-visible path.
       if (dockerLibraryPath && !dockerLibraryPath.startsWith("/")) {
         return {
           message: "The library path must be absolute (start with '/'), e.g. /app/data/docker-library.",
@@ -163,7 +160,6 @@ export async function updateBackupDefaultsAction(
     { const _s = await requireSession(); requireSitePermission(_s, siteConfig.siteId, "manage-settings"); }
 
     return await withSiteConfig(siteConfig, async () => {
-
     const defaultBackupStorage = String(formData.get("defaultBackupStorage") ?? "").trim();
     const slaHoursRaw = Number(formData.get("defaultBackupSlaHours"));
     const defaultBackupSlaHours = Number.isFinite(slaHoursRaw) && slaHoursRaw > 0 ? slaHoursRaw : 24;
@@ -221,7 +217,6 @@ export async function createIpPoolAction(
     requireSitePermission(session, siteConfig.siteId, "manage-settings");
 
     return await withSiteConfig(siteConfig, async () => {
-
     const name = String(formData.get("name") ?? "").trim();
     const subnet = String(formData.get("subnet") ?? "").trim();
     const bridge = String(formData.get("bridge") ?? "").trim();
@@ -286,7 +281,6 @@ export async function deleteIpPoolAction(
     requireSitePermission(session, siteConfig.siteId, "manage-settings");
 
     return await withSiteConfig(siteConfig, async () => {
-
     const poolId = String(formData.get("poolId") ?? "").trim();
     const poolName = String(formData.get("poolName") ?? "").trim();
 

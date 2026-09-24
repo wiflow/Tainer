@@ -20,10 +20,6 @@ const fieldClassName =
 
 const DEFAULT_TIMEOUT_MS = 3500;
 
-// All three actions (save / test / remove) share one <Form>: each
-// submit button uses `formAction` to route to its respective server
-// action. This keeps the form fields in one place and lets the user
-// "test then save" or "remove" without nested forms.
 export function IpamForm({
   initial,
   onCancel,

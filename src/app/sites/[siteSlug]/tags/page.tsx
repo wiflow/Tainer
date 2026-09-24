@@ -14,7 +14,7 @@ import { getDeploymentIndex, withSiteConfig } from "@/lib/proxmox";
 import { extractManagedTagSlugs } from "@/lib/tag-utils";
 import { cn } from "@/lib/utils";
 
-// Avoid `force-dynamic` here — it silently disables the unstable_cache below.
+// Avoid `force-dynamic` here: it silently disables the unstable_cache below.
 const getTagsPageData = unstable_cache(
   async (siteSlug: string) => {
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
@@ -40,7 +40,6 @@ export default async function TagsPage({
 
   const [tags, { deployments }] = await getTagsPageData(siteSlug);
 
-  // Compute per-tag stats by scanning deployment tagList for grp:* tags
   const memberCounts: Record<string, number> = {};
   const statusCounts: Record<string, { running: number; stopped: number; total: number }> = {};
 

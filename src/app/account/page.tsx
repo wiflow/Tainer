@@ -26,9 +26,6 @@ export default async function AccountPage() {
   const isAdmin = session.user.role === "admin";
   const debugPaths = isAdmin ? await getAuthDebugPaths() : null;
 
-  // Resolve the SSO provider name so the UI can show "Linked to Microsoft
-  // Entra" instead of an opaque ID. Falls back to the ID if the provider
-  // has been deleted since the user was last linked.
   let ssoProviderName: string | null = null;
   if (account.ssoProviderId) {
     const provider = await getIdpProviderById(account.ssoProviderId);

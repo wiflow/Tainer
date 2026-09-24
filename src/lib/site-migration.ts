@@ -51,7 +51,6 @@ export async function migrateLegacyEnvSite(): Promise<void> {
         return;
       }
     } catch {
-      // File is invalid or empty; proceed with migration.
     }
   }
 

@@ -4,38 +4,13 @@ import type { EwmaState, NodePenalty, NodeScore, ScoreWeights } from "./types";
 const METRIC_UNAVAILABLE_PENALTY = 10;
 const FALLBACK_PERCENT = 50;
 
-/**
- * Compute composite scores for all nodes.
- *
- * Score formula:
- *   S(node) = (w.cpu * C) + (w.memory * M) + (w.disk * D) + (w.latency * L_norm) + penalties
- *
- * Where:
- *   C = cpuRatio * 100 (0-100 scale)
- *   M = memoryUsed / memoryTotal * 100 (0-100 scale)
- *   D = rootfsUsed / rootfsTotal * 100 (0-100 scale)
- *   L_norm = min(ewmaLatency / latencyMaxMs, 1.0) * 100 (normalized to 0-100)
- *
- * When a metric is unavailable (null/zero total), the node receives the
- * cluster average for that metric (or 50% if no average exists) plus a
- * small penalty. This avoids permanently banning nodes with missing metrics
- * while still slightly disfavoring them.
- *
- * Lower score = better node.
- */
 export type PsiScoringOptions = {
-  /** Penalty added per pressured resource (0 disables PSI scoring). */
+  /** Penalty added per pressured resource; 0 disables PSI scoring. */
   psiPenalty: number;
-  /** avg10 "some" stall percentage above which a resource counts as pressured. */
+  /** PSI avg10 "some" stall percentage above which a resource counts as pressured. */
   psiThresholdPercent: number;
 };
 
-/**
- * PSI (Pressure Stall Information) penalties, PVE 9+. Utilization misses
- * contention — a node can sit at 60% CPU while tasks stall waiting for it.
- * PSI measures the stalling directly, so each pressured resource (CPU,
- * memory, IO) adds a penalty. Nodes that don't report PSI are unaffected.
- */
 function computePsiPenalties(
   metrics: LiveNodeMetrics,
   options: PsiScoringOptions,
@@ -72,7 +47,6 @@ export function computeNodeScores(
 ): NodeScore[] {
   const now = Date.now();
 
-  // First pass: compute raw percentages for available metrics to find averages
   const cpuValues: number[] = [];
   const memValues: number[] = [];
   const diskValues: number[] = [];
@@ -89,12 +63,10 @@ export function computeNodeScores(
   const avgMem = memValues.length > 0 ? memValues.reduce((a, b) => a + b, 0) / memValues.length : FALLBACK_PERCENT;
   const avgDisk = diskValues.length > 0 ? diskValues.reduce((a, b) => a + b, 0) / diskValues.length : FALLBACK_PERCENT;
 
-  // Second pass: compute final scores
   return metrics.map((m) => {
     const penalties = [...(penaltyData.get(m.node) ?? [])];
     if (psiOptions) penalties.push(...computePsiPenalties(m, psiOptions));
 
-    // CPU
     let cpuPercent: number;
     if (m.cpuRatio != null) {
       cpuPercent = m.cpuRatio * 100;
@@ -103,7 +75,6 @@ export function computeNodeScores(
       penalties.push({ reason: "CPU metric unavailable", value: METRIC_UNAVAILABLE_PENALTY });
     }
 
-    // Memory
     let memoryPercent: number;
     const memTotal = m.memoryTotalBytes ?? 0;
     if (memTotal > 0) {
@@ -113,7 +84,6 @@ export function computeNodeScores(
       penalties.push({ reason: "Memory metric unavailable", value: METRIC_UNAVAILABLE_PENALTY });
     }
 
-    // Disk
     let diskPercent: number;
     const diskTotal = m.rootfsTotalBytes ?? 0;
     if (diskTotal > 0) {
@@ -123,7 +93,6 @@ export function computeNodeScores(
       penalties.push({ reason: "Disk metric unavailable", value: METRIC_UNAVAILABLE_PENALTY });
     }
 
-    // Latency
     const ewma = ewmaStates.get(m.node);
     const ewmaLatencyMs = ewma?.value ?? 0;
     const latencyNormalized = Math.min(ewmaLatencyMs / Math.max(latencyMaxMs, 1), 1.0) * 100;

@@ -55,8 +55,6 @@ export function RestoreForm({
     successTitle: "Restore complete",
   });
 
-  // Pre-check sections that actually differ between current and snapshot,
-  // so the default action only touches what's drifted.
   const changedByName = new Map(diffs.map((d) => [d.section, d.changed] as const));
   const initialSelected = new Set<RestoreSection>(
     SECTION_ORDER.filter((s) => changedByName.get(s.matchesDiffSection)).map((s) => s.key),
@@ -85,7 +83,6 @@ export function RestoreForm({
         <input name="siteSlug" type="hidden" value={siteSlug} />
         <input name="snapshotId" type="hidden" value={snapshotId} />
 
-        {/* Section checkboxes */}
         <div className="space-y-2">
           <p className="text-[12px] font-medium text-zinc-400">Sections to restore</p>
           <div className="grid gap-2 sm:grid-cols-2">
@@ -128,7 +125,6 @@ export function RestoreForm({
           </div>
         </div>
 
-        {/* Network reload toggle */}
         {networkSelected && (
           <div className="rounded-md border border-amber-500/20 bg-amber-500/5 p-3">
             <label className="flex items-start gap-2 cursor-pointer">
@@ -151,7 +147,6 @@ export function RestoreForm({
           </div>
         )}
 
-        {/* Destructive toggle */}
         {clusterScopedSelected && (
           <div className="rounded-md border border-red-500/30 bg-red-500/5 p-3">
             <label className="flex items-start gap-2 cursor-pointer">
@@ -179,7 +174,6 @@ export function RestoreForm({
           </div>
         )}
 
-        {/* Warning + confirmation */}
         <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3">
           <div className="flex items-start gap-2">
             <AlertTriangle className="h-4 w-4 text-amber-400 mt-0.5 flex-shrink-0" />
@@ -216,7 +210,6 @@ export function RestoreForm({
           </Button>
         </div>
 
-        {/* Per-section results */}
         {state.result && (
           <div className="space-y-2 border-t border-white/5 pt-4">
             <p className="text-[12px] font-medium text-zinc-400">Last restore result</p>

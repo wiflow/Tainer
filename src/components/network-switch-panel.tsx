@@ -9,13 +9,7 @@ import type { SnmpPort } from "@/lib/lldp-snmp-types";
 
 type Props = {
   ports: LldpDevicePort[];
-  /** Operator-supplied port count, overrides the inference from the highest
-   *  observed port number. */
   portCountOverride?: number | null;
-  /** Real port inventory from SNMP. When provided, the panel renders the
-   *  authoritative chassis layout (every physical port, real up/down state)
-   *  rather than the LLDP-inferred mock. LLDP observations are overlaid as
-   *  highlights on matching ports. */
   snmpPorts?: SnmpPort[] | null;
 };
 
@@ -30,8 +24,6 @@ const FRESH_THRESHOLD_MS = 90_000;
 const COMMON_PORT_COUNTS = [8, 16, 24, 28, 32, 48, 52];
 
 export function NetworkSwitchPanel({ ports, portCountOverride, snmpPorts }: Props) {
-  // If we have real SNMP port data, render the authoritative front panel.
-  // Falls through to the LLDP-inferred view when SNMP isn't configured.
   if (snmpPorts && snmpPorts.length > 0) {
     return <SnmpFrontPanel lldpPorts={ports} snmpPorts={snmpPorts} />;
   }
@@ -63,11 +55,6 @@ function LldpInferredPanel({
     );
   }
 
-  // When a device advertises every port as a MAC address (Linux hosts /
-  // other Proxmox nodes running lldpd with the default port-id subtype),
-  // there are no numbered slots — the inferred chassis grid would just be
-  // an empty 8-port mock, which is misleading. Drop it and present the
-  // observed links as a clean list instead.
   const hasNumberedPorts = slots.some((s) => s.port !== null);
 
   if (!hasNumberedPorts) {
@@ -143,11 +130,6 @@ function LldpInferredPanel({
   );
 }
 
-/**
- * A MAC-addressed link rendered as a readable row: which Proxmox node +
- * interface it terminates at, VLAN, and freshness. Used for devices that
- * have no numbered chassis (Linux hosts / other Proxmox nodes).
- */
 function LinkRow({
   port,
   selected,
@@ -262,7 +244,6 @@ function FrontPanel({
   );
 }
 
-/** Renders RJ45-style ports in column pairs (UniFi convention: two rows of N/2). */
 function PortRowGrouped({
   slots,
   selectedId,
@@ -272,7 +253,6 @@ function PortRowGrouped({
   selectedId: string | null;
   onSelect: (id: string | null) => void;
 }) {
-  // UniFi-style: groups of 4 pairs, separated by small gaps.
   const groups: SlotInfo[][] = [];
   for (let i = 0; i < slots.length; i += 8) {
     groups.push(slots.slice(i, i + 8));
@@ -526,11 +506,6 @@ function formatAge(ms: number): string {
   return `${Math.floor(ms / 86_400_000)}d ago`;
 }
 
-/**
- * Build the visual layout: assign each known port to a numbered slot, infer
- * the total port count, and split anything that doesn't fit a numbered slot
- * into the "Other ports" bucket.
- */
 function buildLayout(
   ports: LldpDevicePort[],
   portCountOverride: number | null,
@@ -581,18 +556,11 @@ function buildLayout(
   };
 }
 
-/**
- * Extract the slot number and whether it's an SFP/uplink port from a port ID.
- * Returns null if the port ID doesn't look slot-numbered (e.g. it's a MAC
- * address — older managed switches sometimes advertise MAC as port ID).
- */
 function extractSlot(portId: string): { slot: number; isSfp: boolean } | null {
   const trimmed = portId.trim();
   if (/^([0-9a-fA-F]{2}[:.\- ]){5}[0-9a-fA-F]{2}$/.test(trimmed)) return null;
 
-  // Prefer the *last* numeric run in the string — that captures "Eth1/14" → 14,
-  // "swp14" → 14, "xe-0/0/14" → 14. Numbers that come before slashes are
-  // typically chassis/module identifiers and not slot numbers.
+  // The last number is the port; in "xe-0/0/14" the others are chassis or module ids.
   const matches = trimmed.match(/\d+/g);
   if (!matches || matches.length === 0) return null;
   const last = matches[matches.length - 1];
@@ -603,16 +571,6 @@ function extractSlot(portId: string): { slot: number; isSfp: boolean } | null {
   return { slot, isSfp };
 }
 
-// ---------------------------------------------------------------------------
-// SNMP-driven front panel (UniFi-style)
-// ---------------------------------------------------------------------------
-//
-// When the SNMP poll agent has run against this chassis, we have a real
-// IF-MIB inventory: every port, real up/down state, real port names,
-// operator-set aliases, speed. We render that as the authoritative chassis
-// layout — rather than the LLDP-inferred mock — and overlay LLDP-observed
-// ports as highlighted "your nodes plug in here" hints.
-
 type SnmpSlot = {
   slot: number;
   isSfp: boolean;
@@ -621,12 +579,11 @@ type SnmpSlot = {
   lldp: LldpDevicePort | null;
 };
 
-const ETHERNET_TYPE_NUMBERS = new Set([6, 7, 117, 169]); // ethernetCsmacd + common variants
+const ETHERNET_TYPE_NUMBERS = new Set([6, 7, 117, 169]); // IANA ifType values
 
 function isPhysicalSnmpPort(p: SnmpPort): boolean {
   if (p.type != null && ETHERNET_TYPE_NUMBERS.has(p.type)) return true;
-  if (p.type != null) return false; // Known non-ethernet → skip
-  // No type info — fall back to name heuristics. Reject obvious virtuals.
+  if (p.type != null) return false;
   if (/^(vlan|vl|lo|loopback|null|tunnel|po|port-?channel|bdi|nve|svi)/i.test(p.name)) {
     return false;
   }
@@ -645,14 +602,9 @@ function shortenPortName(name: string): string {
 }
 
 function slotFromSnmpName(name: string): { slot: number; isSfp: boolean } | null {
-  // Reuse the LLDP extractor — port names from SNMP and LLDP follow the
-  // same conventions (Gi1/0/1, Te1/0/49, swp14, etc.) so the regex matches
-  // identically.
   return extractSlot(name);
 }
 
-/** Best-effort match of an LLDP port to an SNMP port. Compares by short name
- *  (Gi1/0/1) then by trailing slot number. */
 function findLldpForSnmp(
   snmp: SnmpPort,
   lldpPorts: LldpDevicePort[],
@@ -686,7 +638,6 @@ function SnmpFrontPanel({
 }) {
   const [selectedSnmpIndex, setSelectedSnmpIndex] = useState<number | null>(null);
 
-  // Filter + classify. SFP-ness: anything >= 10 Gbps or with Te/Fo/Hu prefix.
   const slots: SnmpSlot[] = useMemo(() => {
     return snmpPorts
       .filter(isPhysicalSnmpPort)
@@ -707,7 +658,6 @@ function SnmpFrontPanel({
         } satisfies SnmpSlot;
       })
       .sort((a, b) => {
-        // SFPs cluster to the right; within each group sort by slot.
         if (a.isSfp !== b.isSfp) return a.isSfp ? 1 : -1;
         return a.slot - b.slot;
       });
@@ -717,7 +667,6 @@ function SnmpFrontPanel({
   const sfpSlots = slots.filter((s) => s.isSfp);
   const selected = slots.find((s) => s.snmp.index === selectedSnmpIndex) ?? null;
 
-  // Live counts for the chassis header strip
   const upCount = slots.filter((s) => s.snmp.operStatus === "up").length;
   const downCount = slots.filter(
     (s) => s.snmp.operStatus === "down" && s.snmp.adminStatus === "up",
@@ -729,9 +678,7 @@ function SnmpFrontPanel({
 
   return (
     <div className="space-y-4">
-      {/* Chassis */}
       <div className="overflow-hidden rounded-xl border border-white/[0.08] bg-gradient-to-b from-zinc-900 to-[#0c0c0e] shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_8px_24px_-12px_rgba(0,0,0,0.6)]">
-        {/* Status strip */}
         <div className="flex items-center justify-between border-b border-white/[0.04] bg-black/30 px-4 py-2 text-[10.5px] uppercase tracking-[0.14em] text-zinc-500">
           <div className="flex items-center gap-3">
             <span>
@@ -765,7 +712,6 @@ function SnmpFrontPanel({
           <span>front panel</span>
         </div>
 
-        {/* Ports */}
         <div className="flex flex-wrap items-end gap-x-4 gap-y-3 px-5 py-5">
           <SnmpRjGrid slots={rjSlots} selectedIndex={selectedSnmpIndex} onSelect={setSelectedSnmpIndex} />
           {sfpSlots.length > 0 ? (
@@ -801,7 +747,6 @@ function SnmpRjGrid({
   selectedIndex: number | null;
   onSelect: (index: number | null) => void;
 }) {
-  // Group in 8s (Unifi convention: 4 visual pair-columns per group).
   const groups: SnmpSlot[][] = [];
   for (let i = 0; i < slots.length; i += 8) {
     groups.push(slots.slice(i, i + 8));
@@ -841,13 +786,12 @@ function SnmpPortChip({
   const hasLldp = lldp !== null;
 
   const tone = (() => {
-    if (isAdminDown) return "off"; // operator-disabled
+    if (isAdminDown) return "off";
     if (isUp) return "up";
     if (isLinkDown) return "down";
     return "off";
   })();
 
-  // Speed badge (Mbps) on hover — show at >=1G with a different LED accent.
   const speedMbps = snmp.speedBps ? Math.round(snmp.speedBps / 1_000_000) : 0;
 
   const titleParts: string[] = [`Port ${slot.slot}: ${snmp.name}`];
@@ -869,16 +813,13 @@ function SnmpPortChip({
         className={cn(
           "relative block overflow-hidden rounded-[3px] border transition-all duration-150",
           isSfp ? "h-9 w-5" : "h-7 w-7",
-          // Tone palette mimics UniFi's per-port LED behaviour.
           tone === "up" && "border-emerald-400/40 bg-emerald-500/[0.12]",
           tone === "down" && "border-rose-500/30 bg-rose-500/[0.08]",
           tone === "off" && "border-white/[0.07] bg-white/[0.02]",
           selected && "ring-2 ring-sky-400 ring-offset-2 ring-offset-zinc-900",
-          // Subtle outline ring when LLDP sees this port — "your nodes plug in here"
           hasLldp && !selected && "ring-1 ring-sky-400/40",
         )}
       >
-        {/* Soft "LED" highlight on top half for up ports */}
         {tone === "up" ? (
           <span
             className={cn(
@@ -890,11 +831,9 @@ function SnmpPortChip({
         {tone === "down" ? (
           <span className="pointer-events-none absolute inset-x-0 top-0 h-1/2 rounded-t-[3px] bg-[radial-gradient(circle_at_50%_0%,rgba(244,63,94,0.35),transparent_75%)]" />
         ) : null}
-        {/* RJ45 detail: subtle bottom notch */}
         {!isSfp ? (
           <span className="pointer-events-none absolute inset-x-1 bottom-0 h-[2px] rounded-b-[1px] bg-black/40" />
         ) : null}
-        {/* SFP detail: latch line down the middle */}
         {isSfp ? (
           <span className="pointer-events-none absolute left-1/2 top-1 h-[7px] w-px -translate-x-1/2 bg-white/[0.08]" />
         ) : null}

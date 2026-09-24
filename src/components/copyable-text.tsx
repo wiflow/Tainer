@@ -9,7 +9,6 @@ function copyToClipboard(text: string): Promise<void> {
   if (navigator.clipboard?.writeText) {
     return navigator.clipboard.writeText(text);
   }
-  // Fallback for plain HTTP
   return new Promise((resolve, reject) => {
     const textarea = document.createElement("textarea");
     textarea.value = text;

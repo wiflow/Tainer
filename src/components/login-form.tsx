@@ -11,13 +11,6 @@ import { initialLoginActionState } from "@/lib/action-states";
 import { cn } from "@/lib/utils";
 import type { IdpBrand } from "@/lib/idp-providers";
 
-/**
- * Microsoft's brand mark — the four coloured squares — rendered inline as
- * SVG with the official brand colours. Inlined rather than pulled from
- * react-icons so the canonical four-colour treatment is preserved (Simple
- * Icons ships a single-colour version that doesn't match Microsoft's
- * brand guidance for sign-in buttons).
- */
 function MicrosoftLogo({ className }: { className?: string }) {
   return (
     <svg

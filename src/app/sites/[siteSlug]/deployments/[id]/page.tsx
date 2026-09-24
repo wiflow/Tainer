@@ -85,7 +85,6 @@ export default async function DeploymentDetailPage({
   await requireSitePageAccess(siteSlug);
   const siteConfig = await ensureSiteConfig(siteSlug);
 
-  // Phase 1: Fetch everything that only needs the deployment id / no dependencies
   const [deployment, { nodes, metrics: nodeMetrics }, session, tags, hasFreshStepUp, settings, activityLog] = await withSiteConfig(siteConfig, () =>
     Promise.all([
       getDeploymentDetail(id),
@@ -102,7 +101,6 @@ export default async function DeploymentDetailPage({
     notFound();
   }
 
-  // Phase 2: Fetch everything that depends on the deployment result — all in parallel
   const tainerMeta = deployment.tainerMeta;
   const [latestActivityResult, sourceTemplate, imageInfo, backupInfo, snapshots, generatedLocalSsh, netPath, firewallOptions, firewallRules] = await withSiteConfig(siteConfig, () =>
     Promise.all([
@@ -173,10 +171,7 @@ export default async function DeploymentDetailPage({
 
   return (
     <div className="space-y-8">
-      {/* Status/uptime/metrics change outside the app and lag behind
-          lifecycle actions — converge without a manual reload. */}
       <AutoRefresh intervalMs={15_000} eventsSite={siteSlug} />
-      {/* Header with name, status, and actions */}
       <div>
         <Link
           className={cn(buttonVariants({ size: "sm", variant: "ghost" }), "mb-4 -ml-3")}
@@ -232,7 +227,6 @@ export default async function DeploymentDetailPage({
         />
       )}
 
-      {/* Info cards row */}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-2xl border border-white/5 bg-[#111113] p-4">
           <div className="flex items-center gap-2 text-zinc-500">
@@ -324,7 +318,6 @@ export default async function DeploymentDetailPage({
         issues={deployment.issues}
       />
 
-      {/* Resource usage + services */}
       <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
         {usage ? (
           <Card className="overflow-hidden rounded-2xl">
@@ -431,7 +424,6 @@ export default async function DeploymentDetailPage({
         <DeploymentEnvEditor deployment={deployment} />
       )}
 
-      {/* Container / VM details at bottom */}
       <Card className="overflow-hidden rounded-2xl">
         <CardHeader className="border-b border-white/5">
           <CardTitle>{deployment.type === "qemu" ? "VM details" : "Container details"}</CardTitle>

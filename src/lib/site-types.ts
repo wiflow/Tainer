@@ -4,17 +4,12 @@ export type TlsMode = "full" | "insecure";
 
 export type ProxmoxSitePayload = {
   apiUrl: string;
-  /** Proxmox username, e.g. `root@pam` or `admin@pve`. */
   username: string;
-  /** AES-256-GCM encrypted password. */
   passwordEncrypted: string;
   tlsMode: TlsMode;
-  /** Optional TLS fingerprint for pinned certs. */
   tlsFingerprint: string | null;
-  /** PEM-encoded custom CA certificate(s) for internal/corporate CAs. */
   tlsCustomCaPem: string | null;
 
-  // Site defaults
   defaultNode: string;
   defaultRootfsStorage: string;
   defaultVmStorage: string;
@@ -22,16 +17,13 @@ export type ProxmoxSitePayload = {
   defaultBackupStorage: string;
   defaultBackupSlaHours: number;
 
-  // SSH
   sshHostKeyPolicy: "strict" | "accept-new" | "auto" | "off";
-  /** App-managed known-hosts content for this site. */
   consoleKnownHostsContent: string | null;
 };
 
 export type SiteLocation = {
   latitude: number;
   longitude: number;
-  /** Human-readable address the coordinates were geocoded from. */
   address?: string | null;
 };
 
@@ -45,10 +37,9 @@ export type SiteRecord = {
   updatedAt: string;
   lastValidatedAt: string | null;
   lastValidationOk: boolean | null;
-  /** SSL fingerprints of all cluster nodes, stored during creation/validation. */
   nodeFingerprints?: string[];
   location: SiteLocation | null;
-  /** ISO-3166-1 alpha-2 (e.g. "DK", "US"). Drives the per-site flag in the sidebar. */
+  /** ISO-3166-1 alpha-2 code. */
   countryCode: string | null;
   payload: ProxmoxSitePayload;
 };
@@ -56,7 +47,6 @@ export type SiteRecord = {
 export type SiteStore = {
   schemaVersion: 1;
   defaultSiteId: string | null;
-  /** Set during auto-import of PROXMOX_* env vars on first upgrade boot. */
   legacyImportedEnvSiteId: string | null;
   sites: SiteRecord[];
 };
@@ -71,7 +61,6 @@ export type ResolvedSiteConfig = {
   password: string;
   tlsInsecure: boolean;
   tlsFingerprint: string | null;
-  /** PEM-encoded custom CA certificate(s) for internal/corporate CAs. */
   tlsCustomCaPem: string | null;
 
   defaultNode: string;
@@ -90,13 +79,10 @@ export type SiteInput = {
   kind: SiteKind;
 
   apiUrl: string;
-  /** Proxmox username, e.g. `root@pam`. */
   username: string;
-  /** Plaintext password — encrypted before persistence. */
   password: string;
   tlsMode: TlsMode;
   tlsFingerprint?: string | null;
-  /** PEM-encoded custom CA certificate(s) for internal/corporate CAs. */
   tlsCustomCaPem?: string | null;
 
   defaultNode: string;
@@ -111,9 +97,8 @@ export type SiteInput = {
 
   latitude?: number | null;
   longitude?: number | null;
-  /** Geocoded source address; stored alongside the coordinates. */
   address?: string | null;
-  /** ISO-3166-1 alpha-2; empty string clears, undefined leaves untouched. */
+  /** Empty string clears the country, undefined leaves it untouched. */
   countryCode?: string | null;
 };
 
@@ -122,6 +107,5 @@ export type SiteValidationResult = {
   latencyMs: number;
   version: string | null;
   message?: string;
-  /** Nodes discovered during validation, with their SSL fingerprints. */
   nodes?: { name: string; fingerprint: string }[];
 };

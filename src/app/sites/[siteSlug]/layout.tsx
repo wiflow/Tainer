@@ -20,13 +20,11 @@ export default async function SiteLayout({
     notFound();
   }
 
-  // Check site access for non-admin users
   const session = await getCurrentSession();
   if (!session) {
     redirect("/login");
   }
   if (!hasSiteAccess(session, site.id)) {
-    // Redirect to first accessible site
     const allSites = await listEnabledSites();
     const accessible = allSites.filter((s) =>
       session.user.accessibleSiteIds.includes(s.id),
@@ -40,8 +38,6 @@ export default async function SiteLayout({
 
   const config = await resolveSiteConfig(site);
 
-  // Store the config in the per-request React.cache() so that all
-  // downstream page components can access it via getActiveSiteConfig().
   setSiteConfigForRequest(config);
 
   return (

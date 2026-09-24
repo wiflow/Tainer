@@ -4,7 +4,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
 }
 
-// Generated root passwords are shown once on the result card and must not reach the model or saved chats.
+// Generated root passwords must never reach the model or saved chats.
 export function redactCredentials(result: unknown): unknown {
   if (!isRecord(result)) return result;
   let out = result;

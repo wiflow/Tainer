@@ -37,9 +37,7 @@ export function DashboardCharts({ siteSlug }: DashboardChartsProps) {
         const json = await res.json();
         setData(json);
       }
-    } catch {
-      // keep existing data on error
-    } finally {
+    } catch {} finally {
       if (!background) {
         setLoading(false);
       }

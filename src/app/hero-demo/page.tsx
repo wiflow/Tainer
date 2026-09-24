@@ -19,7 +19,6 @@ import {
 export default function LandingPage() {
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 selection:bg-white/10">
-      {/* ── Nav ── */}
       <header className="sticky top-0 z-50 border-b border-white/5 bg-zinc-950/80 backdrop-blur-xl">
         <nav className="mx-auto flex h-14 max-w-6xl items-center justify-between px-6">
           <div className="flex items-center gap-8">
@@ -43,7 +42,6 @@ export default function LandingPage() {
         </nav>
       </header>
 
-      {/* ── Hero ── */}
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_50%_at_50%_-10%,rgba(120,119,198,0.08),transparent)]" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,rgba(255,255,255,0.02),transparent)]" />
@@ -88,11 +86,9 @@ export default function LandingPage() {
             </div>
           </div>
 
-          {/* Dashboard Preview */}
           <div className="relative mt-16 md:mt-24">
             <div className="absolute -inset-4 rounded-2xl bg-gradient-to-b from-white/[0.03] to-transparent" />
             <div className="relative overflow-hidden rounded-xl border border-white/[0.08] bg-zinc-900/50 shadow-2xl shadow-black/40">
-              {/* Title bar */}
               <div className="flex items-center gap-2 border-b border-white/5 px-4 py-3">
                 <div className="flex gap-1.5">
                   <div className="h-2.5 w-2.5 rounded-full bg-zinc-700" />
@@ -101,7 +97,6 @@ export default function LandingPage() {
                 </div>
                 <div className="ml-4 h-5 w-48 rounded bg-zinc-800/80" />
               </div>
-              {/* Dashboard wireframe */}
               <div className="p-4 md:p-6">
                 <div className="grid grid-cols-4 gap-3">
                   <div className="rounded-lg border border-white/5 bg-zinc-800/40 p-4">
@@ -160,13 +155,11 @@ export default function LandingPage() {
                 </div>
               </div>
             </div>
-            {/* Bottom fade */}
             <div className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-zinc-950 to-transparent" />
           </div>
         </div>
       </section>
 
-      {/* ── Features ── */}
       <section id="features" className="relative border-t border-white/5 py-28">
         <div className="mx-auto max-w-6xl px-6">
           <div className="mb-16">
@@ -228,7 +221,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── How It Works ── */}
       <section id="how-it-works" className="border-t border-white/5 py-28">
         <div className="mx-auto max-w-6xl px-6">
           <div className="mb-16">
@@ -278,7 +270,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── Stats ── */}
       <section id="stats" className="border-t border-white/5 py-28">
         <div className="mx-auto max-w-6xl px-6">
           <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-10 md:p-16">
@@ -309,7 +300,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── Tech Stack ── */}
       <section className="border-t border-white/5 py-20">
         <div className="mx-auto max-w-6xl px-6">
           <p className="mb-8 text-center font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-600">
@@ -331,7 +321,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── Bottom CTA ── */}
       <section className="border-t border-white/5 py-28">
         <div className="mx-auto max-w-6xl px-6 text-center">
           <h2 className="font-display text-3xl font-semibold tracking-tight text-white md:text-5xl">
@@ -361,7 +350,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── Footer ── */}
       <footer className="border-t border-white/5 py-10">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-6 sm:flex-row">
           <span className="font-display text-sm font-bold tracking-tight text-zinc-600">Tainer</span>

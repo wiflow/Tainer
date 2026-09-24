@@ -13,14 +13,12 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const session = await getCurrentSession();
 
-  // Unauthenticated callers get a minimal status-only response
   if (!session) {
     return NextResponse.json({ status: "ok", timestamp: new Date().toISOString() });
   }
 
   const checks: Record<string, unknown> = {};
 
-  // 1. Data directory writable
   try {
     const dataDir = getDataDirectoryPath();
     await access(dataDir, constants.R_OK | constants.W_OK);
@@ -29,7 +27,6 @@ export async function GET() {
     checks.dataDirectory = { ok: false, message: "Data directory not accessible" };
   }
 
-  // 2. Per-site connectivity (admin-only detail)
   const sites = await listEnabledSites();
   const siteChecks: Record<string, { ok: boolean; latencyMs?: number; message?: string }> = {};
 

@@ -50,7 +50,6 @@ export function CommandPalette({ currentUser }: { currentUser: SessionUser }) {
   const siteSlug = extractSiteSlug(pathname);
   const isAdmin = currentUser.role === "admin";
 
-  // Keyboard shortcut
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
@@ -62,10 +61,9 @@ export function CommandPalette({ currentUser }: { currentUser: SessionUser }) {
     return () => document.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  // Fetch data when opened with a site context
   useEffect(() => {
     if (!open || !siteSlug) return;
-    if (data) return; // Already fetched
+    if (data) return;
 
     setLoading(true);
     fetch(`/api/command-palette?siteSlug=${encodeURIComponent(siteSlug)}`)
@@ -77,7 +75,6 @@ export function CommandPalette({ currentUser }: { currentUser: SessionUser }) {
       .finally(() => setLoading(false));
   }, [open, siteSlug, data]);
 
-  // Reset data when site changes
   useEffect(() => {
     setData(null);
   }, [siteSlug]);
@@ -100,7 +97,6 @@ export function CommandPalette({ currentUser }: { currentUser: SessionUser }) {
           {loading ? "Loading…" : "No results found."}
         </CommandEmpty>
 
-        {/* Navigation */}
         {siteBase && (
           <CommandGroup heading="Navigation">
             <CommandItem onSelect={() => navigate(siteBase)}>
@@ -157,7 +153,6 @@ export function CommandPalette({ currentUser }: { currentUser: SessionUser }) {
 
         <CommandSeparator />
 
-        {/* Deployments */}
         {data && data.deployments.length > 0 && siteBase && (
           <CommandGroup heading="Deployments">
             {data.deployments.map((d) => (
@@ -181,7 +176,6 @@ export function CommandPalette({ currentUser }: { currentUser: SessionUser }) {
           </CommandGroup>
         )}
 
-        {/* Templates */}
         {data && data.templates.length > 0 && siteBase && (
           <CommandGroup heading="Templates">
             {data.templates.map((t) => (
@@ -197,7 +191,6 @@ export function CommandPalette({ currentUser }: { currentUser: SessionUser }) {
           </CommandGroup>
         )}
 
-        {/* Nodes */}
         {data && data.nodes.length > 0 && (
           <CommandGroup heading="Nodes">
             {data.nodes.map((n) => (
@@ -220,7 +213,6 @@ export function CommandPalette({ currentUser }: { currentUser: SessionUser }) {
 
         <CommandSeparator />
 
-        {/* Actions */}
         <CommandGroup heading="Actions">
           <CommandItem
             onSelect={() => {

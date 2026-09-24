@@ -186,7 +186,6 @@ export function HetznerBoxPanel({
               </div>
             </div>
 
-            {/* Services */}
             <div className="rounded-lg border border-zinc-800 p-3">
               <p className="mb-2 flex items-center gap-1.5 text-[12.5px] font-medium text-zinc-200">
                 <Network className="h-3.5 w-3.5" />
@@ -222,7 +221,6 @@ export function HetznerBoxPanel({
               </p>
             </div>
 
-            {/* Snapshots */}
             <div className="rounded-lg border border-zinc-800 p-3">
               <div className="mb-2 flex flex-wrap items-center gap-2">
                 <p className="flex items-center gap-1.5 text-[12.5px] font-medium text-zinc-200">

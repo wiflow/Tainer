@@ -42,7 +42,6 @@ export function GiteaImagePullPanel({
     "mt-1.5 w-full rounded-md border border-white/10 bg-zinc-900 px-3 py-2 text-[13px] text-zinc-200 outline-none transition-colors focus:border-zinc-500 focus:bg-zinc-900";
   const [selectedNode, selectedStorage] = selectedTarget.split("::");
 
-  // Update the reference preview with the currently selected tag
   const referencePreview = ociReference.replace(/:([^/]*)$/, `:${selectedTag || defaultTag}`);
   const fileNamePreview = `${name}_${selectedTag || defaultTag}.tar`;
 

@@ -7,14 +7,6 @@ type Props = {
   siteSlug: string;
 };
 
-/**
- * Pure-SVG topology view. Hierarchical layout: discovered switches/routers
- * along the top row, Proxmox agents along the bottom row. Edges drawn as
- * cubic Bézier paths so multiple connections to the same switch don't
- * overlap visually. Sized for clusters in the small-cluster range
- * (~10 agents, ~5 upstream devices). Larger fleets will get clipped — a
- * follow-up phase introduces a proper force-directed layout.
- */
 export function NetworkTopologyGraph({ topology, siteSlug }: Props) {
   if (topology.agents.length === 0 && topology.devices.length === 0) {
     return <EmptyState />;
@@ -95,7 +87,6 @@ export function NetworkTopologyGraph({ topology, siteSlug }: Props) {
           );
         })}
 
-        {/* Upstream devices (top row). */}
         {upstream.map((d, i) => (
           <DeviceNode
             key={d.chassisId}
@@ -109,7 +100,6 @@ export function NetworkTopologyGraph({ topology, siteSlug }: Props) {
           />
         ))}
 
-        {/* Proxmox agents (bottom row). */}
         {agents.map((host, i) => (
           <AgentNode
             key={host}

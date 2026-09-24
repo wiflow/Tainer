@@ -91,8 +91,6 @@ export async function updateIdpProviderAction(
       };
     }
 
-    // Configuration changed — drop the cached discovery doc so the next
-    // sign-in fetches it fresh.
     invalidateOidcDiscoveryCache(id);
 
     const changes = [

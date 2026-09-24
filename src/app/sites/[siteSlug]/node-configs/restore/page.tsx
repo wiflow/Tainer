@@ -75,7 +75,6 @@ export default async function RestoreSnapshotPage({
   if (!snapshot) notFound();
 
   const live = await withSiteConfig(siteConfig, () => buildLiveSnapshot(snapshot));
-  // Order: live (current) → snapshot (target)
   const diffs = compareConfigSnapshots(live, snapshot);
 
   return (

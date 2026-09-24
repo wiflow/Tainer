@@ -4,11 +4,6 @@ import { useEffect } from "react";
 
 import { ErrorState } from "@/components/error-state";
 
-/**
- * Route-level boundary: a page threw while rendering. The chrome (sidebar,
- * toasts) stays mounted, so the user keeps their bearings and can navigate
- * away instead of staring at a blank screen.
- */
 export default function AppError({
   error,
   reset,

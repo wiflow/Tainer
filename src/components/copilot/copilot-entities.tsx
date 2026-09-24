@@ -45,8 +45,6 @@ import { motion } from "framer-motion";
 import { REDACTED_SECRET } from "@/lib/copilot/redact";
 import { cn } from "@/lib/utils";
 
-// -- Shared types (kept structural to match tool-result JSON) ---------------
-
 type Deployment = {
   id: string;
   vmid: number;
@@ -146,8 +144,6 @@ type AuditEntry = {
   recordedAt: string;
 };
 
-// -- Helpers ----------------------------------------------------------------
-
 const DEPLOYMENT_STATUS_TONE: Record<string, string> = {
   running: "text-emerald-300 bg-emerald-500/10 border-emerald-500/20",
   stopped: "text-zinc-400 bg-zinc-500/10 border-zinc-500/20",
@@ -177,8 +173,6 @@ function fmtPct(ratio: number | null | undefined): string {
 
 const cardBase =
   "group block rounded-lg border border-white/[0.06] bg-white/[0.025] px-3 py-2.5 hover:border-white/15 hover:bg-white/[0.04] transition-colors";
-
-// -- Cards ------------------------------------------------------------------
 
 export function DeploymentCard({
   d,
@@ -697,8 +691,6 @@ function EmptyResult({ message }: { message: string }) {
   return <div className="text-[11.5px] text-zinc-500 italic px-1">{message}</div>;
 }
 
-// -- Service ports view -----------------------------------------------------
-
 type PortResult = {
   open: boolean;
   port: number;
@@ -719,8 +711,6 @@ type ScanResult = {
   ports: PortResult[];
 };
 
-// Pick an icon based on the service name (server-side may have set the real
-// process name, or it falls back to the well-known port label).
 function serviceIcon(service: string, port: number) {
   const s = service.toLowerCase();
   if (/grafana/.test(s)) return BarChart3;
@@ -733,7 +723,6 @@ function serviceIcon(service: string, port: number) {
   if (/ignition/.test(s)) return Workflow;
   if (/chat|discord|matrix|slack/.test(s)) return MessageSquare;
   if (/^http|web|nginx|caddy|apache|traefik/.test(s)) return Globe;
-  // Port-based fallback
   if (port === 22) return TerminalSquare;
   if (port === 80 || port === 443 || port === 8080 || port === 8443) return Globe;
   if (port === 3306 || port === 5432 || port === 6379 || port === 27017) return Database;
@@ -844,11 +833,6 @@ function ServicePortCard({ p }: { p: PortResult }) {
   );
 }
 
-/**
- * Dispatch a tool-result object to the matching entity renderer. Falls back
- * to a collapsed JSON dump when the tool is unknown or the shape doesn't
- * match — the user can always inspect raw JSON via the expand-arrow.
- */
 export function ToolResultView({
   name,
   args,
@@ -864,7 +848,6 @@ export function ToolResultView({
     return <RawJson data={result} />;
   }
 
-  // Error envelope from server
   if ("error" in (result as object)) {
     return (
       <div className="text-[11.5px] text-rose-300 bg-rose-500/[0.06] border border-rose-500/20 rounded-md px-2.5 py-1.5">
@@ -1103,8 +1086,6 @@ function RawJson({ data }: { data: unknown }) {
   );
 }
 
-// -- Lifecycle result card --------------------------------------------------
-
 type LifecycleVerb =
   | "start"
   | "stop"
@@ -1207,7 +1188,6 @@ export function LifecycleResultCard({
   const verb = result.verb;
   const d = result.deployment ?? null;
   const isDestroy = verb === "destroy";
-  // Verbs whose effect is immediate and complete (no UPID/task to track).
   const isFinal =
     verb === "update-resources" ||
     verb === "env-updated" ||
@@ -1348,8 +1328,6 @@ function ResourceChip({ label, value }: { label: string; value: string }) {
     </span>
   );
 }
-
-// -- Create deployment card (with one-time credentials reveal) --------------
 
 type CreateResult = {
   ok: boolean;
@@ -1503,8 +1481,6 @@ function CredentialsCard({
   );
 }
 
-// -- Backups ----------------------------------------------------------------
-
 type BackupArchive = {
   volid: string;
   vmid: number;
@@ -1559,8 +1535,6 @@ function BackupList({ archives, siteSlug }: { archives: BackupArchive[]; siteSlu
   );
 }
 
-// -- Tags -------------------------------------------------------------------
-
 type TagSummary = { slug: string; name: string; color?: string; memberCount: number };
 
 function TagList({ tags }: { tags: TagSummary[] }) {
@@ -1580,8 +1554,6 @@ function TagList({ tags }: { tags: TagSummary[] }) {
     </div>
   );
 }
-
-// -- Metrics ----------------------------------------------------------------
 
 type MetricStat = { avg: number; peak: number; series?: number[] };
 type MetricsResult = {
@@ -1661,8 +1633,6 @@ function MetricsCard({ data }: { data: MetricsResult }) {
   );
 }
 
-// -- CVE report -------------------------------------------------------------
-
 type CveReport = {
   scannedAt: string;
   summary: {
@@ -1732,8 +1702,6 @@ function ShieldIcon({ clean }: { clean: boolean }) {
   );
 }
 
-// -- Diagnostics ------------------------------------------------------------
-
 type DiagnosticsResult = {
   scannedAt: string;
   issueCount: number;
@@ -1787,8 +1755,6 @@ function DiagnosticsCard({ data }: { data: DiagnosticsResult }) {
     </div>
   );
 }
-
-// -- Alerts / heartbeat -----------------------------------------------------
 
 type AlertItem = {
   title: string;
@@ -1852,8 +1818,6 @@ function HeartbeatCard({ data }: { data: HeartbeatResult }) {
     </div>
   );
 }
-
-// -- Network path -----------------------------------------------------------
 
 type NetworkPathResult = {
   node: string;
@@ -1929,8 +1893,6 @@ function NetworkPathCard({ data, siteSlug }: { data: NetworkPathResult; siteSlug
   );
 }
 
-// -- Users & groups ---------------------------------------------------------
-
 type UserItem = {
   name: string;
   email: string;
@@ -2005,8 +1967,6 @@ function GroupList({ groups }: { groups: GroupItem[] }) {
     </div>
   );
 }
-
-// -- Firewall / simple results / VM templates -------------------------------
 
 type FirewallRule = {
   pos: number;
@@ -2123,8 +2083,6 @@ function VmTemplateList({ templates, siteSlug }: { templates: VmTemplateItem[]; 
   );
 }
 
-// -- Batch destroy ----------------------------------------------------------
-
 type BatchDestroyResult = {
   verb: "batch-destroy";
   destroyedCount: number;
@@ -2173,8 +2131,6 @@ function BatchDestroyCard({ result }: { result: BatchDestroyResult }) {
     </div>
   );
 }
-
-// -- Batch create -----------------------------------------------------------
 
 type BatchCreatedItem = {
   hostname: string;
@@ -2321,8 +2277,6 @@ function BatchCreatedRow({
     </div>
   );
 }
-
-// -- Snapshot list ----------------------------------------------------------
 
 type Snapshot = {
   name: string;

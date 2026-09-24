@@ -220,9 +220,7 @@ async function readCache(): Promise<ImageEnvCacheStore> {
         entries: normalizeEntries(parsed),
       };
     }
-  } catch {
-    // Ignore missing or invalid cache files and rebuild on demand.
-  }
+  } catch {}
 
   return {
     entries: {},

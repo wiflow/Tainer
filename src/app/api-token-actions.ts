@@ -13,7 +13,6 @@ export type ApiTokenActionState = {
   message: string;
   requestId: string;
   status: ActionStatus;
-  /** The freshly minted token — present exactly once, on successful create. */
   createdToken: string | null;
 };
 

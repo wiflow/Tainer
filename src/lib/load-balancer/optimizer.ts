@@ -12,27 +12,6 @@ import {
   wouldBreakAffinityGroup,
 } from "./guest-rules";
 
-/**
- * Whole-cluster rebalance planning (our answer to ProxLB's CP-SAT solver
- * mode, in-process and dependency-free).
- *
- * Greedy local search: at each step, evaluate every (guest, target) move
- * against a projected cluster state and apply the one that most reduces the
- * imbalance — the coefficient of variation of projected node scores, the
- * same objective Proxmox's dynamic CRS optimizes. Stops when no move gains
- * enough, or the move cap is reached.
- *
- * The projection adjusts each node's memory component of the score as
- * guests move (memory is the dominant weight and the truly finite
- * resource); CPU/disk/latency components are held constant. Greedy local
- * search doesn't guarantee the global optimum, but each individual step is
- * optimal, explainable, and independently safe — which matters more here
- * than the last percent of balance.
- *
- * Plans are PREVIEWS: nothing here executes. The observer executes an
- * applied plan one move at a time, re-validating each against live state.
- */
-
 export type PlannedMove = {
   vmid: number;
   name: string;
@@ -40,24 +19,21 @@ export type PlannedMove = {
   sourceNode: string;
   targetNode: string;
   memBytes: number;
-  /** Imbalance (CV) after this move, cumulative within the plan. */
   projectedImbalance: number;
 };
 
 export type RebalancePlanResult = {
   moves: PlannedMove[];
-  /** Coefficient of variation of node scores before/after the full plan. */
   imbalanceBefore: number;
   imbalanceAfter: number;
   projectedScores: Array<{ node: string; before: number; after: number }>;
 };
 
-/** Stop when the best remaining move improves CV by less than this. */
 const MIN_CV_GAIN = 0.005;
 
 type ProjectedNode = {
   node: string;
-  baseScore: number; // score minus the memory component
+  baseScore: number;
   memUsedBytes: number;
   memTotalBytes: number;
   rootfsFreeBytes: number;
@@ -85,7 +61,6 @@ export function computeRebalancePlan(input: {
   settings: LoadBalancerSettings;
   guestMemOverrides?: Map<number, number>;
   maxMoves: number;
-  /** Containers restart-migrate (downtime) — explicit opt-in per plan. */
   includeContainers: boolean;
 }): RebalancePlanResult {
   const { scores, deployments, nodeMetrics, settings, maxMoves, includeContainers } = input;
@@ -94,7 +69,6 @@ export function computeRebalancePlan(input: {
 
   const forbiddenNodes = new Set([...settings.excludedNodes, ...settings.maintenanceNodes]);
 
-  // Build the projected cluster state from live metrics + scores.
   const nodes = new Map<string, ProjectedNode>();
   for (const score of scores) {
     if (forbiddenNodes.has(score.node)) continue;
@@ -122,9 +96,6 @@ export function computeRebalancePlan(input: {
     [...nodes.values()].map((n) => projectedScore(n, memoryWeight)),
   );
 
-  // Movable guests under PLAN rules: pins/ignores/exclusions always hold,
-  // plb_manual is movable (a plan is an explicit admin action), containers
-  // only when the admin opted in for this plan.
   const movable = deployments.filter(
     (d) =>
       d.rawStatus === "running" &&
@@ -136,8 +107,6 @@ export function computeRebalancePlan(input: {
       !wouldBreakAffinityGroup(d, deployments),
   );
 
-  // Projected guest positions, updated as the plan grows — anti-affinity
-  // must hold against where guests WILL be, not where they are.
   const positions = new Map<number, string>();
   for (const d of deployments) positions.set(d.vmid, d.node);
 
@@ -149,7 +118,7 @@ export function computeRebalancePlan(input: {
     let best: { guest: LiveDeployment; target: ProjectedNode; cv: number } | null = null;
 
     for (const guest of movable) {
-      if (movedVmids.has(guest.vmid)) continue; // one move per guest per plan
+      if (movedVmids.has(guest.vmid)) continue;
       const source = nodes.get(positions.get(guest.vmid) ?? guest.node);
       if (!source) continue;
 
@@ -174,7 +143,6 @@ export function computeRebalancePlan(input: {
         const guestDisk = guest.diskUsedBytes ?? 0;
         if (guestDisk > 0 && target.rootfsFreeBytes < guestDisk * DISK_HEADROOM) continue;
 
-        // Evaluate CV with the move applied.
         source.memUsedBytes -= memBytes;
         target.memUsedBytes += memBytes;
         const cv = coefficientOfVariation(
@@ -189,7 +157,6 @@ export function computeRebalancePlan(input: {
 
     if (!best || currentCv - best.cv < MIN_CV_GAIN) break;
 
-    // Commit the move to the projection.
     const memBytes = effectiveMemBytes(best.guest, guestMemOverrides);
     const source = nodes.get(positions.get(best.guest.vmid) ?? best.guest.node);
     if (!source) break;

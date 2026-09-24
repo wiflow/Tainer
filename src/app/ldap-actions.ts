@@ -111,12 +111,6 @@ export async function deleteLdapConfigAction(
   }
 }
 
-/**
- * Test the saved LDAP configuration by connecting and binding as the
- * service account, then probing the root DSE. Does NOT attempt a user
- * search (that would require knowing a real user's identifier) — just
- * verifies the configured URL, bind DN, and password.
- */
 export async function testLdapConnectionAction(
   _previousState: BasicActionState,
   _formData: FormData,

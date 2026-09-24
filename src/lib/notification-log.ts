@@ -7,8 +7,7 @@ import { resolveSiteDataFilePathFromContext } from "@/lib/site-data";
 import { createStoreMutator, writeJsonFileAtomically } from "@/lib/store-utils";
 import type { AlertCategory, AlertSeverity } from "@/lib/alert-runtime-state";
 
-// IMPORTANT: This assumes a single Tainer instance writes to the data directory.
-// Running multiple instances against the same data directory will cause race conditions.
+// Assumes a single Tainer instance writes to the data directory.
 
 export type NotificationState = "cleared" | "firing" | "resolved" | "test";
 

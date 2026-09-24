@@ -29,7 +29,7 @@ export async function validateSiteConnection(
           new Promise<string[]>((resolve) => setTimeout(() => resolve([]), 3000)),
         ]);
         if (aiaCerts.length > 0) extras.push(...aiaCerts);
-      } catch { /* proceed without */ }
+      } catch {}
       if (extras.length > 0) {
         const { rootCertificates } = await import("node:tls");
         extraTlsOpts = { ca: [...new Set([...rootCertificates, ...extras])] };
@@ -164,7 +164,6 @@ export async function validateSiteConnection(
           .map((n) => ({ name: n.node, fingerprint: n.ssl_fingerprint! }));
       }
     } catch {
-      // best-effort
     }
 
     const latencyMs = Date.now() - start;

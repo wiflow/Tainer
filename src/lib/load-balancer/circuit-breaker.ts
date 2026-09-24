@@ -22,7 +22,6 @@ export class NodeCircuitBreaker {
 
     let openUntil: number | null = null;
     if (failures >= DEFAULT_FAILURE_THRESHOLD) {
-      // Exponential backoff: 30s, 60s, 120s, 240s, 300s (capped)
       const exponent = failures - DEFAULT_FAILURE_THRESHOLD;
       const cooldown = Math.min(BASE_COOLDOWN_MS * Math.pow(2, exponent), MAX_COOLDOWN_MS);
       openUntil = now + cooldown;
@@ -38,7 +37,7 @@ export class NodeCircuitBreaker {
   isAvailable(node: string): boolean {
     const state = this.states.get(node);
     if (!state || !state.openUntil) return true;
-    if (Date.now() >= state.openUntil) return true; // half-open: allow probe
+    if (Date.now() >= state.openUntil) return true;
     return false;
   }
 

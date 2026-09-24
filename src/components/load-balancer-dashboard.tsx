@@ -66,7 +66,6 @@ function circuitBreakerBadge(state: "closed" | "open" | "half-open") {
   );
 }
 
-/** Column header with an optional ⓘ explaining what the column measures. */
 function Th({
   align = "left",
   children,
@@ -216,7 +215,6 @@ function NodeScoreTable({
   );
 }
 
-/** Group heading, with the group's rationale behind an ⓘ rather than a paragraph. */
 function GroupHeading({ children, tip }: { children: string; tip?: React.ReactNode }) {
   return (
     <div className="flex items-center gap-1.5">
@@ -327,7 +325,6 @@ function SettingsForm({
       <input type="hidden" name="siteSlug" value={siteSlug} />
 
       <div className="space-y-6">
-        {/* Core toggles */}
         <div className="space-y-3">
           <GroupHeading>Core</GroupHeading>
           <ToggleRow
@@ -353,7 +350,6 @@ function SettingsForm({
           />
         </div>
 
-        {/* Predictive balancing */}
         <div className="space-y-3">
           <GroupHeading tip="Instead of waiting for a node to overload, the balancer fits a trend line to its score history and can move a guest before the overload lands.">
             Predictive Balancing
@@ -385,7 +381,6 @@ function SettingsForm({
           </div>
         </div>
 
-        {/* Container safety */}
         <div className="space-y-3">
           <GroupHeading tip="Proxmox cannot live-migrate LXC containers — every automatic move is stop, transfer, start, with real downtime. Containers are therefore excluded from balancing unless you opt in. VMs always live-migrate with no downtime.">
             Container Migrations
@@ -430,7 +425,6 @@ function SettingsForm({
           </div>
         </div>
 
-        {/* Node management */}
         <div className="space-y-3">
           <GroupHeading>Node Management</GroupHeading>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -494,7 +488,6 @@ function SettingsForm({
           </div>
         </div>
 
-        {/* Weights */}
         <div className="space-y-3">
           <GroupHeading tip="How much each signal counts towards a node's score. Weights are auto-normalized to sum to 1.0, so only their ratio matters — higher weight, more influence.">
             Score Weights
@@ -539,7 +532,6 @@ function SettingsForm({
           </div>
         </div>
 
-        {/* Polling */}
         <div className="space-y-3">
           <GroupHeading>Polling</GroupHeading>
           <div className="grid grid-cols-2 gap-3">
@@ -563,7 +555,6 @@ function SettingsForm({
           </div>
         </div>
 
-        {/* Migration thresholds */}
         <div className="space-y-3">
           <GroupHeading tip="The gates a move has to clear. Together they decide how much imbalance is tolerated and how often the cluster is allowed to churn.">
             Migration Thresholds
@@ -612,7 +603,6 @@ function SettingsForm({
           </div>
         </div>
 
-        {/* Penalty config */}
         <div className="space-y-3">
           <GroupHeading tip="Points added to a node's score when its guests are visibly suffering. Utilization alone misses contention — a node at 60% CPU can still be stalling everything on it.">
             Penalties
@@ -712,10 +702,6 @@ export function LoadBalancerDashboard({
         />
       </SectionPanel>
 
-      {/* Migration Log section removed — superseded by the Activity Log
-          (load-balancer-event-viewer) which records every migration,
-          failure, and tick error persistently across restarts. */}
-
       <SettingsTabs settings={settings} siteSlug={siteSlug} />
     </div>
   );
@@ -728,8 +714,6 @@ function SettingsTabs({
   settings: LoadBalancerSettings;
   siteSlug: string;
 }) {
-  // Simple by default; land on Advanced only when the current settings
-  // don't match any preset (someone already tuned the knobs by hand).
   const presetIndex = detectLbPresetIndex(settings);
   const [tab, setTab] = useState<"simple" | "advanced">("simple");
 
@@ -774,7 +758,6 @@ function SimpleSettingsForm({
     successTitle: "Load balancer updated",
   });
 
-  // Default to Balanced when the current settings are custom.
   const [level, setLevel] = useState(presetIndex ?? 2);
   const stop = LB_PRESET_STOPS[level];
   const isCustom = presetIndex === null;

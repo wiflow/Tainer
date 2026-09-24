@@ -22,7 +22,6 @@ export type BackupPolicy = {
   mode: BackupMode;
   name: string;
   nextRunAt: string | null;
-  /** Copy each finished archive to the site's Storage Box. */
   offloadEnabled: boolean;
   /** Remote copies to keep per guest; 0 keeps all. */
   offloadRetentionCount: number;

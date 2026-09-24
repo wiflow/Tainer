@@ -2,16 +2,6 @@
 
 import React from "react";
 
-/**
- * Minimal markdown renderer for assistant text. Handles the subset Claude
- * tends to emit in short responses — bold, italic, inline code, links,
- * headings, lists, fenced code blocks, and horizontal rules. We avoid pulling
- * in react-markdown / remark for this: the output is short, never
- * user-controlled (it's our own model talking), and a 100-line renderer
- * keeps the bundle lean. If the renderer encounters something it doesn't
- * recognise, the raw line is shown verbatim — never throws.
- */
-
 type Block =
   | { kind: "p"; text: string }
   | { kind: "h"; level: 1 | 2 | 3; text: string }
@@ -28,7 +18,6 @@ function parseBlocks(input: string): Block[] {
   while (i < lines.length) {
     const line = lines[i];
 
-    // Fenced code block
     if (line.startsWith("```")) {
       const lang = line.slice(3).trim() || null;
       const start = i + 1;
@@ -39,14 +28,12 @@ function parseBlocks(input: string): Block[] {
       continue;
     }
 
-    // Horizontal rule
     if (/^\s*---+\s*$/.test(line)) {
       out.push({ kind: "hr" });
       i++;
       continue;
     }
 
-    // Headings (#, ##, ###)
     const h = line.match(/^(#{1,3})\s+(.+?)\s*$/);
     if (h) {
       out.push({ kind: "h", level: h[1].length as 1 | 2 | 3, text: h[2] });
@@ -54,7 +41,6 @@ function parseBlocks(input: string): Block[] {
       continue;
     }
 
-    // Unordered list
     if (/^[-*]\s+/.test(line)) {
       const items: string[] = [];
       while (i < lines.length && /^[-*]\s+/.test(lines[i])) {
@@ -65,7 +51,6 @@ function parseBlocks(input: string): Block[] {
       continue;
     }
 
-    // Ordered list
     if (/^\d+\.\s+/.test(line)) {
       const items: string[] = [];
       while (i < lines.length && /^\d+\.\s+/.test(lines[i])) {
@@ -76,13 +61,11 @@ function parseBlocks(input: string): Block[] {
       continue;
     }
 
-    // Blank line
     if (line.trim() === "") {
       i++;
       continue;
     }
 
-    // Paragraph — collect consecutive non-special non-blank lines.
     const para: string[] = [line];
     i++;
     while (
@@ -99,8 +82,6 @@ function parseBlocks(input: string): Block[] {
   return out;
 }
 
-// -- Inline tokeniser -------------------------------------------------------
-
 type InlineToken =
   | { kind: "text"; text: string }
   | { kind: "code"; text: string }
@@ -108,8 +89,7 @@ type InlineToken =
   | { kind: "italic"; text: string }
   | { kind: "link"; text: string; href: string };
 
-// Inline patterns, scanned in priority order. Code wins so that backticks
-// inside a `**bold**` don't confuse the bold/italic regexes.
+// Alternation order is priority: code first, so backticks inside bold stay literal.
 const INLINE_RX =
   /(`[^`\n]+`)|(\[([^\]]+)\]\(([^)\s]+)\))|(\*\*[^*\n]+\*\*)|(\*[^*\n]+\*)|(_[^_\n]+_)/;
 
@@ -186,8 +166,6 @@ function Inline({ text }: { text: string }) {
     </>
   );
 }
-
-// -- Block renderer ---------------------------------------------------------
 
 function Block({ block }: { block: Block }) {
   switch (block.kind) {

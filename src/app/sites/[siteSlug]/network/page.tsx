@@ -49,9 +49,6 @@ export default async function NetworkPage({
   requireSiteAccess(session, siteConfig.siteId);
 
   const canManage = hasSitePermission(session, siteConfig.siteId, "manage-security");
-  // IP pool editing requires admin role (same gate as the legacy /settings
-  // location). Non-admins don't see the IP Pools tab at all; admins see it
-  // alongside the discovery tabs.
   const canManageIpPools = session.user.role === "admin";
 
   const [snapshots, tokens, annotations, snmpConfig, ipPoolData] = await Promise.all([
@@ -70,8 +67,6 @@ export default async function NetworkPage({
     Awaited<ReturnType<typeof listContainerTags>>,
   ];
   const baseTopology = deriveTopology(snapshots);
-  // Apply operator-supplied friendly names in listings without mutating the
-  // original LldpDevice objects (the detail page surfaces both names).
   const topology = {
     ...baseTopology,
     devices: baseTopology.devices.map((d) => {
@@ -93,9 +88,6 @@ export default async function NetworkPage({
   } catch {
     fallbackOrigin = "https://YOUR-TAINER-HOST";
   }
-  // Precedence: per-site override → TAINER_AGENT_BASE_URL → request origin.
-  // The override exists because the public origin (APP_URL) is often not
-  // resolvable from the Proxmox nodes (LAN box reached by IP, split DNS).
   const agentBase = resolveAgentBaseUrl(snmpConfig.agentBaseUrl, fallbackOrigin);
   const ingestUrl = `${agentBase}/api/internal/lldp-ingest`;
   const snmpIngestUrl = `${agentBase}/api/internal/snmp-ingest`;

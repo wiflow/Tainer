@@ -4,22 +4,6 @@ import type {
   SnmpPort,
 } from "@/lib/lldp-snmp-types";
 
-/**
- * Parses the agent's `snmpwalk -Oqs` output text into a structured IF-MIB
- * port inventory.
- *
- * Each line of input is `<name>.<index> [optional STRING: prefix] <value>`,
- * e.g.
- *   ifDescr.1 GigabitEthernet1/0/1
- *   ifAlias.1 uplink-to-pve
- *   ifOperStatus.1 up
- *   ifHighSpeed.1 1000
- *
- * Unrecognised lines are silently skipped — the format from net-snmp is
- * stable, but we'd rather drop a malformed row than throw and lose every
- * port for the device.
- */
-
 const LINE_RX = /^(\w+)\.(\d+)\s+(?:[A-Z][A-Z0-9_-]*:\s*)?(.*)$/;
 
 const OPER_STATUS_MAP: Record<string, SnmpOperStatus> = {
@@ -98,8 +82,6 @@ export function parseSnmpWalk(text: string): ParsedWalk {
     const line = rawLine.trim();
     if (!line) continue;
 
-    // sysName.0 and sysDescr.0 are scalars (index 0); handle them ahead of
-    // the ifTable regex.
     if (line.startsWith("sysName.0")) {
       buckets.sysName = stripQuotes(line.slice("sysName.0".length).trim());
       continue;
@@ -133,9 +115,7 @@ export function parseSnmpWalk(text: string): ParsedWalk {
         entry.adminStatus = ADMIN_STATUS_MAP[value.toLowerCase()] ?? "unknown";
         break;
       case "ifSpeed": {
-        // 32-bit speed in bits-per-second. Saturates at 4.29 Gbps and the
-        // MIB returns 4294967295 for higher-speed links, in which case
-        // ifHighSpeed (in Mbps) is the authoritative source.
+        // ifSpeed saturates at 4294967295 bps on fast links; ifHighSpeed (Mbps) wins there.
         const n = parseNumber(value);
         if (n !== null && n !== 4294967295 && entry.speedBps == null) {
           entry.speedBps = n;
@@ -164,7 +144,7 @@ export function parseSnmpWalk(text: string): ParsedWalk {
 
   const ports: SnmpPort[] = [];
   for (const partial of buckets.ports.values()) {
-    if (!partial.name) continue; // No ifDescr → not a real port
+    if (!partial.name) continue;
     ports.push({
       index: partial.index ?? 0,
       name: partial.name,

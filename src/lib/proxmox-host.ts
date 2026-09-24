@@ -48,7 +48,6 @@ function validateIpv4Address(value: string) {
 
 function getProxmoxConsoleUser() {
   const config = getActiveSiteConfig();
-  // Extract the OS-level username from the Proxmox username (e.g. "root@pam" → "root")
   const pveUser = config.username?.trim() || "root@pam";
   const osUser = pveUser.split("@")[0] || "root";
 
@@ -87,7 +86,6 @@ async function resolveNodeIp(node: string): Promise<string> {
   const safeNode = validateNodeName(node);
   const config = getProxmoxApiConfig();
 
-  // Combine custom CA + AIA intermediates into a single trust store
   const siteConfig = getActiveSiteConfig();
   let extraTlsOpts: { ca?: string[] } = {};
   if (!config.tlsInsecure) {
@@ -97,7 +95,7 @@ async function resolveNodeIp(node: string): Promise<string> {
       const parsed = new URL(config.url);
       const aiaCerts = await getExtraCaCerts(parsed.hostname, parsed.port || "8006", siteConfig.tlsCustomCaPem);
       if (aiaCerts.length > 0) extras.push(...aiaCerts);
-    } catch { /* proceed without */ }
+    } catch {}
     if (extras.length > 0) {
       const { rootCertificates } = await import("node:tls");
       extraTlsOpts = { ca: [...new Set([...rootCertificates, ...extras])] };
@@ -173,7 +171,6 @@ export async function getHostKeyOptions() {
     return ["-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null"];
   }
 
-  // policy === "strict"
   const knownHostsFile = process.env.HOME ? path.join(process.env.HOME, ".ssh", "known_hosts") : "";
 
   if (!knownHostsFile || !(await pathExists(knownHostsFile))) {
@@ -225,10 +222,6 @@ async function runProxmoxRootCommand(
   }
 }
 
-/**
- * Run a root command on a Proxmox node over SSH. Used by the off-site backup
- * offload to drive rsync on the node that holds the archive.
- */
 export async function runNodeRootCommand(
   node: string,
   remoteCommand: string,

@@ -6,11 +6,7 @@ import { dirname } from "node:path";
 
 import { resolveDataFilePath } from "@/lib/app-data";
 
-// Bumped from 1s -> 5s. The cache is invalidated on every write (see
-// `primeJsonFileCache` below), so staleness is impossible — the previous TTL
-// just meant cascading reads within a single request (auth-store read 3-4 times
-// per page render in some flows) couldn't share data. 5s comfortably covers
-// any single render hierarchy and reduces disk I/O without affecting freshness.
+// Writes invalidate the cache, so the TTL cannot serve stale data.
 const DEFAULT_JSON_CACHE_TTL_MS = 5_000;
 const jsonFileCache = new Map<string, { expiresAt: number; value: unknown }>();
 const jsonFileInflight = new Map<string, Promise<unknown>>();

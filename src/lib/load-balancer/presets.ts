@@ -1,12 +1,5 @@
 import type { LoadBalancerSettings } from "@/lib/load-balancer/types";
 
-/**
- * Aggressiveness presets for the load balancer's Simple mode. Each stop
- * bundles the handful of settings that decide how eagerly guests move;
- * everything else (weights, penalties, container policy, exclusions) is
- * deliberately untouched and stays whatever Advanced mode configured.
- */
-
 export type LbPresetStop = {
   key: string;
   label: string;
@@ -74,10 +67,6 @@ export const LB_PRESET_STOPS: LbPresetStop[] = [
   },
 ];
 
-/**
- * Which stop matches the current settings exactly — or null when Advanced
- * mode has tuned something the presets manage, i.e. "Custom".
- */
 export function detectLbPresetIndex(settings: LoadBalancerSettings): number | null {
   for (let index = 0; index < LB_PRESET_STOPS.length; index += 1) {
     const overrides = LB_PRESET_STOPS[index].overrides;

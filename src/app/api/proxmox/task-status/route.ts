@@ -20,7 +20,6 @@ const pollCounts = new Map<string, { count: number; firstReq: number }>();
 
 function checkPollRateLimit(key: string): boolean {
   const now = Date.now();
-  // Prune expired entries to prevent unbounded map growth
   const cutoff = now - POLL_WINDOW_MS;
   for (const [k, entry] of pollCounts) {
     if (entry.firstReq < cutoff) pollCounts.delete(k);
@@ -169,7 +168,6 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Resolve site slug from query params or from the first task in the body
   const siteSlug =
     request.nextUrl.searchParams.get("siteSlug") ||
     String((payload?.tasks ?? [])[0]?.siteSlug ?? "").trim();

@@ -180,13 +180,9 @@ export async function deleteSshAccessAuthority(): Promise<void> {
   try {
     const filePath = await resolveDataFilePath(SSH_AUTHORITY_FILE);
     await unlink(filePath);
-  } catch {
-    // File doesn't exist — nothing to delete
-  }
+  } catch {}
 }
 
-// Legacy aliases to keep existing imports compiling while the UI copy shifts to
-// the new SSH CA model.
 export const deleteSshKeyPair = deleteSshAccessAuthority;
 export const generateSshKeyPair = generateSshAccessAuthority;
 export const getSshKeyInfo = getSshAuthorityInfo;

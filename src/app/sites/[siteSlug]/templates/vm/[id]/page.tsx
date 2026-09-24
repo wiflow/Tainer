@@ -67,7 +67,6 @@ export default async function VmTemplateDetailPage({ params }: VmTemplatePagePro
         )}
       </div>
 
-      {/* Template details */}
       <Card className="overflow-hidden rounded-2xl">
         <CardHeader className="border-b border-white/5">
           <CardTitle>Template configuration</CardTitle>

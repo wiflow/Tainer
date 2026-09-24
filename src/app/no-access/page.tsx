@@ -19,15 +19,10 @@ export const dynamic = "force-dynamic";
 export default async function NoAccessPage() {
   const session = await getCurrentSession();
 
-  // Layout's auth guard normally pushes anonymous users to /login already,
-  // but be defensive in case this page is hit directly during a logout
-  // race or stale cookie.
   if (!session) {
     redirect("/login");
   }
 
-  // If the user actually has access, don't strand them on this page.
-  // Admins always have access; non-admins need at least one site.
   const hasAnyAccess =
     session.user.role === "admin" || session.user.accessibleSiteIds.length > 0;
   if (hasAnyAccess) {

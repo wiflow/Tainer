@@ -1,6 +1,5 @@
 import "server-only";
 
-// Side-effect imports — each module calls registerTool() at import time.
 import "@/lib/copilot/tools/sites";
 import "@/lib/copilot/tools/cluster";
 import "@/lib/copilot/tools/containers";

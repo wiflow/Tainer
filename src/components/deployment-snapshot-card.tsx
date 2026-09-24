@@ -64,7 +64,6 @@ export function DeploymentSnapshotCard({
   const handledCompletionsRef = useRef(new Set<string>());
   const [showForm, setShowForm] = useState(false);
 
-  // Create snapshot
   const [createState, createAction, isCreatePending] = useActionState(
     createSnapshotAction,
     initialActionState,
@@ -74,7 +73,6 @@ export function DeploymentSnapshotCard({
     successTitle: "Snapshot creation started",
   });
 
-  // Delete snapshot
   const [deleteState, deleteAction, isDeletePending] = useActionState(
     deleteSnapshotAction,
     initialActionState,
@@ -84,7 +82,6 @@ export function DeploymentSnapshotCard({
     successTitle: "Snapshot deletion started",
   });
 
-  // Rollback snapshot
   const [rollbackState, rollbackAction, isRollbackPending] = useActionState(
     rollbackSnapshotAction,
     initialActionState,
@@ -94,7 +91,6 @@ export function DeploymentSnapshotCard({
     successTitle: "Rollback started",
   });
 
-  // Refresh on task completion
   const latestUpid = [createState, deleteState, rollbackState]
     .filter((s) => s.status === "success" && s.task?.upid)
     .map((s) => s.task!.upid)
@@ -134,7 +130,6 @@ export function DeploymentSnapshotCard({
       </CardHeader>
 
       <CardContent className="p-0">
-        {/* Create form */}
         {showForm && (
           <div className="border-b border-white/5 px-5 py-4">
             <Form action={createAction}>
@@ -170,7 +165,6 @@ export function DeploymentSnapshotCard({
           </div>
         )}
 
-        {/* Snapshot list */}
         {snapshots.length === 0 ? (
           <div className="px-5 py-8 text-center">
             <Camera className="mx-auto h-8 w-8 text-zinc-700" />

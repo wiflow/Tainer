@@ -20,9 +20,6 @@ import {
 } from "./guest-rules";
 import { selectNodeP2C } from "./p2c-selector";
 
-// Drains move one guest per node per spacing window. Faster than the
-// overload cooldown (draining is deliberate), slow enough that a failing
-// migration doesn't cascade into a storm before the operator notices.
 const DRAIN_SPACING_SECONDS = 60;
 
 export type DrainWarning = {
@@ -41,26 +38,18 @@ function parseTimeOfDayMinutes(value: string): number {
   return Number(h) * 60 + Number(m);
 }
 
-/**
- * True when `date` falls inside any window. Windows use the server's local
- * timezone and may wrap midnight (22:00–06:00 covers late evening AND early
- * morning).
- */
+/** Windows use the server's local timezone and may wrap past midnight. */
 export function isWithinMigrationWindow(windows: MigrationWindow[], date: Date): boolean {
   const nowMinutes = date.getHours() * 60 + date.getMinutes();
   return windows.some((w) => {
     const start = parseTimeOfDayMinutes(w.start);
     const end = parseTimeOfDayMinutes(w.end);
     if (start < end) return nowMinutes >= start && nowMinutes < end;
-    return nowMinutes >= start || nowMinutes < end; // wraps midnight
+    return nowMinutes >= start || nowMinutes < end;
   });
 }
 
-/**
- * Containers restart-migrate in Proxmox (stop → transfer → start), so a
- * balancing move means real downtime. Gate them behind an explicit opt-in
- * and, optionally, downtime windows.
- */
+/** Proxmox migrates containers by stop, transfer and start, so a move means downtime. */
 function containerMoveAllowed(settings: LoadBalancerSettings, date: Date): boolean {
   if (settings.containerMigrations === "always") return true;
   if (settings.containerMigrations === "never") return false;
@@ -89,8 +78,6 @@ function findValidTarget(
   const targetScore = candidateScores.find((s) => s.node === targetNode);
   if (!targetScore) return null;
 
-  // Cost-benefit floor: a migration is never free, so the target must be
-  // meaningfully better than the source or the move is skipped.
   if (
     maxSourceScore !== null &&
     targetScore.compositeScore >= maxSourceScore * (1 - minImprovementPercent / 100)
@@ -104,11 +91,6 @@ function findValidTarget(
   return targetNode;
 }
 
-/**
- * Eligibility for AUTOMATIC moves (overload + predictive phases). Explicit
- * admin actions (drains, rebalance plans) apply their own, looser rules —
- * notably plb_manual guests are movable there but never here.
- */
 function isAutoMovable(
   guest: LiveDeployment,
   node: string,
@@ -128,17 +110,6 @@ function isAutoMovable(
   );
 }
 
-/**
- * Cost-benefit candidate ordering for an overloaded node (DRS-inspired:
- * achieve the goal with the least disruption):
- *
- * 1. VMs before containers — VM live migration is invisible to the
- *    workload, a container move is downtime.
- * 2. Within each group, the SMALLEST guest that alone sheds enough load
- *    ("smallest sufficient move") — moving a 64 GB VM when 4 GB would
- *    rebalance the node is pure waste. Guests too small to be sufficient
- *    follow, biggest first, as best-effort relief.
- */
 function orderGuestsByCostBenefit(
   guests: LiveDeployment[],
   desiredShedBytes: number,
@@ -151,7 +122,7 @@ function orderGuestsByCostBenefit(
     const splitIndex = ascending.findIndex(
       (g) => effectiveMemBytes(g, guestMemOverrides) >= desiredShedBytes,
     );
-    if (splitIndex === -1) return ascending.reverse(); // none sufficient — biggest first
+    if (splitIndex === -1) return ascending.reverse();
     return [...ascending.slice(splitIndex), ...ascending.slice(0, splitIndex).reverse()];
   };
 
@@ -161,16 +132,6 @@ function orderGuestsByCostBenefit(
   ];
 }
 
-/**
- * Evaluate all migration decisions for a tick: maintenance drains first
- * (deliberate admin action, highest priority), then sustained-overload
- * rebalancing. Both share the maxConcurrentMigrations budget together with
- * migrations already in flight.
- *
- * Overload detection uses hysteresis (consecutive breach counting) to
- * prevent flapping: a node must exceed the cluster average by the configured
- * threshold for N consecutive polls before anything moves.
- */
 export function evaluateMigrationDecisions(input: {
   scores: NodeScore[];
   hysteresisStates: Map<string, HysteresisState>;
@@ -179,9 +140,8 @@ export function evaluateMigrationDecisions(input: {
   migrationCooldowns: Map<string, number>;
   nodeMetrics: LiveNodeMetrics[];
   activeMigrationCount: number;
-  /** vmid → guest-actual memory bytes from the balloon driver (QEMU). */
+  /** Guest-reported memory bytes from the QEMU balloon driver, keyed by vmid. */
   guestMemOverrides?: Map<number, number>;
-  /** node → score forecast; enables the predictive phase when set. */
   forecasts?: Map<string, ScoreForecast>;
 }): MigrationEvaluation {
   const {
@@ -203,11 +163,8 @@ export function evaluateMigrationDecisions(input: {
 
   let budget = Math.max(0, settings.maxConcurrentMigrations - activeMigrationCount);
 
-  // Targets must not be excluded, in maintenance, or already receiving a
-  // migration decided this tick (avoids dogpiling one cool node).
   const baseExclusions = new Set([...settings.excludedNodes, ...settings.maintenanceNodes]);
 
-  // ---- Phase 1: maintenance drains -----------------------------------
   for (const node of settings.maintenanceNodes) {
     if (budget <= 0) break;
 
@@ -237,8 +194,6 @@ export function evaluateMigrationDecisions(input: {
         continue;
       }
 
-      // Prefer a target already hosting the guest's affinity peers so a
-      // drain reunites groups instead of scattering them.
       const affinity = affinityTags(guest);
       let preferredTarget: string | null = null;
       if (affinity.length > 0) {
@@ -292,11 +247,10 @@ export function evaluateMigrationDecisions(input: {
       budget--;
       baseExclusions.add(targetNode);
       migrationCooldowns.set(node, now + DRAIN_SPACING_SECONDS * 1000);
-      break; // one guest per maintenance node per tick
+      break;
     }
   }
 
-  // ---- Phase 2: sustained-overload rebalancing ------------------------
   if (!settings.migrationEnabled || scores.length < 2) {
     return { decisions, drainWarnings };
   }
@@ -305,13 +259,11 @@ export function evaluateMigrationDecisions(input: {
   const threshold = clusterAvg * (1 + settings.migrationThresholdPercent / 100);
   const activeNodes = new Set(scores.map((s) => s.node));
 
-  // Clean up hysteresis for nodes no longer in the cluster
   for (const node of hysteresisStates.keys()) {
     if (!activeNodes.has(node)) hysteresisStates.delete(node);
   }
 
   for (const score of scores) {
-    // Maintenance nodes are handled by the drain phase.
     if (maintenanceSet.has(score.node)) continue;
 
     const hs = hysteresisStates.get(score.node) ?? {
@@ -333,19 +285,15 @@ export function evaluateMigrationDecisions(input: {
     hysteresisStates.set(score.node, hs);
 
     if (hs.consecutiveBreaches < settings.migrationConsecutivePolls) continue;
-    if (budget <= 0) continue; // keep counting breaches, just don't act yet
+    if (budget <= 0) continue;
 
-    // Check cooldown
     const cooldownUntil = migrationCooldowns.get(score.node);
     if (cooldownUntil && now < cooldownUntil) continue;
 
-    // Movable guests on this overloaded node.
     const movableGuests = deployments.filter((d) =>
       isAutoMovable(d, score.node, settings, nowDate, deployments),
     );
 
-    // How much memory the node needs to shed to come back to the cluster
-    // average — drives "smallest sufficient move" candidate ordering.
     const sourceMetrics = nodeMetrics.find((m) => m.node === score.node);
     const sourceMemUsed = sourceMetrics?.memoryUsedBytes ?? 0;
     const desiredShedBytes = Math.max(
@@ -360,7 +308,6 @@ export function evaluateMigrationDecisions(input: {
       guestMemOverrides,
     );
 
-    // Target candidates: below-average nodes only
     const belowAvgScores = scores.filter(
       (s) => s.node !== score.node && s.compositeScore < clusterAvg,
     );
@@ -389,26 +336,18 @@ export function evaluateMigrationDecisions(input: {
       budget--;
       baseExclusions.add(targetNode);
 
-      // Apply cooldown
       migrationCooldowns.set(
         score.node,
         now + settings.migrationCooldownSeconds * 1000,
       );
 
-      // Reset hysteresis after triggering
       hs.consecutiveBreaches = 0;
       hs.firstBreachAt = null;
       hs.lastBreachAt = null;
-      break; // one guest per overloaded node per tick
+      break;
     }
   }
 
-  // ---- Phase 3: predictive pre-emption ---------------------------------
-  // Act on high-confidence forecasts of a node crossing the threshold
-  // within the horizon, before the overload materializes. The forecast
-  // window doubles as hysteresis (a spike can't produce a confident trend),
-  // and all the usual gates — cooldown, budget, eligibility, target
-  // validation — still apply.
   if (settings.predictiveEnabled && input.forecasts) {
     const decidedNodes = new Set(decisions.map((d) => d.sourceNode));
     const minR2 = settings.predictiveMinConfidencePercent / 100;
@@ -416,12 +355,12 @@ export function evaluateMigrationDecisions(input: {
     for (const score of scores) {
       if (budget <= 0) break;
       if (maintenanceSet.has(score.node) || decidedNodes.has(score.node)) continue;
-      if (score.compositeScore > threshold) continue; // real overload — phase 2's job
+      if (score.compositeScore > threshold) continue;
 
       const forecast = input.forecasts.get(score.node);
       if (!forecast) continue;
       if (forecast.r2 < minR2) continue;
-      if (forecast.slopePerMinute <= 0) continue; // load falling or flat
+      if (forecast.slopePerMinute <= 0) continue;
       if (forecast.predictedScore <= threshold) continue;
 
       const cooldownUntil = migrationCooldowns.get(score.node);
@@ -450,8 +389,6 @@ export function evaluateMigrationDecisions(input: {
       );
 
       for (const guest of orderedGuests) {
-        // The improvement gate compares against the PREDICTED score — the
-        // whole point is the source isn't hot yet.
         const targetNode = findValidTarget(
           guest,
           belowAvgScores,
@@ -478,7 +415,7 @@ export function evaluateMigrationDecisions(input: {
           score.node,
           now + settings.migrationCooldownSeconds * 1000,
         );
-        break; // one guest per predicted node per tick
+        break;
       }
     }
   }

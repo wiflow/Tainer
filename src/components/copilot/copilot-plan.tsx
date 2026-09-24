@@ -31,13 +31,9 @@ export type ToolCallView = {
   confirmString?: string | null;
   plan?: ApprovalPlan | null;
   token?: string;
-  /** External content (e.g. Docker Hub descriptions) entered the conversation
-   *  before this action was proposed — show a provenance warning. */
   afterExternalContent?: boolean;
 };
 
-// Humanize tool names + args into short subtask titles. Falls back to the
-// raw tool name if we don't have a label.
 const TOOL_LABELS: Record<string, (args: Record<string, unknown>) => string> = {
   list_sites: () => "List accessible sites",
   list_nodes: (a) => `List nodes — ${String(a.siteSlug ?? "?")}`,
@@ -133,8 +129,6 @@ function labelForToolCall(tc: ToolCallView): string {
   return label ? label(tc.args) : tc.name;
 }
 
-// -- Status icons & badges (dark-theme palette) ------------------------------
-
 function StatusIcon({
   status,
   size = "sm",
@@ -214,12 +208,6 @@ function StatusBadge({ status }: { status: ToolCallView["status"] }) {
   );
 }
 
-// -- Plan view ---------------------------------------------------------------
-
-/**
- * Renders the agent-plan-style task list for an assistant turn. The "task" is
- * the assistant's overall progress; "subtasks" are the individual tool calls.
- */
 export function PlanView({
   toolCalls,
   onApprove,
@@ -231,8 +219,6 @@ export function PlanView({
 }) {
   if (toolCalls.length === 0) return null;
 
-  // Compute overall status. Any awaiting-approval dominates; otherwise
-  // any running dominates; otherwise any error → error; else all done.
   const overall: ToolCallView["status"] = toolCalls.some(
     (tc) => tc.status === "awaiting-approval",
   )
@@ -300,10 +286,7 @@ function ToolSubtask({
   onApprove: () => void;
   onDeny: () => void;
 }) {
-  // Steps stay collapsed by default — expanding every result made long turns
-  // noisy. The one exception is awaiting-approval: the approve/deny card must
-  // be visible without a click, so it forces open on that transition (state
-  // adjusted during render, per React's derived-state pattern).
+  // An awaiting-approval step opens itself so the approve/deny card is visible.
   const [open, setOpen] = useState(tc.status === "awaiting-approval");
   const [prevStatus, setPrevStatus] = useState(tc.status);
   if (prevStatus !== tc.status) {
@@ -404,8 +387,6 @@ function ToolSubtask({
   );
 }
 
-// -- Approval plan (batch preview) -------------------------------------------
-
 function ApprovalPlanTable({ plan }: { plan: ApprovalPlan }) {
   return (
     <div className="mt-2 rounded-md border border-white/[0.08] bg-black/20 overflow-hidden">
@@ -445,8 +426,6 @@ function ApprovalPlanTable({ plan }: { plan: ApprovalPlan }) {
     </div>
   );
 }
-
-// -- Approval card -----------------------------------------------------------
 
 function ApprovalCard({
   tc,

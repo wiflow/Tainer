@@ -14,7 +14,7 @@ import { listContainerTags } from "@/lib/container-groups";
 import { listDeploymentTemplates } from "@/lib/deployment-templates";
 import { getDeploymentIndex, withSiteConfig } from "@/lib/proxmox";
 
-// Avoid `force-dynamic` here — it silently disables the unstable_cache below.
+// Do not set force-dynamic here; it silently disables the unstable_cache below.
 const getDeploymentsPageData = unstable_cache(
   async (siteSlug: string) => {
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
@@ -41,7 +41,6 @@ export default async function DeploymentsPage({
 
   const [{ deployments, issues }, templates, tags] = await getDeploymentsPageData(siteSlug);
 
-  // Build update map: deployment ID → true if template has been updated since deploy
   const templateMap = new Map(templates.map((t) => [t.id, t.updatedAt]));
   const updateMap: Record<string, boolean> = {};
   for (const d of deployments) {
@@ -68,8 +67,6 @@ export default async function DeploymentsPage({
 
   return (
     <div className="space-y-4">
-      {/* Proxmox guest status changes outside the app (and lags behind
-          lifecycle tasks) — keep the list from going stale between actions. */}
       <AutoRefresh intervalMs={15_000} eventsSite={siteSlug} />
       <ProxmoxIssues
         description="Deployment inventory and controls need VM.Audit plus lifecycle permissions. Empty results can still mean either no guests or a token that cannot see them yet."

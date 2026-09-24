@@ -1,11 +1,3 @@
-/**
- * ISO 3166-1 alpha-2 country list used to render the per-site flag in the
- * sidebar and to drive the country picker in the site form. The list is
- * trimmed to UN member + observer states + a handful of common
- * dependencies — keeping it short keeps the dropdown manageable while
- * covering effectively any data-center location.
- */
-
 export type CountryEntry = {
   code: string;
   name: string;
@@ -213,7 +205,6 @@ export const COUNTRIES: CountryEntry[] = [
 
 const COUNTRY_CODES = new Set(COUNTRIES.map((c) => c.code));
 
-/** Returns a normalized ISO-3166-1 alpha-2 code, or null if not recognised. */
 export function normalizeCountryCode(value: string | null | undefined): string | null {
   if (!value) return null;
   const upper = String(value).trim().toUpperCase();

@@ -69,9 +69,7 @@ function intToIp(n: number): string {
 type Cell = {
   ip: string;
   used: boolean;
-  /** Who's using this IP, if known (deployment name, IPAM service, etc.). */
   label: string | null;
-  /** Which side has the usage entry — drives tooltip accent color. */
   source: "tainer" | "ipam" | null;
 };
 
@@ -81,8 +79,6 @@ function buildHeatmap(pool: IpPoolEntry): Cell[] {
   if (!Number.isFinite(firstInt) || !Number.isFinite(lastInt) || lastInt < firstInt) {
     return [];
   }
-  // Tainer-side entries win over IPAM when both describe the same address —
-  // operators care most about which container is bound there.
   const usageByIp = new Map<string, { label: string; source: "tainer" | "ipam" }>();
   for (const u of pool.ipamUsedAddresses) {
     usageByIp.set(u.address, {
@@ -136,7 +132,6 @@ function PoolCard({
           : "border-white/[0.06]",
       )}
     >
-      {/* Top row: name + status */}
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="truncate font-mono text-[13px] font-semibold text-zinc-100">
@@ -151,11 +146,6 @@ function PoolCard({
         </span>
       </div>
 
-      {/* Heatmap. Each cell hosts an absolutely-positioned tooltip child that
-          stays hidden until the cell is hovered — pure CSS so we don't pay
-          per-cell render cost. Tooltip overflows the card upward; the parent
-          card deliberately doesn't set overflow:hidden so the tip is visible
-          even for cells on the top row. */}
       <div
         className="grid gap-[2px]"
         style={{ gridTemplateColumns: "repeat(28, minmax(0, 1fr))" }}
@@ -201,7 +191,6 @@ function PoolCard({
         ))}
       </div>
 
-      {/* Bottom row: usage + next free */}
       <div className="mt-1 flex items-center justify-between text-[11.5px]">
         <span className="text-zinc-400">
           <span className="font-mono text-zinc-200">{usedCount}</span>
@@ -260,14 +249,12 @@ function PoolDetails({
       </header>
 
       <div className="space-y-4 px-4 py-4">
-        {/* Counts */}
         <div className="grid gap-2 sm:grid-cols-3">
           <CountTile label="Free" value={pool.availableCount} accent="emerald" />
           <CountTile label="Used (Tainer)" value={pool.tainerUsedCount} accent="sky" />
           <CountTile label="Used (IPAM)" value={pool.ipamUsedCount} accent="amber" />
         </div>
 
-        {/* Settings */}
         <div className="grid gap-3 lg:grid-cols-[1.15fr_0.85fr]">
           <div className="rounded-md border border-white/[0.06] bg-black/30 px-4 py-3">
             <p className="text-[10.5px] font-medium uppercase tracking-[0.14em] text-zinc-500">

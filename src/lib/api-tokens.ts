@@ -9,16 +9,7 @@ import { SITE_PERMISSIONS, type Permission } from "@/lib/permissions";
 import { listEnabledSites } from "@/lib/site-store";
 import { createStoreMutator, writeJsonFileAtomically } from "@/lib/store-utils";
 
-/**
- * Scoped service tokens for scripts / Terraform / CI. Tokens are shown once
- * at creation and stored only as SHA-256 hashes. A bearer token resolves to
- * a synthetic operator session carrying exactly the granted per-site
- * permissions — deny-by-default:
- *   - role is always "operator", so admin-only surfaces (requireAdminSession,
- *     role === "admin" checks) refuse tokens outright;
- *   - only SITE_PERMISSIONS are grantable — user, group, and site management
- *     can never be driven by a token.
- */
+// Token sessions always get the operator role and only site permissions.
 
 const DATA_FILE = "api-tokens.json";
 const TOKEN_PREFIX = "tnr_";
@@ -27,12 +18,10 @@ const LAST_USED_UPDATE_MS = 60 * 60 * 1000;
 export type ApiTokenRecord = {
   id: string;
   name: string;
-  /** SHA-256 hex of the full token — the token itself is never stored. */
   tokenHash: string;
-  /** First characters of the token, for identification in the UI. */
   displayPrefix: string;
   permissions: Permission[];
-  /** Site ids the token is scoped to; empty array = all enabled sites. */
+  /** Empty means all enabled sites. */
   siteIds: string[];
   createdBy: string;
   createdAt: string;
@@ -131,12 +120,6 @@ export async function revokeApiToken(id: string): Promise<ApiTokenSummary | null
   });
 }
 
-/**
- * Resolve an Authorization header value to a synthetic session, or null.
- * Site scoping: the token's siteIds (or every enabled site when unscoped)
- * become accessibleSiteIds, and each carries the token's permission set.
- * Global permissions stay empty, so a token only passes per-site checks.
- */
 export async function getSessionForBearerToken(
   authorizationHeader: string | null,
 ): Promise<AuthSession | null> {
@@ -152,8 +135,6 @@ export async function getSessionForBearerToken(
     return null;
   }
 
-  // Throttled last-used stamp — one store write per hour per token, not one
-  // per request.
   const lastUsed = record.lastUsedAt ? new Date(record.lastUsedAt).getTime() : 0;
   if (Date.now() - lastUsed >= LAST_USED_UPDATE_MS) {
     void mutateStore((s) => {

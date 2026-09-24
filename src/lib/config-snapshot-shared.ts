@@ -1,5 +1,4 @@
-// Constants + pure helpers shared between server and client. No node:fs / no
-// server-only imports — safe to pull into client components.
+// Imported by client components, so no node:fs or server-only imports here.
 
 export const CONFIG_SNAPSHOT_INTERVAL_OPTIONS = [
   { label: "Every hour", value: 60 },
@@ -18,10 +17,7 @@ export function formatConfigIntervalLabel(minutes: number): string {
   return `Every ${Math.round(minutes / 1440)}d`;
 }
 
-/**
- * Plain shape mirrored from `@/lib/config-snapshot-policies` so client
- * components can type their props without importing from a server-only file.
- */
+/** Mirrors the shape in `@/lib/config-snapshot-policies`; keep the two in sync. */
 export type ConfigSnapshotPolicyView = {
   createdAt: string;
   description: string;

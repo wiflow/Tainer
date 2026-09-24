@@ -112,7 +112,6 @@ export function TemplatesBoard({ templates, vmTemplates = [] }: { templates: Dep
 
   return (
     <div className="space-y-4">
-      {/* Search */}
       <div className="flex items-center gap-3">
         <div className="relative flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
@@ -128,7 +127,6 @@ export function TemplatesBoard({ templates, vmTemplates = [] }: { templates: Dep
         </span>
       </div>
 
-      {/* Table list */}
       {filteredTemplates.length === 0 ? (
         <div className="rounded-2xl border border-white/5 bg-[#111113] p-10 text-center">
           <p className="text-sm font-medium text-zinc-200">

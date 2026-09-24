@@ -23,11 +23,6 @@ import type { LdapConfigPublic } from "@/lib/ldap-config";
 const fieldClassName =
   "mt-1.5 w-full rounded-md border border-white/10 bg-zinc-900 px-3 py-2 text-[13px] text-zinc-200 outline-none transition-colors focus:border-zinc-500 focus:bg-zinc-900";
 
-// The manager handles two distinct provider types — OIDC SSO providers
-// (multiple) and a single LDAP/AD config — but presents them in a
-// unified list. Mode encodes both the active view and the type of
-// provider being created/edited so the same component switches forms
-// cleanly without a separate route.
 type Mode =
   | { kind: "list" }
   | { kind: "choose-type" }
@@ -54,7 +49,6 @@ function ProviderForm({
     successTitle: isEdit ? "Provider updated" : "Provider created",
   });
 
-  // Bubble success up to parent so the form closes back to the list view.
   if (state.status === "success" && state.requestId) {
     queueMicrotask(onSaved);
   }
@@ -152,11 +146,6 @@ function ProviderForm({
         />
       </label>
 
-      {/* The defaultRole field stays in the data model for backward
-          compatibility, but auto-provisioning now always creates users
-          with no permissions and no group memberships (effectively
-          read-only / "guest"). The hidden input keeps the form
-          submission shape intact. */}
       <input name="defaultRole" type="hidden" value="operator" />
 
       <div className="rounded-md border border-white/[0.05] bg-zinc-900/40 p-3">

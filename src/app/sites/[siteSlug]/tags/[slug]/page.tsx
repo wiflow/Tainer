@@ -21,7 +21,7 @@ import { getDeploymentIndex, withSiteConfig } from "@/lib/proxmox";
 import { getTagBadgeClass, hasManagedTag } from "@/lib/tag-utils";
 import { cn } from "@/lib/utils";
 
-// Avoid `force-dynamic` here — it silently disables the unstable_cache below.
+// Avoid `force-dynamic` here; it silently disables the unstable_cache below.
 const getTagDetailData = unstable_cache(
   async (siteSlug: string, slug: string) => {
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
@@ -66,7 +66,6 @@ export default async function TagDetailPage({ params }: TagDetailPageProps) {
 
   return (
     <div className="space-y-8">
-      {/* Back link + header */}
       <div>
         <Link
           className={cn(buttonVariants({ size: "sm", variant: "ghost" }), "mb-4 -ml-3")}
@@ -111,7 +110,6 @@ export default async function TagDetailPage({ params }: TagDetailPageProps) {
         </div>
       </div>
 
-      {/* Stats row */}
       <div className="grid gap-4 md:grid-cols-3">
         <MetricCard
           icon={<Box className="w-3.5 h-3.5" />}
@@ -133,7 +131,6 @@ export default async function TagDetailPage({ params }: TagDetailPageProps) {
         />
       </div>
 
-      {/* Bulk environment */}
       {members.length > 0 && (
         <TagBulkEnv
           tagSlug={tag.slug}
@@ -142,7 +139,6 @@ export default async function TagDetailPage({ params }: TagDetailPageProps) {
         />
       )}
 
-      {/* Member manager */}
       <TagMemberManager
         tagSlug={tag.slug}
         members={members}
@@ -150,7 +146,6 @@ export default async function TagDetailPage({ params }: TagDetailPageProps) {
         tags={allTags}
       />
 
-      {/* Reuse deployments board for the member list */}
       {members.length > 0 && (
         <div>
           <h2 className="mb-4 text-sm font-semibold text-zinc-100">

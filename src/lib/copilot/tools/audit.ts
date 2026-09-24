@@ -24,8 +24,6 @@ registerTool({
     required: [],
   },
   describe: (args) => `Read audit log (limit=${args.limit ?? 50})`,
-  // No typed-confirm: it's a read of audit data. But it's `admin` klass, so
-  // it still goes through the approval gate.
   execute: async (args, ctx) => {
     if (ctx.session.user.role !== "admin") {
       throw new Error("Administrator access required for get_audit_log.");

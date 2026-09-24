@@ -36,10 +36,6 @@ import type { ManagedUserSummary } from "@/lib/auth";
 import type { UserGroup } from "@/lib/user-groups";
 import { cn } from "@/lib/utils";
 
-// ── Avatar / status helpers ──────────────────────────────────────────────────
-
-/** Pick from a small palette deterministically based on the user's name so the
- *  same user always gets the same avatar tint (lets you scan rows by colour). */
 function avatarTint(seed: string): string {
   const palette = [
     "bg-sky-500/15 text-sky-300",
@@ -64,8 +60,6 @@ function initials(name: string, email: string): string {
 
 type Presence = { color: string; label: string };
 
-/** Derive a presence dot from the user's lastSeenAt timestamp. Same buckets
- *  every chat-like product uses: online (now-ish), recent, idle, offline. */
 function presence(lastSeenAt: string | null): Presence {
   if (!lastSeenAt) return { color: "bg-zinc-600", label: "Never signed in" };
   const ageMs = Date.now() - new Date(lastSeenAt).getTime();
@@ -140,7 +134,6 @@ function UserResetPasswordButton({ user }: { user: ManagedUserSummary }) {
     successTitle: "Password reset",
   });
 
-  // Auto-close on success.
   useEffect(() => {
     if (state.status === "success") setOpen(false);
   }, [state.status, state.requestId]);
@@ -255,8 +248,6 @@ function UserGroupsCell({
   });
   useRefreshOnSuccess(state.status);
 
-  // Reset checkbox state to the current truth whenever the dialog opens.
-  // Otherwise after Save the checkboxes drift and a subsequent open shows stale.
   useEffect(() => {
     if (open) setSelected(new Set(user.groupIds));
   }, [open, user.groupIds]);
@@ -278,8 +269,6 @@ function UserGroupsCell({
 
   return (
     <>
-      {/* Inline display: chips for current groups, plus an icon button to open
-          the editor. Click the chips area or the icon to open the dialog. */}
       <button
         className="flex w-full flex-wrap items-center gap-1.5 rounded-md px-1 py-0.5 text-left transition-colors hover:bg-white/[0.03]"
         onClick={() => setOpen(true)}
@@ -400,14 +389,12 @@ export function UserManagementPanel({
   });
   useRefreshOnSuccess(createUserState.status);
 
-  // Auto-collapse the create form on success.
   useEffect(() => {
     if (createUserState.status === "success") setShowCreate(false);
   }, [createUserState.status, createUserState.requestId]);
 
   return (
     <div className="space-y-4">
-      {/* ── Header strip with toggle for create form ── */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-[15px] font-medium text-white">User directory</h2>
@@ -431,7 +418,6 @@ export function UserManagementPanel({
         </Button>
       </div>
 
-      {/* ── Collapsible create form ── */}
       {showCreate && (
         <SectionPanel
           title="Create user"
@@ -519,7 +505,6 @@ export function UserManagementPanel({
         </SectionPanel>
       )}
 
-      {/* ── Directory ── */}
       <SectionPanel noPadding>
         {users.length === 0 ? (
           <div className="flex flex-col items-center justify-center bg-zinc-900/20 px-6 py-16 text-center">
@@ -533,7 +518,6 @@ export function UserManagementPanel({
           </div>
         ) : (
           <>
-            {/* Column header — sticky-ish single row, pixel-aligned with row below */}
             <div className="hidden md:grid grid-cols-[minmax(220px,1.4fr)_120px_160px_minmax(160px,1.2fr)_88px] items-center gap-4 border-b border-white/5 bg-black/30 px-5 py-2.5 text-[11px] font-medium uppercase tracking-[0.16em] text-zinc-500">
               <span>User</span>
               <span>Security</span>
@@ -548,12 +532,6 @@ export function UserManagementPanel({
                   key={user.id}
                   className="md:grid md:grid-cols-[minmax(220px,1.4fr)_120px_160px_minmax(160px,1.2fr)_88px] items-center gap-4 px-5 py-3.5 transition-colors hover:bg-white/[0.02]"
                 >
-                  {/* Identity column. The "admin" / "operator" role used
-                      to render here as a separate badge but it duplicated
-                      the group-membership column on the right of the row
-                      (an admin user is one who's in an admin group). The
-                      role is now derived from groups at session-hydration
-                      time, so the column is the source of truth. */}
                   <div className="flex items-center gap-3 min-w-0">
                     <UserAvatar user={user} />
                     <div className="min-w-0 flex-1">
@@ -564,7 +542,6 @@ export function UserManagementPanel({
                     </div>
                   </div>
 
-                  {/* Security */}
                   <div className="mt-2 md:mt-0">
                     {user.hasTwoFactor ? (
                       <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-0.5 text-[11px] font-medium text-emerald-300">
@@ -579,7 +556,6 @@ export function UserManagementPanel({
                     )}
                   </div>
 
-                  {/* Activity */}
                   <div className="mt-2 md:mt-0 text-[12px] text-zinc-400">
                     <p>
                       <strong className="text-zinc-200">{user.activeSessionCount}</strong>{" "}
@@ -597,12 +573,10 @@ export function UserManagementPanel({
                     </p>
                   </div>
 
-                  {/* Groups */}
                   <div className="mt-2 md:mt-0 min-w-0">
                     <UserGroupsCell allGroups={groups} user={user} />
                   </div>
 
-                  {/* Actions */}
                   <div className="mt-2 md:mt-0 flex md:justify-end gap-1">
                     <UserClearLockoutButton user={user} />
                     <UserResetPasswordButton user={user} />

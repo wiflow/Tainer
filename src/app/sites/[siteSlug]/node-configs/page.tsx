@@ -41,7 +41,6 @@ export default async function NodeConfigsPage({
 
   const nodeNames = nodesData.nodes.map((n) => n.name);
 
-  // Compare mode
   const sp = await searchParams;
   let diffs: { section: string; before: string; after: string; changed: boolean }[] | null = null;
   let compareLabels: { a: string; b: string } | null = null;
@@ -57,7 +56,6 @@ export default async function NodeConfigsPage({
     }
   }
 
-  // Group snapshots by node
   const groupedByNode = new Map<string, typeof snapshots>();
   for (const snap of snapshots) {
     const existing = groupedByNode.get(snap.nodeName) ?? [];
@@ -67,7 +65,6 @@ export default async function NodeConfigsPage({
 
   return (
     <div className="space-y-4">
-      {/* Stats */}
       <div className="grid gap-4 sm:grid-cols-3">
         <MetricCard
           icon={<FileJson2 className="w-3.5 h-3.5" />}
@@ -88,16 +85,13 @@ export default async function NodeConfigsPage({
         />
       </div>
 
-      {/* Schedules */}
       <ConfigSnapshotSchedules nodeNames={nodeNames} policies={schedules} />
 
-      {/* Take snapshot + list */}
       <NodeConfigSnapshots
         nodeNames={nodeNames}
         snapshots={snapshots}
       />
 
-      {/* Compare results */}
       {diffs && compareLabels && (
         <SectionPanel
           title="Configuration Diff"

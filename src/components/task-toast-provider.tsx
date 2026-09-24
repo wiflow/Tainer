@@ -429,13 +429,9 @@ export function TaskToastProvider({
       );
 
       if (shouldRefresh && document.visibilityState === "visible") {
-        // Invalidate server-side caches first so router.refresh() gets fresh data
         fetch("/api/revalidate", { method: "POST" }).finally(() => {
           router.refresh();
-          // Proxmox propagates guest status to /cluster/resources on
-          // pvestatd's ~10s cadence, so a task can complete well before the
-          // API reports the new state. Stagger follow-up refreshes to ride
-          // that out instead of refreshing once and going stale.
+          // Proxmox updates /cluster/resources on a ~10s cadence, so refresh again after completion.
           for (const delayMs of [1500, 5000, 12000]) {
             setTimeout(() => {
               if (document.visibilityState === "visible") {
@@ -445,9 +441,7 @@ export function TaskToastProvider({
           }
         });
       }
-    } catch {
-      // Keep the current toast state and retry on the next interval.
-    } finally {
+    } catch {} finally {
       pollInFlightRef.current = false;
     }
   });
@@ -559,10 +553,7 @@ export function TaskToastProvider({
     };
   }, [router, toasts]);
 
-  // Stabilize the Set reference: a new toast progress update arrives every
-  // 2-5s, but the SET of running UPIDs only changes when a task starts or
-  // finishes. Returning the same Set reference when content is unchanged means
-  // the context value is stable and consumers don't re-render on progress.
+  // Reuse the Set when its contents are unchanged so progress updates skip re-renders.
   const prevUpidsRef = useRef<Set<string>>(new Set());
   const activeTaskUpids = useMemo(() => {
     const next = new Set<string>();

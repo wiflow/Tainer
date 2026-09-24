@@ -14,14 +14,6 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 
-/**
- * Confirmation for destructive actions, replacing `window.confirm`.
- *
- * Beyond looking like the rest of the app, this can do what the native
- * dialog can't: spell out the blast radius, and — for anything that
- * destroys data we can't get back — demand the resource's name typed out,
- * so a reflexive Enter can't delete something.
- */
 export function ConfirmDialog({
   confirmLabel = "Delete",
   consequences,
@@ -34,21 +26,17 @@ export function ConfirmDialog({
   title,
 }: {
   confirmLabel?: string;
-  /** Bullet list of what will happen; shown above the confirm button. */
   consequences?: React.ReactNode[];
   description: React.ReactNode;
   onConfirm: () => void;
   onOpenChange: (open: boolean) => void;
   open: boolean;
   pending?: boolean;
-  /** When set, the button unlocks only once this exact string is typed. */
   requireTypedName?: string;
   title: string;
 }) {
   const [typed, setTyped] = React.useState("");
 
-  // Reset the challenge whenever the dialog is dismissed, so reopening it
-  // never starts pre-armed.
   React.useEffect(() => {
     if (!open) setTyped("");
   }, [open]);

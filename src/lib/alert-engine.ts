@@ -470,7 +470,6 @@ async function evaluateNotifications(
   const conditionMap = new Map(conditions.map((c) => [c.key, c]));
   const policyKeyPrefix = `policy:${policy.id}:`;
 
-  // Resolve webhook: policy override > global default
   const webhookUrl = policy.webhookUrl || globalSettings.webhookUrl;
   const webhookKind = policy.webhookUrl ? policy.webhookKind : globalSettings.webhookKind;
   const mentionUpns = policy.mentionUserUpns.length > 0
@@ -534,7 +533,6 @@ async function evaluateNotifications(
         ? new Date(activeEntry.lastNotifiedAt).getTime()
         : null;
 
-      // Notify-once: suppress all reminders after the first notification
       if (policy.notifyOnce && activeEntry.notificationCount >= 1) {
         suppressedEvents++;
         continue;
@@ -647,7 +645,6 @@ export async function runAlertCheck(options?: { force?: boolean }): Promise<Aler
     };
   }
 
-  // Fetch all data once, shared across policies
   const [storageResult, archivesResult, deploymentsResult, nodesResult] = await Promise.all([
     listBackupStoragePools(),
     listAllBackups(),
@@ -737,7 +734,6 @@ export async function runAlertCheck(options?: { force?: boolean }): Promise<Aler
     await markPolicyChecked(policy.id, nowIso);
   }
 
-  // Clean up legacy alerts (from old flat-rule system, keys without "policy:" prefix)
   const legacyResolved = await mutateAlertRuntimeState((store) => {
     let count = 0;
     for (const [key, entry] of Object.entries(store.alerts)) {

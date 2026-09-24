@@ -36,7 +36,6 @@ async function readStore(): Promise<SiteStore> {
     normalize: (parsed) => {
       const store = parsed as Partial<SiteStore>;
       const sites = Array.isArray(store.sites) ? store.sites : [];
-      // Backfill optional fields for sites created before each was added.
       for (const site of sites) {
         if (!site.location) site.location = null;
         if (site.countryCode === undefined) site.countryCode = null;
@@ -114,7 +113,6 @@ export async function getDefaultSite(): Promise<SiteRecord | null> {
     if (site) return site;
   }
 
-  // Fallback: first enabled site.
   return store.sites.find((s) => s.enabled) ?? null;
 }
 
@@ -200,7 +198,6 @@ export async function createSite(
 
     store.sites.push(site);
 
-    // First site becomes the default automatically.
     if (store.sites.length === 1) {
       store.defaultSiteId = site.id;
     }
@@ -255,9 +252,7 @@ export async function updateSite(
       });
     }
 
-    // `countryCode === ""` is the explicit "clear it" signal from the form;
-    // `undefined` means the field wasn't submitted (partial update) and we
-    // leave the existing value alone.
+    // "" clears the country code; undefined leaves it unchanged.
     if (input.countryCode !== undefined) {
       site.countryCode = normalizeCountryCode(input.countryCode);
     }
@@ -313,10 +308,6 @@ export async function updateSiteValidation(
   });
 }
 
-/**
- * Check if any existing site shares node fingerprints with the given set.
- * Returns the overlapping site name and node name, or null if no overlap.
- */
 export async function findOverlappingSite(
   fingerprints: string[],
   excludeSiteId?: string,
@@ -349,7 +340,6 @@ export async function deleteSite(id: string): Promise<boolean> {
   });
 }
 
-// Used only during migration — writes the entire store directly.
 export async function writeSiteStore(store: SiteStore): Promise<void> {
   await writeStore(store);
 }

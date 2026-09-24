@@ -369,8 +369,7 @@ export async function updateSiteAction(
     const apiUrl = String(formData.get("apiUrl") ?? "").trim();
     const username = String(formData.get("username") ?? "").trim();
     const pvePassword = String(formData.get("password") ?? "").trim();
-    // Checkbox with hidden fallback: getAll returns ["full"] or ["full","insecure"].
-    // The last value is the effective one.
+    // A hidden fallback field means the last tlsMode value is the effective one.
     const tlsModeValues = formData.getAll("tlsMode").map(String);
     const tlsMode = tlsModeValues[tlsModeValues.length - 1] === "insecure" ? "insecure" as const : "full" as const;
     const tlsCustomCaPem = String(formData.get("tlsCustomCaPem") ?? "").trim() || null;
@@ -406,13 +405,10 @@ export async function updateSiteAction(
     if (apiUrl) updates.apiUrl = apiUrl;
     if (username) updates.username = username;
     if (pvePassword) updates.password = pvePassword;
-    // Always send tlsMode since the checkbox hidden field guarantees a value
     updates.tlsMode = tlsMode;
     updates.tlsCustomCaPem = tlsCustomCaPem;
     if (defaultNode) updates.defaultNode = defaultNode;
 
-    // Address wins over coordinates: an empty submitted field clears the
-    // location, a value is geocoded server-side.
     if (formData.has("address")) {
       if (addressRaw) {
         const geo = await geocodeAddress(addressRaw);
@@ -429,8 +425,6 @@ export async function updateSiteAction(
       }
     }
 
-    // The country select always submits a value (even if empty for "—").
-    // formData.has() distinguishes "field absent" from "field cleared".
     if (formData.has("countryCode")) {
       updates.countryCode = String(formData.get("countryCode") ?? "").trim() || null;
     }

@@ -46,9 +46,6 @@ export async function POST(request: Request) {
     await recordCopilotAudit({
       session,
       toolName: payload.toolName,
-      // Klass is rebuilt from the tool def at execution time. For audit
-      // we don't know the klass without looking up the tool again, but
-      // since denial doesn't run anything, recording "denied" is enough.
       klass: "write",
       args: payload.args,
       outcome: "denied",
@@ -59,10 +56,7 @@ export async function POST(request: Request) {
     });
   }
 
-  // Execute the approved tool. If a siteSlug was attached, run inside that
-  // site's context so proxmox.ts has the active config — the tool itself
-  // also re-validates site access on `session`, so a tampered siteSlug
-  // would still be rejected.
+  // The tool re-checks site access on `session`, so a tampered siteSlug is rejected.
   const run = async () => executeApprovedTool(session, payload.toolName, payload.args);
   const { result, isError } = payload.siteSlug
     ? await withSiteConfig(await ensureSiteConfig(payload.siteSlug), run)

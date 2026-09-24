@@ -16,18 +16,10 @@ const SETTINGS_FILE = "lb-settings.json";
 export const DEFAULT_LB_SETTINGS: LoadBalancerSettings = {
   enabled: false,
   pollIntervalSeconds: 10,
-  // Memory-primary weighting: memory is the truly finite resource — CPU
-  // contention degrades gracefully, memory exhaustion OOM-kills. Proxmox's
-  // own TOPSIS scheduler weights memory 5:1 over CPU for the same reason.
   weights: { cpu: 0.25, memory: 0.5, latency: 0.1, disk: 0.15 },
   migrationEnabled: false,
-  // Dry-run by default: a freshly enabled auto-migration records what it
-  // WOULD move as "migration-recommended" events without touching guests.
-  // Operators flip this off once the recommendations look sane.
   migrationDryRun: true,
-  // Containers restart-migrate in Proxmox (stop → transfer → start = real
-  // downtime), so they are exempt from automatic balancing unless the
-  // operator explicitly opts in.
+  // Containers restart-migrate in Proxmox, which means real downtime.
   containerMigrations: "never",
   containerMigrationWindows: [],
   maxConcurrentMigrations: 1,
@@ -46,11 +38,6 @@ export const DEFAULT_LB_SETTINGS: LoadBalancerSettings = {
   predictiveMinConfidencePercent: 70,
   ewmaAlpha: 0.3,
   latencyMaxMs: 500,
-  // Lowered from 30s -> 10s. Anything over 10s on a load-balancer tick means
-  // the site's Proxmox is genuinely broken; spinning for 30 seconds just
-  // chains delays into the next tick and burns sockets. The per-request
-  // 15s timeout in proxmoxRequest will kick in well before this anyway —
-  // this is the cumulative budget across ALL requests in the tick.
   tickTimeoutSeconds: 10,
   excludedNodes: [],
   excludedVmids: [],
@@ -76,11 +63,6 @@ function clampInteger(
   return Math.round(clampNumber(value, fallback, min, max));
 }
 
-/**
- * Normalize weights to sum to exactly 1.0.
- * After rounding to 3 decimal places, the remainder is added to the
- * largest weight to guarantee the sum is exactly 1.000.
- */
 function normalizeWeights(raw: unknown): ScoreWeights {
   const defaults = DEFAULT_LB_SETTINGS.weights;
   if (!raw || typeof raw !== "object") return { ...defaults };
@@ -99,13 +81,11 @@ function normalizeWeights(raw: unknown): ScoreWeights {
   latency /= sum;
   disk /= sum;
 
-  // Round to 3 decimal places
   let rCpu = Math.round(cpu * 1000) / 1000;
   let rMemory = Math.round(memory * 1000) / 1000;
   let rLatency = Math.round(latency * 1000) / 1000;
   let rDisk = Math.round(disk * 1000) / 1000;
 
-  // Fix rounding drift: add remainder to the largest weight
   const roundedSum = rCpu + rMemory + rLatency + rDisk;
   const drift = Math.round((1 - roundedSum) * 1000) / 1000;
   if (drift !== 0) {

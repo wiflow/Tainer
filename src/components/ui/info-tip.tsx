@@ -5,20 +5,7 @@ import { Tooltip } from "radix-ui";
 
 import { cn } from "@/lib/utils";
 
-/**
- * A small ⓘ affordance that reveals a short explanation on hover, focus or
- * tap. The point is to keep dense settings pages skimmable: the label says
- * what the control is, the tip says what it does — nobody has to read a wall
- * of prose to find the one knob they came for.
- *
- * Radix Tooltip is hover/focus-only by design, so tap is wired up manually:
- * a click pins the tip open (`pinnedRef`) and Radix's own close attempts are
- * ignored while pinned. Without that, a tap on touch opens and immediately
- * closes the tip via Radix's pointer-down handler.
- */
-
 export type InfoTipProps = {
-  /** Used for the accessible name, e.g. "Poll Interval" → "About Poll Interval". */
   label: string;
   children: React.ReactNode;
   side?: "top" | "right" | "bottom" | "left";
@@ -39,7 +26,7 @@ export function InfoTip({ label, children, side = "top", className }: InfoTipPro
       <Tooltip.Root
         open={open}
         onOpenChange={(next) => {
-          // While pinned by a click/tap, only an explicit dismissal closes it.
+          // Radix closes on pointer-down, which would undo a tap that pinned the tip open.
           if (pinnedRef.current && !next) return;
           setOpen(next);
         }}
@@ -91,7 +78,6 @@ export function InfoTip({ label, children, side = "top", className }: InfoTipPro
   );
 }
 
-/** Label + ⓘ, the standard pairing above an input. */
 export function InfoLabel({
   children,
   className,

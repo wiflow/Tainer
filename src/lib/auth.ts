@@ -78,19 +78,8 @@ type StoredUser = {
   twoFactorSecret: string | null;
   twoFactorUpdatedAt: string | null;
   updatedAt: string;
-  /** When set, the user was created via or last logged in via this OIDC provider. */
   ssoProviderId?: string | null;
-  /** Stable identifier from the IdP (the `sub` claim). Used to match a user
-   * across email changes — emails get re-used and re-assigned at IdPs, this
-   * doesn't. Set on first SSO login alongside ssoProviderId. */
   ssoSubject?: string | null;
-  /**
-   * The user's distinguished name in the configured LDAP directory, set on
-   * first successful LDAP authentication. Stable per-user identifier — the
-   * `mail` attribute can change but the DN typically does not. Used both
-   * to recognise the user on later sign-ins and to distinguish LDAP-backed
-   * accounts from local-password accounts in the trust boundary.
-   */
   ldapDN?: string | null;
 };
 
@@ -252,7 +241,6 @@ function isPrivateOrLocalHost(hostname: string): boolean {
     return true;
   }
 
-  // RFC 1918 private IPv4 ranges (10.x, 172.16-31.x, 192.168.x) and link-local
   const segments = hostname.split(".").map(Number);
   if (segments.length === 4 && segments.every((s) => Number.isFinite(s))) {
     const [a = 0, b = 0] = segments;
@@ -279,8 +267,6 @@ function shouldUseSecureCookies() {
     return false;
   }
 
-  // In production, disable secure cookies for private/local APP_URL hosts
-  // (typically accessed over plain HTTP on corporate networks).
   const appUrl = process.env.APP_URL?.trim();
   if (appUrl) {
     try {
@@ -515,9 +501,6 @@ async function hashPassword(password: string) {
 }
 
 async function verifyPassword(password: string, storedHash: string) {
-  // SSO-provisioned users have an empty `passwordHash` — they cannot authenticate
-  // via the password flow at all. Reject before parsing so the caller's "wrong
-  // credentials" message is consistent with a non-SSO unknown user.
   if (!storedHash) return false;
 
   const [algorithm, saltRaw, keyRaw] = storedHash.split(":");
@@ -645,19 +628,9 @@ async function sanitizeUser(user: StoredUser): Promise<SessionUser> {
   const { resolveEffectivePermissions } = await import("@/lib/user-groups");
   const resolved = await resolveEffectivePermissions(groupIds);
 
-  // Determine effective role: honour group-based admin flag, but also
-  // respect the stored user.role when the user has no groups assigned
-  // (e.g. the initial admin created during setup).
   const effectiveAdmin = resolved.isAdmin || user.role === "admin";
 
-  // Admins get the full permission set populated explicitly. Previously
-  // `hasPermission` short-circuited on `role === "admin"` — meaning anything
-  // that flipped role to admin was a full takeover even if `permissions`
-  // stayed empty. With permissions enumerated here, the source of truth is
-  // the list itself: a future code path that mutated role without going
-  // through sanitizeUser would no longer escalate. The visible behaviour is
-  // unchanged (admins still see / do everything), but the security property
-  // tightens.
+  // Admins get every permission listed because hasPermission has no admin bypass.
   const permissions = effectiveAdmin
     ? [...ALL_PERMISSIONS]
     : resolved.globalPermissions;
@@ -685,12 +658,7 @@ async function setSessionCookie(sessionId: string, expiresAt: string) {
     expires: new Date(expiresAt),
     httpOnly: true,
     path: "/",
-    // `lax` (not `strict`) is required for federated sign-in flows: when the
-    // user comes back from an OIDC IdP via a cross-site redirect, Chrome
-    // refuses to send `strict` cookies on the first navigation, so the user
-    // lands on /login until they reload (the bug we just hit). `lax` still
-    // blocks CSRF on cross-site form POSTs (the threat model `strict`
-    // protects against) — it only relaxes top-level navigations.
+    // Strict would drop the cookie on the cross-site redirect back from an OIDC IdP.
     sameSite: "lax",
     secure,
   });
@@ -703,8 +671,6 @@ async function clearSessionCookie() {
     expires: new Date(0),
     httpOnly: true,
     path: "/",
-    // Match setSessionCookie so the browser's cookie-jar lookup paired with
-    // the same SameSite is what removes the entry.
     sameSite: "lax",
     secure,
   });
@@ -856,12 +822,7 @@ async function readGuestShellStepUpCookie() {
 }
 
 async function savePasswordResetDebugEntry(entry: PasswordResetDebugEntry) {
-  // Previously this persisted the reset link (with the single-use token in
-  // the path) to password-reset-debug.json in the data directory. That made
-  // any disk-level compromise — backup leak, snapshot copy, post-RCE read
-  // — a path to hijack any pending reset within the link's TTL. We now log
-  // the link to stderr only; the operator running the container is the
-  // only intended audience, and the link disappears with the log line.
+  // The reset link grants account takeover, so it is logged and never written to disk.
   console.info(
     `[auth] Password reset link for ${entry.email} (expires ${entry.expiresAt}): ${entry.link}`,
   );
@@ -908,14 +869,6 @@ export async function getUserCount() {
   return store.users.length;
 }
 
-/**
- * Bearer-token fallback for automation clients (scripts, Terraform, CI).
- * Only consulted when no session cookie is present; the resulting session
- * is role "operator" with exactly the token's granted site permissions, so
- * admin-only surfaces and ungranted capabilities refuse it. Tokens are not
- * ambient authority — browsers never attach the header on their own, so
- * this adds no CSRF surface.
- */
 async function getApiTokenSession(): Promise<AuthSession | null> {
   try {
     const headerStore = await headers();
@@ -924,8 +877,6 @@ async function getApiTokenSession(): Promise<AuthSession | null> {
     const { getSessionForBearerToken } = await import("@/lib/api-tokens");
     return await getSessionForBearerToken(authorization);
   } catch {
-    // headers() unavailable (static render) or store read failure — treat
-    // as unauthenticated rather than erroring the caller.
     return null;
   }
 }
@@ -1003,13 +954,7 @@ export async function requireAdminSession() {
 }
 
 export function hasPermission(session: AuthSession, permission: Permission): boolean {
-  // No `role === "admin"` short-circuit: admin grants are now explicit in
-  // `session.user.permissions` (see sanitizeUser). The list is the source
-  // of truth for capability checks, so any path that grants a permission
-  // has to go through sanitizeUser → group resolution. `requireAdminSession`
-  // remains for things that gate specifically on admin role (audit log,
-  // IdP config, user management UI), but ad-hoc `role === "admin"` checks
-  // for capability-style gates are an antipattern — use `requirePermission`.
+  // No admin bypass here: sanitizeUser lists every permission for admins.
   return session.user.permissions.includes(permission);
 }
 
@@ -1239,7 +1184,7 @@ function pruneRateLimitTracker(tracker: RateLimitTracker, windowMs: number, limi
 
   const entries = Object.entries(tracker);
   if (entries.length > MAX_RATE_LIMIT_KEYS) {
-    // Entries at their limit are never evicted, so flooding a tracker with new keys cannot reset a lockout.
+    // Entries at their limit are never evicted, so key flooding cannot reset a lockout.
     entries
       .filter(([, entry]) => entry.count < limit && (entry.blockedUntil ?? 0) <= now)
       .sort(([, a], [, b]) => a.firstAttempt - b.firstAttempt)
@@ -1427,12 +1372,7 @@ function loginRateLimitKey(emailKey: string, ipKey?: string) {
   return ipKey ? `${emailKey}:${ipKey}` : emailKey;
 }
 
-/**
- * Hard lockout is per (email, client IP), so a remote caller cannot lock the
- * owner out from their own address. Attempts summed per email or per IP only
- * throttle: past a threshold each attempt must wait for a delay that doubles
- * up to a minute, which bounds distributed guessing without a lockout.
- */
+// Hard lockout is keyed by email and IP so a remote caller cannot lock the owner out.
 async function checkLoginRateLimit(email: string, clientIp?: string) {
   const emailKey = rateLimitEmailKey(email);
   const ipKey = clientIp ? rateLimitIpKey(clientIp) : undefined;
@@ -1553,31 +1493,19 @@ export async function beginLogin(email: string, password: string, clientIp?: str
 
   await checkLoginRateLimit(normalizedEmail, clientIp);
 
-  // ── 1. Local password ──────────────────────────────────────────────
   const store = await readAuthStore();
   const localUser = store.users.find((entry) => entry.email === normalizedEmail);
   const localOk = await verifyPasswordOrDummy(password, localUser?.passwordHash);
 
   let authedUser: StoredUser | undefined = localOk ? localUser : undefined;
 
-  // ── 2. LDAP fallback ────────────────────────────────────────────────
-  // Tried only when local auth didn't succeed AND LDAP is configured. The
-  // directory is the source of truth for the *LDAP-backed* subset of
-  // users; locally-created accounts always take precedence (they hit the
-  // local-password branch above first). Trust-boundary checks live inside
-  // signInWithLdap.
   if (!authedUser) {
     const { isLdapEnabled, getLdapConfig, isEmailAllowed } = await import("@/lib/ldap-config");
     if (await isLdapEnabled()) {
       const config = await getLdapConfig();
       if (config) {
-        // Domain allowlist applied BEFORE we touch the directory — saves
-        // a directory round-trip for emails that are obviously out of
-        // scope and avoids leaking the existence of arbitrary emails to
-        // the LDAP audit log.
         if (!isEmailAllowed(normalizedEmail, config.allowedEmailDomains)) {
-          // Fall through; no special-casing — user gets the generic
-          // "Invalid email or password" treatment below.
+          // Disallowed domains fall through to the generic invalid-credentials error.
         } else {
           const { authenticateLdap } = await import("@/lib/ldap");
           const ldapResult = await authenticateLdap(config, normalizedEmail, password);
@@ -1601,11 +1529,7 @@ export async function beginLogin(email: string, password: string, clientIp?: str
                   : `Signed in via LDAP`,
               }).catch(() => {});
             } catch (err) {
-              // Trust-boundary refusal lands here. We surface a generic
-              // "invalid credentials" to the user rather than the precise
-              // reason — exposing "this email is taken by a local-password
-              // user" would let an attacker enumerate which Tainer users
-              // exist locally vs in LDAP.
+              // Keep the error generic so local and LDAP users cannot be enumerated.
               const { recordAdminAudit } = await import("@/lib/admin-audit-log");
               recordAdminAudit({
                 action: "ldap-login-failure",
@@ -1681,8 +1605,7 @@ export async function completeTwoFactorLogin(code: string) {
     if (!isTotp) {
       const recoveryHash = hashOpaqueValue(normalizedRecoveryCode);
 
-      // Record challenge nonce first to prevent replay, then atomically
-      // verify and consume the recovery code inside mutateAuthStore.
+      // Record the nonce before consuming the code so the challenge cannot be replayed.
       if (!(await recordChallengeNonce(challenge.nonce))) {
         throw new Error("This login challenge has already been used.");
       }
@@ -1735,7 +1658,6 @@ export async function completeTwoFactorLogin(code: string) {
   });
 }
 
-// Mobile login — does not set cookies; returns an encrypted challenge token if 2FA is required.
 export async function beginMobileLogin(email: string, password: string, clientIp?: string) {
   const normalizedEmail = normalizeEmail(email);
 
@@ -1889,51 +1811,20 @@ export async function createSession(userId: string) {
 export type SsoSignInInput = {
   providerId: string;
   providerName: string;
-  /** Stable identifier from the IdP (`sub` claim). */
   subject: string;
   email: string;
-  /**
-   * `email_verified` claim from the IdP. `null` if absent. Anything other
-   * than `true` is refused: an attacker controlling a permissive IdP can
-   * otherwise assert any email.
-   */
   emailVerified: boolean | null;
   name: string;
-  /** Whether to auto-create a Tainer user if no match is found. */
   autoProvision: boolean;
-  /** Role assigned to a newly-provisioned user. Ignored if user already exists. */
   defaultRole: AuthRole;
 };
 
 export type SsoSignInResult = {
-  /** True if a brand-new Tainer user was just created. */
   provisioned: boolean;
-  /** True if a 2FA challenge was issued instead of a session. */
   requiresTwoFactor: boolean;
   user: StoredUser;
 };
 
-/**
- * Sign a user in using credentials already validated by an OIDC provider.
- *
- * Trust boundary: the IdP is allowed to assert *its own* users — it is not
- * allowed to take over Tainer users that already have local credentials.
- * Specifically:
- *
- *   - We refuse unless the IdP reported `email_verified: true` (or the
- *     provider is opted in to trusting emails without the claim).
- *   - We match by (providerId, subject) first — that's the stable, IdP-scoped
- *     identifier and survives email rotation.
- *   - We fall back to matching by email ONLY for users that are linkable:
- *     no local password, no 2FA enrolled, no LDAP link, and no prior SSO
- *     link to a different provider. Otherwise an attacker who registers the same
- *     email at a permissive IdP could bypass the local password and 2FA.
- *     The remediation in that case is for an admin to remove the local
- *     credential or pre-link the user.
- *
- * A user with Tainer 2FA enrolled gets the normal login challenge cookie
- * instead of a session and must complete the TOTP step on /login.
- */
 export async function signInWithSso(
   input: SsoSignInInput,
 ): Promise<SsoSignInResult> {
@@ -1954,14 +1845,10 @@ export async function signInWithSso(
 
   let provisioned = false;
   const user = await mutateAuthStore((store) => {
-    // 1. Match by stable IdP subject — survives email changes and is the
-    //    only path that can adopt an existing record.
     let existing = store.users.find(
       (u) => u.ssoProviderId === input.providerId && u.ssoSubject === input.subject,
     );
 
-    // 2. Fall back to email match — but only for users that are safe to
-    //    auto-link (no local password, no 2FA, no other SSO or LDAP binding).
     if (!existing) {
       const candidate = store.users.find((u) => u.email === email);
       if (candidate) {
@@ -1989,7 +1876,6 @@ export async function signInWithSso(
       const timestamp = nowIso();
       existing.ssoProviderId = input.providerId;
       existing.ssoSubject = input.subject;
-      // Refresh display name — IdPs are usually the source of truth here.
       if (name && name !== existing.name) existing.name = name;
       existing.updatedAt = timestamp;
       return existing;
@@ -2008,18 +1894,11 @@ export async function signInWithSso(
       groupIds: [],
       id: randomUUID(),
       name,
-      passwordHash: "", // SSO-provisioned, no local password
+      passwordHash: "",
       passwordUpdatedAt: timestamp,
       pendingTwoFactorSecret: null,
       pendingTwoFactorExpiresAt: null,
-      // Auto-provisioned users always land as operators with no group
-      // memberships — that means zero permissions and zero site access
-      // ("guest read-only" by default). An admin promotes them by
-      // assigning groups via /users. The configured `defaultRole` is
-      // ignored here; previously it could be set to "admin" with a
-      // domain-allowlist guard, but that left a foot-gun where a
-      // misconfigured allowlist auto-created admins. Now the only path
-      // to admin is admin-side group assignment.
+      // defaultRole is ignored: new users get no groups until an admin assigns them.
       role: "operator",
       twoFactorRecoveryCodeHashes: [],
       twoFactorSecret: null,
@@ -2048,44 +1927,18 @@ export async function signInWithSso(
 }
 
 export type LdapSignInInput = {
-  /** Distinguished name returned by the directory search. Stable. */
   dn: string;
-  /** Canonical email pulled from the LDAP `mail` attribute. */
   email: string;
-  /** Display name from the directory; falls back to email. */
   name: string;
-  /** Whether to auto-create a Tainer user if no match is found. */
   autoProvision: boolean;
-  /** Role assigned to a newly-provisioned user. Ignored if user already exists. */
   defaultRole: AuthRole;
 };
 
 export type LdapSignInResult = {
-  /** True if a brand-new Tainer user was just created. */
   provisioned: boolean;
   user: StoredUser;
 };
 
-/**
- * Sign a user in using credentials already verified by an LDAP directory.
- *
- * Trust boundary (mirrors `signInWithSso`): the directory is allowed to
- * assert *its own* users — it is not allowed to take over Tainer users
- * that already have local credentials. Specifically:
- *
- *   - We match by stored `ldapDN` first (stable across email changes).
- *   - We fall back to email match ONLY when the existing user is
- *     adoptable: no local password, no 2FA enrolled, no SSO link, and
- *     no different LDAP DN already attached. Otherwise an attacker who
- *     gets credentials at the corporate directory could bypass a Tainer
- *     user's locally-set password and 2FA. The remediation in that case
- *     is for an admin to remove the local credential or pre-link the
- *     LDAP DN.
- *
- * Note that 2FA is enforced indirectly: if a user has it enrolled, LDAP
- * cannot adopt that account without admin action — the local 2FA challenge
- * is what authorises the link.
- */
 export async function signInWithLdap(
   input: LdapSignInInput,
 ): Promise<LdapSignInResult> {
@@ -2095,11 +1948,8 @@ export async function signInWithLdap(
 
   let provisioned = false;
   const user = await mutateAuthStore((store) => {
-    // 1. Match by stored DN — survives email changes and is the only
-    //    path that can adopt an existing record without further checks.
     let existing = store.users.find((u) => u.ldapDN && u.ldapDN === input.dn);
 
-    // 2. Fall back to email match — only for users safe to auto-link.
     if (!existing) {
       const candidate = store.users.find((u) => u.email === email);
       if (candidate) {
@@ -2125,7 +1975,6 @@ export async function signInWithLdap(
     if (existing) {
       const timestamp = nowIso();
       existing.ldapDN = input.dn;
-      // Refresh display name — directories are usually the source of truth.
       if (name && name !== existing.name) existing.name = name;
       existing.updatedAt = timestamp;
       return existing;
@@ -2144,13 +1993,11 @@ export async function signInWithLdap(
       groupIds: [],
       id: randomUUID(),
       name,
-      passwordHash: "", // LDAP-provisioned, no local password
+      passwordHash: "",
       passwordUpdatedAt: timestamp,
       pendingTwoFactorSecret: null,
       pendingTwoFactorExpiresAt: null,
-      // See signInWithSso for the same reasoning: auto-provisioned
-      // users always land as operators with no groups (zero
-      // permissions, zero site access). Promotion happens via /users.
+      // defaultRole is ignored: new users get no groups until an admin assigns them.
       role: "operator",
       twoFactorRecoveryCodeHashes: [],
       twoFactorSecret: null,
@@ -2166,7 +2013,6 @@ export async function signInWithLdap(
   return { provisioned, user };
 }
 
-// No cookie is set; caller wraps the returned session ID in a JWT via generateMobileToken().
 export async function createSessionForMobile(userId: string): Promise<string> {
   const expiresAt = addDays(new Date(), SESSION_TTL_DAYS).toISOString();
   const sessionId = randomBytes(32).toString("base64url");
@@ -2300,16 +2146,6 @@ export async function listManagedUsers() {
     .map((user) => summarizeManagedUser(user, store));
 }
 
-/**
- * Clear every login-lockout bucket associated with a user.
- *
- * Login attempts are tracked under keys that are either the email key (no
- * client IP available) or `{emailKey}:{ip}`. An admin unlocking a user from
- * the GUI doesn't know the offending IP set, so we wipe every bucket whose
- * key starts with their email key, covering all IP variants in one shot.
- *
- * Returns the number of buckets removed; 0 means there was nothing to clear.
- */
 export async function clearLoginLockoutsForUser(userId: string): Promise<number> {
   const session = await requireSession();
   requirePermission(session, "manage-users");
@@ -2669,7 +2505,6 @@ export async function createPasswordReset(
   const link = `${origin.replace(/\/$/, "")}/reset-password?token=${encodeURIComponent(resetToken)}`;
   const delivery = sendPasswordResetEmail(targetUserEmail, targetUserName, link);
 
-  // Waiting for SMTP would make known accounts measurably slower than unknown ones.
   if (!options.waitForDelivery) {
     delivery.catch((error) => {
       console.error("[auth] Failed to send password reset email:", error);
@@ -2784,12 +2619,6 @@ export async function getAccountSettings() {
   };
 }
 
-/**
- * Clear the current user's local password (set passwordHash = ""). Refuses
- * if no SSO link is set, otherwise the user would be locked out. Revokes
- * all OTHER active sessions for safety — anyone who learned the password
- * before now no longer has access; the current device stays signed in.
- */
 export async function disableLocalPassword(): Promise<void> {
   const session = await requireSession();
   const timestamp = nowIso();
@@ -2800,7 +2629,6 @@ export async function disableLocalPassword(): Promise<void> {
       throw new Error("User account could not be found.");
     }
     if (!user.passwordHash) {
-      // Already disabled — nothing to do.
       return;
     }
     if (!user.ssoProviderId || !user.ssoSubject) {
@@ -2811,9 +2639,6 @@ export async function disableLocalPassword(): Promise<void> {
     user.passwordHash = "";
     user.passwordUpdatedAt = timestamp;
     user.updatedAt = timestamp;
-    // Revoke every session for this user EXCEPT the active one, so anyone who
-    // had the password (including the user themselves on other devices) needs
-    // to re-auth via SSO.
     for (const s of store.sessions) {
       if (s.userId !== user.id) continue;
       if (s.id === session.id) continue;

@@ -30,8 +30,6 @@ import type { ApprovalPlan } from "@/lib/copilot/types";
 export const HOSTNAME_REGEX = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/;
 
 export function generatePassword(): string {
-  // 18 base64url chars = ~108 bits of entropy. Mixed case + digits, safe
-  // for shell pasting (no special chars Proxmox might reject).
   return randomBytes(14).toString("base64url");
 }
 
@@ -47,11 +45,6 @@ export async function assertUniqueHostname(hostname: string) {
   }
 }
 
-/**
- * Merge env-override pairs into the deployment template's default env, with
- * the overrides winning. Returns a Proxmox-formatted env text — newline
- * separated KEY=VAL lines, ready to be passed through envTextToString.
- */
 export function mergeEnvOverrides(
   baseEnvText: string,
   overrides: Record<string, string> | null,
@@ -143,10 +136,6 @@ registerTool({
 
       await assertUniqueHostname(hostname);
 
-      // Resolve a static IP-pool selection up front (before allocating a
-      // VMID) so a bad pool/address fails cleanly. When an address isn't
-      // specified, pick the first free one in the pool. The pool's bridge
-      // wins over the template's bridge for that interface.
       let staticNet: { net0: string; nameserver: string; assigned: string; pool: string } | null =
         null;
       if (ipPoolId) {
@@ -199,8 +188,6 @@ registerTool({
         params.set("net0", `name=eth0,bridge=${template.bridge},ip=dhcp`);
       }
 
-      // Stamp template metadata so the deployment is recognised as
-      // template-managed in the UI just like UI-launched ones.
       const meta: TainerMeta = {
         templateId: template.id,
         templateName: template.name,
@@ -222,10 +209,6 @@ registerTool({
         vmid,
       }).catch(() => {});
 
-      // Post-create: merge env, optionally start. Runs in the background —
-      // we return the upid + password to the user immediately so they can
-      // store the password before navigating away. Errors here are logged
-      // but don't fail the create itself.
       const baseEnv = template.envText ?? "";
       const mergedEnv = mergeEnvOverrides(baseEnv, envOverrides);
       void waitForTask(template.node, upid)
@@ -245,8 +228,6 @@ registerTool({
         })
         .catch((err) => console.error(`[copilot] post-create chain failed for ${vmid}:`, err));
 
-      // Build a preliminary deployment summary — Proxmox may not have the
-      // fresh details indexed yet, so this is a best-effort.
       const deployment = await getDeploymentDetail(deploymentId).catch(() => null);
 
       return {
@@ -289,8 +270,6 @@ registerTool({
   },
 });
 
-// -- Batch launch (write, one approval for the whole set) -------------------
-
 const MAX_BATCH = 20;
 
 type BatchPlanRow = {
@@ -309,13 +288,7 @@ type BatchPlan = {
   rows: BatchPlanRow[];
 };
 
-/**
- * Deterministically plan a batch: generate hostnames from prefix+index,
- * allocate free VMIDs, and (when an IP pool is given) reserve the first N
- * free addresses. Must run inside the site's Proxmox context (runInSite /
- * runInSiteWithPermission). Called both to preview the approval card and to
- * execute — re-planning at execution time re-validates against current state.
- */
+/** Must run inside runInSite or runInSiteWithPermission. */
 async function computeBatchPlan(rawArgs: Record<string, unknown>): Promise<BatchPlan> {
   const templateId = String(rawArgs.templateId ?? "");
   const prefix = String(rawArgs.hostnamePrefix ?? "").trim().toLowerCase();
@@ -337,7 +310,6 @@ async function computeBatchPlan(rawArgs: Record<string, unknown>): Promise<Batch
   const existingNames = new Set(deployments.map((d) => d.name.trim().toLowerCase()));
   const usedVmids = new Set(deployments.map((d) => d.vmid));
 
-  // Hostnames: prefix + zero-padded index, width covers the largest number.
   const width = Math.max(2, String(startIndex + count - 1).length);
   const hostnames: string[] = [];
   for (let i = 0; i < count; i += 1) {
@@ -351,7 +323,6 @@ async function computeBatchPlan(rawArgs: Record<string, unknown>): Promise<Batch
     hostnames.push(hostname);
   }
 
-  // VMIDs: walk up from getNextId, skipping any already taken.
   const baseStr = await getNextId();
   if (!baseStr) throw new Error("Couldn't allocate VMIDs — cluster may be exhausted.");
   let candidate = Number(baseStr);
@@ -365,7 +336,6 @@ async function computeBatchPlan(rawArgs: Record<string, unknown>): Promise<Batch
     if (candidate > 999_999_999) throw new Error("Ran out of VMIDs while planning the batch.");
   }
 
-  // IPs: reserve the first N free pool addresses, or DHCP for all.
   let mode: "static" | "dhcp" = "dhcp";
   let poolName: string | null = null;
   const ips: { ip: string; net0: string; nameserver: string }[] = [];
@@ -531,7 +501,6 @@ registerTool({
             vmid: row.vmid,
           }).catch(() => {});
 
-          // Post-create per container: apply template env, optionally start.
           const baseEnv = template.envText ?? "";
           void waitForTask(template.node, upid)
             .then(async () => {

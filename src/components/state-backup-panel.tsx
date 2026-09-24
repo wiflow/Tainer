@@ -36,11 +36,6 @@ type BackupFileInfo = { name: string; sizeBytes: number; createdAt: string };
 const inputClassName =
   "mt-1.5 w-full rounded-md border border-white/10 bg-zinc-900 px-3 py-2 text-[13px] text-zinc-200 outline-none transition-colors focus:border-zinc-500 focus:bg-zinc-900";
 
-/**
- * Instance-wide (not per-site): backs up Tainer's own data directory —
- * users, sessions, encrypted site credentials, audit log, policies — as a
- * passphrase-encrypted archive. Tainer backs up guests; this backs up Tainer.
- */
 export function StateBackupPanel({
   config,
   backups,

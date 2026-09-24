@@ -5,14 +5,7 @@ import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 
-/**
- * Shared body for every error boundary in the app.
- *
- * The important part is `digest`: Next redacts server error messages in
- * production and only ships this hash, which is also printed in the
- * container log for the same request. Showing it turns "an application
- * error occurred" into something an operator can actually grep for.
- */
+// Next redacts server errors in production; digest matches the container log.
 export function ErrorState({
   backHref,
   backLabel = "Back to dashboard",

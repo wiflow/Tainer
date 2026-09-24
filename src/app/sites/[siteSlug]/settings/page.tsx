@@ -26,7 +26,7 @@ import {
   resolveDestinationDir,
 } from "@/lib/state-backup";
 
-// Avoid `force-dynamic` here — it silently disables the unstable_cache below.
+// force-dynamic would silently disable the unstable_cache below.
 const getSettingsPageData = unstable_cache(
   async (siteSlug: string) => {
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
@@ -63,8 +63,6 @@ export default async function SettingsPage({
 
   const [settings, rootfsResult, backupStorageResult] = await getSettingsPageData(siteSlug);
   const sshKeyInfo = await getSshKeyInfo();
-  // Instance-wide, not per-site — deliberately uncached so the file list and
-  // last-run status are always current (local fs reads, no Proxmox cost).
   const stateBackupConfig = await getStateBackupConfig();
   const stateBackups = await listStateBackups(stateBackupConfig);
   const [apiTokens, enabledSites] = await Promise.all([listApiTokens(), listEnabledSites()]);

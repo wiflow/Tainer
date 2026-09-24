@@ -59,7 +59,6 @@ export async function triggerBackupAction(
 
     const { node, vmid } = decodeDeploymentId(deploymentId);
 
-    // Resolve backup storage
     let storage = storageOverride;
     if (!storage) {
       const settings = await getAppSettings();
@@ -67,7 +66,6 @@ export async function triggerBackupAction(
     }
 
     if (!storage) {
-      // Fall back to first healthy backup pool
       const { pools } = await listBackupStoragePools();
       const healthy = pools.find((p) => p.issues.length === 0);
       if (!healthy) {
@@ -170,7 +168,6 @@ export async function restoreBackupAction(
       };
     }
 
-    // Use explicit target VMID or allocate next available
     let targetVmid: number;
     if (targetVmidStr) {
       targetVmid = Number.parseInt(targetVmidStr, 10);
@@ -195,8 +192,7 @@ export async function restoreBackupAction(
       targetVmid = Number.parseInt(nextIdStr, 10);
     }
 
-    // When replacing an existing container, stop it first so
-    // Proxmox accepts the force-restore over the same VMID.
+    // Proxmox rejects a force restore over a running guest, so stop it first.
     if (replaceMode) {
       const restoredType = volid.includes("vzdump-lxc-") ? "lxc" : "qemu";
       try {
@@ -205,7 +201,6 @@ export async function restoreBackupAction(
           : await runVmLifecycleAction(targetNode, targetVmid, "stop");
         await waitForTask(targetNode, validateUpid(stopUpid));
       } catch {
-        // Already stopped — that's fine, continue with restore.
       }
     }
 

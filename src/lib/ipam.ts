@@ -220,13 +220,6 @@ export async function getIpamConfigState() {
   };
 }
 
-/**
- * Probe the supplied phpIPAM credentials with a single lightweight call.
- * Used by the "Test connection" button so an admin can verify config
- * before saving — accepts plaintext input (with an optional fallback
- * token from the existing saved integration) so we don't have to
- * persist broken settings just to test them.
- */
 export async function testPhpIpamConnection(
   input: PhpIpamIntegrationInput,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -261,8 +254,6 @@ export async function testPhpIpamConnection(
   };
 
   try {
-    // /sections/ is universally available on a working phpIPAM API app.
-    // Returning here means auth + base URL + app ID all line up.
     await phpIpamRequest<unknown>(config, "/sections/");
     return { ok: true };
   } catch (error) {

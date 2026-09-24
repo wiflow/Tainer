@@ -7,12 +7,6 @@ import { resolveSiteConfigBySlug } from "@/lib/site-resolver";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-/**
- * SSE stream of site change events. Emits `data: changed` whenever any
- * guest or node status in the site changes (server-side watcher, one
- * upstream poll per site shared by all clients), plus keepalive comments.
- * Clients (the AutoRefresh component) refresh their route on each event.
- */
 export async function GET(request: NextRequest) {
   const session = await getCurrentSession();
   if (!session) {
@@ -52,7 +46,6 @@ export async function GET(request: NextRequest) {
       const unsubscribe = subscribeToSiteEvents(siteSlug, () =>
         safeEnqueue("data: changed\n\n"),
       );
-      // Keepalive comment defeats idle-connection timeouts in proxies.
       const ping = setInterval(() => safeEnqueue(": ping\n\n"), 25_000);
 
       const cleanup = () => {
@@ -63,7 +56,6 @@ export async function GET(request: NextRequest) {
         try {
           controller.close();
         } catch {
-          // already closed by the runtime
         }
       };
       request.signal.addEventListener("abort", cleanup);

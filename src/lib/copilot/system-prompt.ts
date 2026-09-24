@@ -4,12 +4,8 @@ import type { AuthSession } from "@/lib/auth";
 import { listAccessibleSites } from "@/lib/copilot/tools/helpers";
 
 export type SidebarContext = {
-  /** Current pathname the user is viewing (e.g. /sites/prod/deployments/abc). */
   pathname?: string | null;
-  /** Active site slug from the URL/cookie, if any. */
   siteSlug?: string | null;
-  /** Active deployment id when the user is on a deployment detail page.
-   *  Lets the model resolve "this container" / "this VM" without a list call. */
   deploymentId?: string | null;
 };
 
@@ -43,7 +39,7 @@ export async function buildSystemPrompt(
   }
   const contextBlock = ctxLines.length ? `\nUI context:\n${ctxLines.join("\n")}` : "";
 
-  // Admin-authored, trusted — unlike tool results, these ARE instructions.
+  // Admin-authored and trusted, unlike tool results.
   const notes = options.operatorNotes?.trim();
   const notesBlock = notes
     ? `\n## Operator notes (set by this site's admins — follow them)\n\n${notes}\n`

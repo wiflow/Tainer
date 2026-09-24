@@ -209,10 +209,6 @@ export async function deleteConfigSnapshotAction(
   }
 }
 
-// ---------------------------------------------------------------------------
-// Scheduled-snapshot policy actions
-// ---------------------------------------------------------------------------
-
 function parsePolicyInput(formData: FormData): ConfigSnapshotPolicyInput {
   const intervalRaw = Number(formData.get("intervalMinutes"));
   const retentionRaw = Number(formData.get("retentionCount"));
@@ -380,10 +376,6 @@ export async function toggleConfigSnapshotPolicyAction(
   }
 }
 
-/**
- * "Run now" — fires the same scheduler tick the cron loop runs, but immediately
- * (only the requested policy is forced due by clearing nextRunAt first).
- */
 export async function runConfigSnapshotPolicyNowAction(
   _previousState: BasicActionState,
   formData: FormData,

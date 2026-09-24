@@ -170,10 +170,6 @@ export async function markConfigSnapshotPolicyRun(
   });
 }
 
-/**
- * Mark a policy as immediately due (sets nextRunAt to now). Other policies are
- * untouched, so the next tick will only fire the forced one.
- */
 export async function forceConfigSnapshotPolicyDue(id: string): Promise<boolean> {
   return mutateStore((store) => {
     const policy = store.policies.find((p) => p.id === id);

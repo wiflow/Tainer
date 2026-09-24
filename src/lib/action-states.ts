@@ -14,7 +14,6 @@ export const initialBasicActionState: BasicActionState = {
 
 export type ProxmoxTaskHandle = {
   node: string;
-  /** Site slug for site-scoped task polling. */
   siteSlug?: string;
   submittedMessage: string;
   successHref?: string;

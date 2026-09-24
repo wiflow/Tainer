@@ -5,8 +5,6 @@ export default function RootLoading() {
     <div className="flex min-h-screen flex-col items-center justify-center bg-[#0a0a0a]">
       <Image
         alt="Tainer"
-        // Same long wordmark used on the login screen + sidebar.
-        // 220x83 keeps the ~2.64:1 source aspect ratio.
         className="brightness-90"
         height={83}
         priority

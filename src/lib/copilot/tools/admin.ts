@@ -14,8 +14,6 @@ import {
   siteSlugSchema,
 } from "@/lib/copilot/tools/helpers";
 
-// -- Policies ---------------------------------------------------------------
-
 registerTool({
   name: "list_backup_policies",
   category: "Backups",
@@ -64,8 +62,6 @@ registerTool({
     });
   },
 });
-
-// -- Node config snapshots --------------------------------------------------
 
 registerTool({
   name: "list_config_snapshots",
@@ -125,8 +121,6 @@ registerTool({
   },
 });
 
-// -- ISO library ------------------------------------------------------------
-
 registerTool({
   name: "list_isos",
   category: "Templates",
@@ -151,8 +145,6 @@ registerTool({
   },
 });
 
-// -- Users & groups (read-only, admin) --------------------------------------
-
 registerTool({
   name: "list_users",
   category: "Access",
@@ -163,7 +155,7 @@ registerTool({
   input_schema: { type: "object", additionalProperties: false, properties: {} },
   describe: () => "List Tainer users",
   execute: async () => {
-    // listManagedUsers self-enforces requireSession + manage-users.
+    // listManagedUsers enforces the manage-users permission itself.
     const users = await listManagedUsers();
     return users.map((u) => ({
       name: u.name,

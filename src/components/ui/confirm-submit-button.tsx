@@ -5,11 +5,6 @@ import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
-/**
- * A submit button that asks first. Drop-in for destructive actions that
- * live inside a `<form action={serverAction}>`: the click opens the
- * confirmation, and only a confirmed click submits the surrounding form.
- */
 export function ConfirmSubmitButton({
   children,
   className,
@@ -29,7 +24,6 @@ export function ConfirmSubmitButton({
   consequences?: React.ReactNode[];
   description: React.ReactNode;
   disabled?: boolean;
-  /** For buttons that override the form's action (e.g. a "remove" next to "save"). */
   formAction?: React.ComponentProps<"button">["formAction"];
   pending?: boolean;
   requireTypedName?: string;
@@ -53,9 +47,7 @@ export function ConfirmSubmitButton({
         {children}
       </Button>
 
-      {/* Submitting through this hidden button is what carries `formAction`
-          to the form — requestSubmit() without a submitter would fall back
-          to the form's own action. */}
+      {/* requestSubmit needs this submitter to use formAction instead of the form's action. */}
       {formAction && (
         <button
           aria-hidden="true"
@@ -75,8 +67,6 @@ export function ConfirmSubmitButton({
         onConfirm={() => {
           setOpen(false);
           const form = buttonRef.current?.form;
-          // requestSubmit() runs the form's own action and validation,
-          // exactly as a real submit click would.
           if (formAction && submitterRef.current) {
             form?.requestSubmit(submitterRef.current);
             return;

@@ -48,7 +48,7 @@ function generatePlaintextToken(): string {
 
 export type IssueTokenResult = {
   token: LldpToken;
-  /** Plaintext token shown to the operator ONCE. Never stored. */
+  /** Shown to the operator once and never stored. */
   plaintext: string;
 };
 
@@ -106,17 +106,6 @@ export async function listLldpTokensForSite(siteId: string): Promise<LldpToken[]
   return store.tokens.filter((t) => t.siteId === siteId);
 }
 
-/**
- * Look up a token by its plaintext value. Returns the stored record on a
- * successful match, or null. Uses constant-time comparison and silently
- * refuses revoked tokens.
- *
- * The lookup is O(n) over all tokens across all sites — we hash the
- * candidate plaintext once, then walk and compare hashes. n is small
- * (one token per Proxmox node) so this is fine in practice; if it ever
- * grew we'd add a hash → tokenId index, but the index file would itself
- * leak which token ids exist.
- */
 export async function lookupLldpTokenByPlaintext(
   plaintext: string,
 ): Promise<LldpToken | null> {

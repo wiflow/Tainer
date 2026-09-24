@@ -292,7 +292,6 @@ export function StorageBoxCard({
           )}
         </div>
 
-        {/* Native Proxmox storage */}
         <div className="rounded-lg border border-zinc-800 p-3">
           <p className="text-[12.5px] font-medium text-zinc-200 flex items-center gap-1.5">
             <HardDriveDownload className="h-3.5 w-3.5" />
@@ -343,7 +342,6 @@ export function StorageBoxCard({
           )}
         </div>
 
-        {/* Retrieve */}
         {showRetrieve && retrievableArchives.length > 0 && (
           <div className="rounded-lg border border-zinc-800 p-3">
             <p className="text-[12.5px] font-medium text-zinc-200 flex items-center gap-1.5">
@@ -410,7 +408,6 @@ export function StorageBoxCard({
           </div>
         )}
 
-        {/* Activity */}
         {offloadLog.length > 0 && (
           <div>
             <p className="text-[12.5px] font-medium text-zinc-200 mb-1.5">Off-site activity</p>

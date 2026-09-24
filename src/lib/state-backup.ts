@@ -11,26 +11,14 @@ import { getDataDirectoryPath, resolveDataFilePath } from "@/lib/app-data";
 import { decryptText, encryptText } from "@/lib/crypto";
 import { createStoreMutator, writeJsonFileAtomically } from "@/lib/store-utils";
 
-/**
- * Backs up Tainer's OWN state — the data directory holding users, sessions,
- * 2FA secrets, encrypted site credentials, audit log, IP pools, policies —
- * as a single passphrase-encrypted archive. Tainer backs up guests; this
- * backs up Tainer.
- *
- * File format (.tsb): MAGIC(9) | salt(16) | iv(12) | AES-256-GCM(tar.gz) | tag(16).
- * The key is scrypt(passphrase, salt) — restoring needs only the passphrase
- * and `scripts/restore-state-backup.mjs`, deliberately NOT AUTH_SECRET, so a
- * total host loss stays recoverable.
- */
+// Key derives from the passphrase alone, not AUTH_SECRET, so restore survives host loss.
 
 const DATA_FILE = "state-backup.json";
-const MAGIC = Buffer.from("TAINERSB1", "utf8"); // 9 bytes
+const MAGIC = Buffer.from("TAINERSB1", "utf8");
 const FILE_PREFIX = "tainer-state-";
 const FILE_SUFFIX = ".tsb";
 const FILE_RX = /^tainer-state-[0-9T]{15}Z\.tsb$/;
 
-// Top-level data-dir entries that never belong in a state backup: previous
-// backups (recursion) and the Docker image library (large and re-pullable).
 const EXCLUDED_ENTRIES = new Set(["state-backups", "docker-library"]);
 
 const SCRYPT_PARAMS = { N: 16384, r: 8, p: 1, maxmem: 64 * 1024 * 1024 };
@@ -46,13 +34,9 @@ export type StateBackupLastRun = {
 
 export type StateBackupConfig = {
   enabled: boolean;
-  /** UTC hour (0-23) after which the daily scheduled backup runs. */
   scheduleHourUtc: number;
-  /** How many backup files to keep in the destination. */
   retention: number;
-  /** Absolute destination directory; empty = <data>/state-backups. */
   destinationDir: string;
-  /** AES-encrypted (AUTH_SECRET root) so the scheduler can run unattended. */
   passphraseEncrypted: string | null;
   updatedAt: string | null;
   lastRun: StateBackupLastRun | null;
@@ -110,7 +94,7 @@ export async function saveStateBackupConfig(input: {
   scheduleHourUtc: number;
   retention: number;
   destinationDir: string;
-  /** New passphrase; null/empty keeps the existing one. */
+  /** Null or empty keeps the existing passphrase. */
   passphrase: string | null;
 }): Promise<StateBackupConfig> {
   const passphraseEncrypted = input.passphrase?.trim()
@@ -168,7 +152,6 @@ export async function listStateBackups(
     .sort((a, b) => b.name.localeCompare(a.name));
 }
 
-/** Validated join so the download route can't be walked out of the dir. */
 export function resolveBackupFilePath(destination: string, name: string): string {
   if (!FILE_RX.test(name)) {
     throw new Error("Invalid backup file name.");
@@ -228,9 +211,6 @@ async function runBackup(): Promise<StateBackupResult> {
   await mkdir(destination, { recursive: true });
   const destinationResolved = path.resolve(destination);
 
-  // Explicit top-level entry list instead of tar --exclude patterns —
-  // deterministic across tar implementations, and it lets us skip the
-  // destination dir wherever the operator pointed it.
   const entries = (await readdir(dataDir)).filter((entry) => {
     if (EXCLUDED_ENTRIES.has(entry)) return false;
     const entryResolved = path.resolve(dataDir, entry);
@@ -259,8 +239,7 @@ async function runBackup(): Promise<StateBackupResult> {
   tar.stderr.on("data", (chunk: Buffer) => {
     tarStderr += chunk.toString("utf8").slice(0, 500);
   });
-  // Attach before the pipeline drains — a fast tar can close before a
-  // listener registered afterwards would ever fire.
+  // Listen before awaiting the pipeline; a fast tar can close before a later listener.
   const tarExit = new Promise<number>((resolve) =>
     tar.on("close", (code) => resolve(code ?? 1)),
   );
@@ -311,10 +290,6 @@ async function pruneOldBackups(destination: string, retention: number) {
   }
 }
 
-/**
- * Scheduler hook — runs at most one scheduled backup per UTC day, once the
- * configured hour has passed. Called from the alert scheduler's 30s tick.
- */
 export async function runStateBackupTick(): Promise<{ ran: boolean; error: string | null }> {
   const config = await readConfig();
   if (!config.enabled || !config.passphraseEncrypted) return { ran: false, error: null };
@@ -325,8 +300,7 @@ export async function runStateBackupTick(): Promise<{ ran: boolean; error: strin
   const today = now.toISOString().slice(0, 10);
   const lastScheduled =
     config.lastRun?.trigger === "scheduled" ? config.lastRun.at.slice(0, 10) : null;
-  // A failed scheduled attempt still counts for today — retrying every 30s
-  // against a persistent failure (bad destination, full disk) would thrash.
+  // A failed scheduled run still counts for today, so failures are not retried every tick.
   if (lastScheduled === today) return { ran: false, error: null };
 
   const result = await createStateBackup("scheduled");

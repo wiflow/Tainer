@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import { useMemo } from "react";
 import { ApexOptions } from "apexcharts";
 
-// react-apexcharts must be loaded dynamically in nextjs
+// react-apexcharts cannot be rendered on the server.
 const Chart = dynamic(() => import("react-apexcharts"), { ssr: false });
 
 export function VisitorsChart() {
@@ -55,7 +55,7 @@ export function VisitorsChart() {
         ],
         labels: {
           style: {
-            colors: "#a1a1aa", // zinc-400
+            colors: "#a1a1aa",
             fontSize: "11px",
             fontFamily: "inherit",
           },

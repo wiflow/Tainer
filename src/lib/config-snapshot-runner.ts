@@ -12,11 +12,6 @@ export type ConfigSnapshotMultiSiteResult = {
   snapshotsTaken: number;
 };
 
-/**
- * Runs `runConfigSnapshotTick()` once per enabled site, each call wrapped in
- * its own `withSiteConfig` so per-site policy stores resolve correctly.
- * Errors are collected — a failure in one site does not stop the others.
- */
 export async function runConfigSnapshotTickAllSites(): Promise<ConfigSnapshotMultiSiteResult> {
   const errors: string[] = [];
   let policiesEvaluated = 0;
@@ -37,10 +32,6 @@ export async function runConfigSnapshotTickAllSites(): Promise<ConfigSnapshotMul
     };
   }
 
-  // Process sites in parallel with a bounded concurrency. Sites are independent
-  // (each has its own Proxmox cluster + its own policy store), so we get linear
-  // speedup until the bound. Capped at 3 to avoid hammering Proxmox tickets and
-  // disk I/O when there are many sites — backups can run hot already.
   const CONCURRENCY = 3;
   const queue = [...sites];
 

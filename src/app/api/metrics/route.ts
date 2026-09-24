@@ -35,25 +35,21 @@ export async function GET(request: Request) {
     const lines: string[] = [];
 
     if (siteSlug) {
-      // Single site
       const siteConfig = await resolveSiteConfigBySlug(siteSlug);
       const overview = await withSiteConfig(siteConfig, () => getOverviewData());
       emitMetrics(lines, overview, siteSlug);
     } else {
-      // All enabled sites
       const sites = await listEnabledSites();
       for (const site of sites) {
         try {
           const siteConfig = await resolveSiteConfigBySlug(site.slug);
           const overview = await withSiteConfig(siteConfig, () => getOverviewData());
           emitMetrics(lines, overview, site.slug);
-        } catch {
-          // Skip unreachable sites
-        }
+        } catch {}
       }
     }
 
-    lines.push(""); // Trailing newline
+    lines.push("");
     return new Response(lines.join("\n"), {
       headers: {
         "Content-Type": "text/plain; version=0.0.4; charset=utf-8",
@@ -68,7 +64,6 @@ export async function GET(request: Request) {
 type OverviewLike = Awaited<ReturnType<typeof getOverviewData>>;
 
 function emitMetrics(lines: string[], overview: OverviewLike, site: string) {
-  // Node metrics
   lines.push("# HELP tainer_node_cpu_usage Current CPU usage ratio (0-1)");
   lines.push("# TYPE tainer_node_cpu_usage gauge");
   for (const n of overview.nodeMetrics) {
@@ -90,7 +85,6 @@ function emitMetrics(lines: string[], overview: OverviewLike, site: string) {
     }
   }
 
-  // Deployment metrics
   lines.push("# HELP tainer_deployment_up 1 if running, 0 otherwise");
   lines.push("# TYPE tainer_deployment_up gauge");
   lines.push("# HELP tainer_deployment_cpu_usage Current CPU usage ratio (0-1)");
@@ -114,7 +108,6 @@ function emitMetrics(lines: string[], overview: OverviewLike, site: string) {
     }
   }
 
-  // Storage metrics
   lines.push("# HELP tainer_storage_usage_bytes Current storage usage in bytes");
   lines.push("# TYPE tainer_storage_usage_bytes gauge");
   lines.push("# HELP tainer_storage_total_bytes Total storage capacity in bytes");
@@ -129,7 +122,6 @@ function emitMetrics(lines: string[], overview: OverviewLike, site: string) {
     }
   }
 
-  // Cluster totals
   lines.push("# HELP tainer_cluster_deployments_total Total number of deployments");
   lines.push("# TYPE tainer_cluster_deployments_total gauge");
   lines.push(metric("tainer_cluster_deployments_total", { site }, overview.deployments.length));

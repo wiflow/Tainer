@@ -42,9 +42,8 @@ export type NodeConfigSnapshot = {
   id: string;
   label: string;
   nodeName: string;
-  /** Set when the snapshot was created by a scheduled policy. */
   policyId?: string | null;
-  /** Defaults to "manual" for legacy / pre-existing snapshots. */
+  /** Missing on older snapshots, which count as "manual". */
   trigger?: NodeConfigSnapshotTrigger;
 };
 
@@ -111,7 +110,7 @@ export async function takeConfigSnapshot(
   label: string,
   options: {
     policyId?: string | null;
-    /** Per-policy retention: keep at most this many snapshots from the same policy (0 = unlimited). */
+    /** Maximum snapshots kept per policy; 0 means unlimited. */
     policyRetention?: number;
     trigger?: NodeConfigSnapshotTrigger;
   } = {},
@@ -147,8 +146,6 @@ export async function takeConfigSnapshot(
   return mutateStore((store) => {
     store.snapshots.unshift(snapshot);
 
-    // Per-policy retention: drop the oldest snapshots from the SAME policy that
-    // exceed the policy's retention count. Manual snapshots are unaffected.
     if (snapshot.policyId && options.policyRetention && options.policyRetention > 0) {
       const sameFromPolicy = store.snapshots
         .filter((s) => s.policyId === snapshot.policyId)
@@ -160,7 +157,6 @@ export async function takeConfigSnapshot(
       }
     }
 
-    // Global cap (keeps the file from growing unbounded).
     if (store.snapshots.length > MAX_SNAPSHOTS) {
       store.snapshots = store.snapshots.slice(0, MAX_SNAPSHOTS);
     }
@@ -169,23 +165,9 @@ export async function takeConfigSnapshot(
   });
 }
 
-/**
- * Identity keys we'll try in priority order when canonicalising arrays of
- * objects. Proxmox returns interface lists, storage lists, firewall rule lists
- * etc. in different orders on different reads — sorting by a stable identity
- * field makes semantically-equal arrays stringify identically.
- *
- * `pos` first because firewall rules use it and it's numeric (cheap), then
- * the named identifiers we know appear in the snapshot sections.
- */
 const ARRAY_IDENTITY_KEYS = ["pos", "iface", "storage", "id", "name"] as const;
 
-/**
- * Proxmox stores set-valued config fields as comma-separated strings ("vztmpl,
- * backup,iso") but treats them as unordered. Different reads can return the
- * same set with the elements in different orders, so we canonicalise these
- * specific fields by splitting, sorting, and rejoining.
- */
+/** Proxmox treats these comma-separated fields as unordered sets. */
 const COMMA_SET_FIELDS = new Set([
   "content",
   "nodes",
@@ -214,12 +196,6 @@ function findArrayIdentityKey(arr: unknown[]): string | null {
   return null;
 }
 
-/**
- * Recursively canonicalise: sort object keys, and sort arrays of objects by
- * a stable identity field (`pos`, `iface`, `storage`, `id`, `name`) when one
- * exists across every element. Arrays without a recognised identity key keep
- * their order — meaningful for ordered scalars or heterogeneous lists.
- */
 function sortKeysDeep(value: unknown): unknown {
   if (Array.isArray(value)) {
     const items = value.map(sortKeysDeep);
@@ -262,10 +238,6 @@ function prettyJson(value: unknown): string {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Scheduled-snapshot tick
-// ---------------------------------------------------------------------------
-
 import {
   listConfigSnapshotPolicies,
   markConfigSnapshotPolicyRun,
@@ -278,11 +250,6 @@ export type ConfigSnapshotTickResult = {
   snapshotsTaken: number;
 };
 
-/**
- * Iterate the active site's config-snapshot policies and capture a snapshot
- * for each one whose `nextRunAt` is due. Caller is responsible for setting
- * up site context (use `runConfigSnapshotTickAllSites()` for cluster-wide).
- */
 export async function runConfigSnapshotTick(): Promise<ConfigSnapshotTickResult> {
   let policies;
   try {
@@ -319,10 +286,6 @@ export async function runConfigSnapshotTick(): Promise<ConfigSnapshotTickResult>
   };
 }
 
-// ---------------------------------------------------------------------------
-// Restore
-// ---------------------------------------------------------------------------
-
 export type RestoreSection =
   | "dns"
   | "firewallRules"
@@ -334,16 +297,8 @@ export type RestoreSection =
 export type RestoreSelection = Record<RestoreSection, boolean>;
 
 export type RestoreOptions = {
-  /**
-   * If true, also remove storages / firewall rules that exist now but were
-   * NOT in the snapshot. Without this, restore is purely additive — safer
-   * default since deleting cluster-wide config has wide blast radius.
-   */
   destructive?: boolean;
-  /**
-   * If true and the network section is restored, call `ifreload -a` on the
-   * node afterwards to apply pending changes. Defaults to true.
-   */
+  /** Defaults to true. */
   reloadNetwork?: boolean;
 };
 
@@ -474,7 +429,6 @@ async function restoreNetwork(
   try {
     currentIfaces = await getNodeNetworkConfig(snapshot.nodeName);
   } catch {
-    // Continue — we'll attempt PUT and fall back to POST on per-iface error.
   }
   const currentByName = new Map(currentIfaces.map((i) => [i.iface, i] as const));
 
@@ -549,7 +503,6 @@ async function restoreStorage(
       .map(asRecord)
       .filter((s): s is Record<string, unknown> => Boolean(s));
   } catch {
-    // best-effort; we'll still attempt creates and updates
   }
   const currentByName = new Map(
     currentStorages
@@ -560,7 +513,6 @@ async function restoreStorage(
   const details: string[] = [];
   const errors: string[] = [];
 
-  // Add or update storages from the snapshot
   for (const snap of snapStorages) {
     const name = typeof snap.storage === "string" ? snap.storage : "";
     if (!name) continue;
@@ -577,7 +529,6 @@ async function restoreStorage(
     }
   }
 
-  // Optionally remove storages that exist now but weren't in the snapshot
   if (options.destructive) {
     const snapNames = new Set(
       snapStorages
@@ -627,7 +578,7 @@ async function restoreFirewall(
   const errors: string[] = [];
 
   if (options.destructive) {
-    // Wipe all current rules in reverse order so positions don't shift
+    // Delete from the highest position down so the remaining positions do not shift.
     let currentRules: Record<string, unknown>[] = [];
     try {
       const raw = await getClusterFirewallRules();
@@ -657,8 +608,7 @@ async function restoreFirewall(
     }
   }
 
-  // Create rules in snapshot order; Proxmox prepends new rules at pos 0, so
-  // iterate in reverse to preserve original ordering.
+  // Proxmox inserts new rules at pos 0, so create them in reverse order.
   const ordered = [...snapRules].sort((a, b) => {
     const ap = typeof a.pos === "number" ? a.pos : Number(a.pos ?? 0);
     const bp = typeof b.pos === "number" ? b.pos : Number(b.pos ?? 0);
@@ -711,8 +661,6 @@ export async function restoreConfigSnapshot(
   if (selection.storage) sections.push(await restoreStorage(snapshot, options));
   if (selection.firewallRules) sections.push(await restoreFirewall(snapshot, options));
 
-  // Sections explicitly not selected are reported as "skipped" so the UI can
-  // render a complete picture of what was attempted vs ignored.
   const ALL_SECTIONS: RestoreSection[] = [
     "dns",
     "hosts",

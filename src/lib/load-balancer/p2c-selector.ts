@@ -3,13 +3,6 @@ import type { NodeScore } from "./types";
 
 const STALE_THRESHOLD_MS = 60_000;
 
-/**
- * Power-of-Two-Choices (P2C) node selection.
- *
- * Picks 2 random nodes from the available pool and returns the one
- * with the lower composite score. This achieves O(log log n) expected
- * max load, significantly better than greedy selection's O(log n / log log n).
- */
 export function selectNodeP2C(
   scores: NodeScore[],
   excludeNodes?: Set<string>,

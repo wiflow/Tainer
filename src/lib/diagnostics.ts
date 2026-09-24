@@ -31,7 +31,6 @@ export async function runDiagnosticScan(siteSlug: string): Promise<DiagnosticRep
 
     const issues: DiagnosticIssue[] = [];
 
-    // 1. Storage capacity
     for (const pool of overview.storagePools) {
       if (pool.usageRatio == null) continue;
       if (pool.usageRatio > 0.95) {
@@ -57,7 +56,6 @@ export async function runDiagnosticScan(siteSlug: string): Promise<DiagnosticRep
       }
     }
 
-    // 2. Node resources
     for (const node of overview.nodeMetrics) {
       if (node.cpuRatio != null && node.cpuRatio > 0.9) {
         issues.push({
@@ -86,7 +84,6 @@ export async function runDiagnosticScan(siteSlug: string): Promise<DiagnosticRep
       }
     }
 
-    // 3. Backup coverage
     if (backupOverview) {
       for (const vmid of backupOverview.unprotectedVmids) {
         const deployment = overview.deployments.find((d) => d.vmid === vmid);
@@ -104,7 +101,6 @@ export async function runDiagnosticScan(siteSlug: string): Promise<DiagnosticRep
       }
     }
 
-    // 4. Deployment disk overuse
     for (const d of overview.deployments) {
       if (d.diskTotalBytes && d.diskUsedBytes) {
         const diskRatio = d.diskUsedBytes / d.diskTotalBytes;
@@ -122,7 +118,6 @@ export async function runDiagnosticScan(siteSlug: string): Promise<DiagnosticRep
       }
     }
 
-    // 5. Stopped deployments that may need attention
     const stoppedCount = overview.deployments.filter((d) => d.rawStatus === "stopped").length;
     if (stoppedCount > 0) {
       issues.push({

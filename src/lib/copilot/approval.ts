@@ -9,18 +9,7 @@ const APPROVAL_TTL_MS = 5 * 60 * 1000;
 
 const consumedTokens = new Map<string, number>();
 
-/**
- * Mint a signed, encrypted approval token. The payload is AES-256-GCM
- * encrypted under AUTH_SECRET, so the token is opaque to the client and
- * cannot be tampered with — the server is the only party that knows what
- * will run when the token is presented at /api/copilot/approve.
- *
- * The client receives the token AND a separate display blob (toolName +
- * args). The display blob is what the user sees in the approval card;
- * the token is what gets executed. If the client tampers with the
- * display blob they get a confused UI, but the server still only runs
- * whatever is inside the encrypted token.
- */
+/** Only the encrypted token decides what runs; client display args are never trusted. */
 export async function mintApprovalToken(
   input: Omit<ApprovalPayload, "v" | "expiresAt" | "nonce">,
 ): Promise<{ token: string; expiresAt: number }> {
@@ -60,15 +49,12 @@ export async function verifyApprovalToken(
   }
 
   if (decoded.userId !== expectedUserId) {
-    // Belt-and-braces: an attacker who exfiltrated another user's token
-    // can't replay it on their own session.
     throw new Error("Approval token does not match the current user.");
   }
 
   return decoded;
 }
 
-/** Verify a token and mark it used, so each approval runs at most once. */
 export async function consumeApprovalToken(
   token: string,
   expectedUserId: string,

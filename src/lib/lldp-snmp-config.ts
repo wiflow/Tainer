@@ -39,7 +39,6 @@ export type SnmpSitePublicConfig = {
   hasCommunity: boolean;
   version: "v2c";
   pollIntervalSeconds: number;
-  /** Per-site agent base URL override, or null when deriving from APP_URL. */
   agentBaseUrl: string | null;
   updatedAt: string | null;
   updatedBy: string | null;
@@ -57,12 +56,6 @@ function toPublic(record: SnmpSiteConfigRecord | undefined, siteId: string): Snm
   };
 }
 
-/**
- * Validate + normalise an operator-supplied agent base URL. Must be a bare
- * origin: scheme + host + optional port, no path/query/fragment. Returns the
- * trimmed value (trailing slashes stripped) or throws with a clear message.
- * Empty/null clears the override.
- */
 export function normalizeAgentBaseUrl(raw: string | null | undefined): string | null {
   const trimmed = (raw ?? "").trim().replace(/\/+$/, "");
   if (!trimmed) return null;
@@ -83,16 +76,9 @@ export function normalizeAgentBaseUrl(raw: string | null | undefined): string | 
       "Agent base URL must be a bare origin (no path) — Tainer appends /api/internal/... itself.",
     );
   }
-  // Reconstruct from origin so we drop any trailing slash or default port.
   return parsed.origin;
 }
 
-/**
- * Resolve the effective agent base URL for a site. Precedence:
- *   1. Per-site override (set in the Integrations panel)
- *   2. TAINER_AGENT_BASE_URL env var (global default)
- *   3. fallbackOrigin (the request's public origin / APP_URL)
- */
 export function resolveAgentBaseUrl(
   override: string | null,
   fallbackOrigin: string,
@@ -103,7 +89,6 @@ export function resolveAgentBaseUrl(
     try {
       return normalizeAgentBaseUrl(envOverride) ?? fallbackOrigin;
     } catch {
-      // Misconfigured env var shouldn't break the page — fall through.
       return fallbackOrigin;
     }
   }
@@ -118,7 +103,6 @@ export async function getSnmpConfigForSite(siteId: string): Promise<SnmpSitePubl
   );
 }
 
-/** Returns the decrypted community string, or null if SNMP isn't configured. */
 export async function getSnmpCommunityForSite(siteId: string): Promise<string | null> {
   const store = await readStore();
   const record = store.sites.find((s) => s.siteId === siteId);
@@ -156,11 +140,8 @@ export async function saveSnmpConfigForSite(input: {
     } else {
       const trimmed = input.community.trim();
       if (!trimmed) {
-        // Empty string is treated as "clear" — matches the BYOK pattern
-        // elsewhere where saving an empty value removes the secret.
         record.encryptedCommunity = null;
       } else {
-        // The community string is the SNMP "password" — store encrypted.
         record.encryptedCommunity = await encryptText(trimmed);
       }
     }
@@ -178,17 +159,11 @@ export async function saveSnmpConfigForSite(input: {
   });
 }
 
-/**
- * Persist the per-site agent base URL override. Lives in the same store as
- * the SNMP community (it's all "how do agents talk to Tainer for this
- * site"). Pass null/empty to clear and fall back to env/APP_URL.
- */
 export async function saveAgentBaseUrlForSite(input: {
   siteId: string;
   agentBaseUrl: string | null;
   actor: { email: string; name: string };
 }): Promise<SnmpSitePublicConfig> {
-  // Validate/normalise outside the mutator so a bad URL never mutates state.
   const normalized = normalizeAgentBaseUrl(input.agentBaseUrl);
 
   return mutateStore((store) => {

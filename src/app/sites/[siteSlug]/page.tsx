@@ -12,9 +12,7 @@ import { ArrowUpRight, ArrowDownRight, Cpu, MemoryStick, HardDrive, RefreshCw } 
 import { MetricCard } from "@/components/ui/metric-card";
 import { requireSitePageAccess } from "@/lib/page-guard";
 
-// Note: do NOT add `export const dynamic = "force-dynamic"` here. It silently
-// disables `unstable_cache` and the `revalidate` value below becomes a no-op,
-// turning every request into a full Proxmox refetch.
+// Do not add force-dynamic here; it disables unstable_cache and the revalidate below.
 const getHomePageData = unstable_cache(
   async (siteSlug: string) => {
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
@@ -56,10 +54,7 @@ export default async function HomePage({
 
   return (
     <div className="flex flex-col space-y-4">
-      {/* Matches the cache's 30s revalidate above — each refresh gets data
-          at most one revalidation window old without extra Proxmox load. */}
       <AutoRefresh intervalMs={30_000} eventsSite={siteSlug} />
-      {/* ── Top Metric Cards (Mapped to Tainer Data) ── */}
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard
           icon={<Cpu className="w-3.5 h-3.5" />}
@@ -113,10 +108,8 @@ export default async function HomePage({
         />
       </div>
 
-      {/* ── Charts Section ── */}
       <DashboardCharts siteSlug={siteSlug} />
 
-      {/* ── Table Section (Tabbed) ── */}
       <DashboardTabs
         siteSlug={siteSlug}
         deployments={overview.deployments}

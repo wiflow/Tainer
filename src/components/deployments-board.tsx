@@ -21,11 +21,6 @@ import { useSiteBasePath } from "@/lib/use-site-path";
 
 const PAGE_SIZE = 10;
 
-/**
- * Status pill that follows the row's optimistic status (set by the quick
- * actions when a lifecycle task completes) so the dot flips together with
- * the buttons instead of waiting for the next server render.
- */
 function RowStatusPill({
   rawStatus,
   statusLabel,
@@ -69,19 +64,16 @@ export function DeploymentsBoard({ deployments, updateMap = {}, tags = [] }: { d
   const filteredDeployments = useMemo(() => {
     let filtered = deployments;
 
-    // Type filter
     if (typeFilter) {
       filtered = filtered.filter((d) => d.type === typeFilter);
     }
 
-    // Tag filter
     if (tagFilter === "__untagged__") {
       filtered = filtered.filter((d) => !d.tagList.some((t) => t.startsWith(TAG_PREFIX)));
     } else if (tagFilter) {
       filtered = filtered.filter((d) => d.tagList.includes(`${TAG_PREFIX}${tagFilter}`));
     }
 
-    // Text search
     const term = deferredSearch.trim().toLowerCase();
     if (term) {
       filtered = filtered.filter(
@@ -105,7 +97,6 @@ export function DeploymentsBoard({ deployments, updateMap = {}, tags = [] }: { d
     currentPage * PAGE_SIZE,
   );
 
-  // Reset to page 1 when search changes
   const handleSearch = (value: string) => {
     setSearch(value);
     setPage(1);
@@ -139,7 +130,6 @@ export function DeploymentsBoard({ deployments, updateMap = {}, tags = [] }: { d
 
   return (
     <div className="space-y-4">
-      {/* Search + group filter */}
       <div className="flex items-center gap-3">
         <div className="relative flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
@@ -178,7 +168,6 @@ export function DeploymentsBoard({ deployments, updateMap = {}, tags = [] }: { d
         <CreateDeploymentMenu />
       </div>
 
-      {/* Table list */}
       {filteredDeployments.length === 0 ? (
         <div className="rounded-2xl border border-white/5 bg-[#111113] p-10 text-center">
           <p className="text-sm font-medium text-zinc-200">

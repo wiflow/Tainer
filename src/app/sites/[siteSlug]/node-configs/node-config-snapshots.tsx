@@ -150,7 +150,7 @@ export function NodeConfigSnapshots({
   function handleSelect(id: string) {
     setSelectedIds((prev) => {
       if (prev.includes(id)) return prev.filter((x) => x !== id);
-      if (prev.length >= 2) return [prev[1], id]; // Keep last 2
+      if (prev.length >= 2) return [prev[1], id];
       return [...prev, id];
     });
   }
@@ -163,7 +163,6 @@ export function NodeConfigSnapshots({
 
   return (
     <>
-      {/* Take snapshot form */}
       <Card>
         <CardHeader className="border-b border-white/5">
           <CardTitle>Take configuration snapshot</CardTitle>
@@ -199,7 +198,6 @@ export function NodeConfigSnapshots({
         </CardContent>
       </Card>
 
-      {/* Snapshot list */}
       <Card>
         <CardHeader className="border-b border-white/5">
           <div className="flex flex-wrap items-start justify-between gap-3">

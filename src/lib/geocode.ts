@@ -1,17 +1,9 @@
 import "server-only";
 
-/**
- * Address → coordinates via OpenStreetMap Nominatim. No API key; the usage
- * policy requires an identifying User-Agent and tolerates only light,
- * interactive traffic — which is exactly what site-location edits are.
- */
-
 export type GeocodeResult = {
   latitude: number;
   longitude: number;
-  /** Nominatim's normalized display name, e.g. "Copenhagen, Denmark". */
   displayName: string;
-  /** ISO-3166-1 alpha-2, uppercase, when the result carries one. */
   countryCode: string | null;
 };
 
@@ -27,6 +19,7 @@ export async function geocodeAddress(query: string): Promise<GeocodeResult> {
 
   const response = await fetch(url, {
     headers: {
+      // Nominatim's usage policy requires an identifying User-Agent.
       "user-agent": "TainerV2-panel (https://tainer.sh)",
       accept: "application/json",
     },

@@ -2,18 +2,8 @@ import "server-only";
 
 import { registerTool } from "@/lib/copilot/registry";
 
-/**
- * Client-side navigation. The tool itself only validates the path and echoes
- * it back — the sidebar watches tool results for a `navigate` field and calls
- * router.push. Read-class: it changes nothing server-side and the user can
- * always navigate back.
- */
 function validateInternalPath(raw: string): string {
   const path = raw.trim();
-  // Internal app paths only: no scheme/host (protects against the model
-  // pushing the browser to an external site), no API routes, no protocol-
-  // relative "//host" form. Next.js router treats anything else as a local
-  // route — worst case is the app's own 404 page.
   if (!path.startsWith("/") || path.startsWith("//")) {
     throw new Error("path must be an internal path starting with '/'.");
   }

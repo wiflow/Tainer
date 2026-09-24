@@ -56,7 +56,6 @@ export function VmCreateWizard({
       <CardContent className="p-5">
         <Form action={formAction} className="space-y-6">
           <input name="siteSlug" type="hidden" value={siteSlug} />
-          {/* Identity section */}
           <div>
             <p className="text-[12px] font-medium uppercase tracking-[0.15em] text-zinc-500 mb-3">Identity</p>
             <div className="grid gap-3 sm:grid-cols-3">
@@ -82,7 +81,6 @@ export function VmCreateWizard({
             </div>
           </div>
 
-          {/* Hardware section */}
           <div>
             <p className="text-[12px] font-medium uppercase tracking-[0.15em] text-zinc-500 mb-3">Hardware</p>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -113,7 +111,6 @@ export function VmCreateWizard({
             </div>
           </div>
 
-          {/* Storage section */}
           <div>
             <p className="text-[12px] font-medium uppercase tracking-[0.15em] text-zinc-500 mb-3">Storage</p>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -136,7 +133,6 @@ export function VmCreateWizard({
             </div>
           </div>
 
-          {/* Boot / ISO section */}
           <div>
             <p className="text-[12px] font-medium uppercase tracking-[0.15em] text-zinc-500 mb-3">Boot</p>
             <label className="block rounded-md border border-white/5 bg-[#111113] px-4 py-3">
@@ -155,7 +151,6 @@ export function VmCreateWizard({
             </label>
           </div>
 
-          {/* Network section */}
           <div>
             <p className="text-[12px] font-medium uppercase tracking-[0.15em] text-zinc-500 mb-3">Network</p>
             <label className="block rounded-md border border-white/5 bg-[#111113] px-4 py-3">
@@ -164,7 +159,6 @@ export function VmCreateWizard({
             </label>
           </div>
 
-          {/* Advanced section */}
           <div>
             <p className="text-[12px] font-medium uppercase tracking-[0.15em] text-zinc-500 mb-3">Advanced</p>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -216,7 +210,6 @@ export function VmCreateWizard({
             </div>
           </div>
 
-          {/* Options */}
           <div className="grid gap-3 sm:grid-cols-3">
             <label className="flex items-center gap-2 rounded-md border border-white/5 bg-[#111113] px-4 py-3 text-[13px] text-zinc-300">
               <input defaultChecked name="enableQemuAgent" type="checkbox" />

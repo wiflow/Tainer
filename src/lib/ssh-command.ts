@@ -13,11 +13,7 @@ type RunSshCommandInput = {
   /** PEM private key used instead of password auth when set. */
   privateKey?: string;
   port?: number;
-  /**
-   * Send the command verbatim instead of wrapping it in `sh -lc`. Required for
-   * restricted remotes (e.g. Hetzner Storage Boxes) that whitelist commands
-   * and provide no shell.
-   */
+  /** Skip the `sh -lc` wrapper for remotes without a shell, such as Hetzner Storage Boxes. */
   raw?: boolean;
   remoteCommand: string;
   timeoutMs?: number;

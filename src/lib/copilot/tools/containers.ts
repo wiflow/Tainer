@@ -25,7 +25,6 @@ import {
 } from "@/lib/copilot/tools/helpers";
 import type { ApprovalPlan } from "@/lib/copilot/types";
 
-/** Await a Proxmox task but give up after `ms` so a stuck stop can't hang the turn. */
 async function waitForTaskBounded(node: string, upid: string, ms: number): Promise<boolean> {
   try {
     await Promise.race([
@@ -60,12 +59,6 @@ function leanDeployment(d: import("@/lib/proxmox").LiveDeployment): LeanDeployme
   };
 }
 
-/**
- * Fetch the (post-action) deployment summary so the client can render a
- * LifecycleResultCard with the real name/node/IP. Failures are non-fatal —
- * the tool result still carries the task UPID and a message, the card just
- * falls back to a plain success block.
- */
 async function safeDeploymentSummary(deploymentId: string): Promise<LeanDeployment | null> {
   try {
     const detail = await getDeploymentDetail(deploymentId);
@@ -140,8 +133,6 @@ registerTool({
   },
 });
 
-// -- Lifecycle actions (write) ---------------------------------------------
-
 type LifecycleVerb = "start" | "stop" | "shutdown" | "restart";
 
 function lifecycleTool(verb: LifecycleVerb, description: string) {
@@ -197,8 +188,6 @@ lifecycleTool("start", "Start a stopped container or VM.");
 lifecycleTool("stop", "Hard-stop a container or VM (immediate, no graceful shutdown).");
 lifecycleTool("shutdown", "Gracefully shut down a container or VM.");
 lifecycleTool("restart", "Restart a container or VM (reboot).");
-
-// -- Resource updates (write) ----------------------------------------------
 
 registerTool({
   name: "update_deployment_resources",
@@ -278,8 +267,6 @@ registerTool({
     });
   },
 });
-
-// -- Env vars (write) ------------------------------------------------------
 
 registerTool({
   name: "update_container_env",
@@ -367,8 +354,6 @@ registerTool({
   },
 });
 
-// -- Destroy (destructive) -------------------------------------------------
-
 registerTool({
   name: "destroy_deployment",
   category: "Containers",
@@ -387,10 +372,6 @@ registerTool({
     },
   }),
   describe: (args) => `DESTROY deployment ${args.deploymentId} (site ${args.siteSlug})`,
-  // The container's own name is the typed-confirmation string. Reuses
-  // existing get_container result rather than asking the user to type it
-  // again — but the server still validates that confirmName matches what
-  // Proxmox actually reports for that VMID, so a hallucinated name fails.
   confirmString: (args) => String(args.confirmName ?? ""),
   execute: async (args, ctx) => {
     const siteSlug = String(args.siteSlug ?? "");
@@ -428,8 +409,6 @@ registerTool({
   },
 });
 
-// -- Batch destroy (destructive, one confirmation for the whole set) --------
-
 const MAX_BATCH_DESTROY = 30;
 const STOP_WAIT_MS = 25_000;
 
@@ -442,10 +421,6 @@ type ResolvedTarget = {
   running: boolean;
 };
 
-/**
- * Resolve + validate the deployment ids for a batch destroy. Throws if any id
- * is unknown so the user never confirms a set that can't be fully actioned.
- */
 async function resolveDestroyTargets(deploymentIds: string[]): Promise<ResolvedTarget[]> {
   const seen = new Set<string>();
   const targets: ResolvedTarget[] = [];
@@ -486,8 +461,6 @@ registerTool({
     const ids = Array.isArray(args.deploymentIds) ? (args.deploymentIds as unknown[]) : [];
     return `DESTROY ${ids.length} deployments (site ${String(args.siteSlug)})`;
   },
-  // Single typed confirmation for the whole batch — "delete N" matches the
-  // count shown on the plan card.
   confirmString: (args) => {
     const ids = Array.isArray(args.deploymentIds) ? (args.deploymentIds as unknown[]) : [];
     return `delete ${ids.length}`;
@@ -523,9 +496,6 @@ registerTool({
     return runInSiteWithPermission(ctx.session, siteSlug, "delete-deployments", async () => {
       const targets = await resolveDestroyTargets(ids);
 
-      // Phase 1: hard-stop every running guest in parallel, then wait (bounded)
-      // for those stop tasks so the subsequent delete isn't rejected for a
-      // still-running guest.
       const stops = await Promise.all(
         targets
           .filter((t) => t.running)
@@ -544,8 +514,6 @@ registerTool({
       );
       const stoppedOk = new Set(stops.filter((s) => s.ok).map((s) => s.vmid));
 
-      // Phase 2: delete each guest that is now stopped. A guest whose stop
-      // timed out is reported as failed rather than force-deleted.
       const destroyed: Array<{ name: string; vmid: number }> = [];
       const failed: Array<{ name: string; vmid: number; error: string }> = [];
       for (const t of targets) {

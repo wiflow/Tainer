@@ -231,9 +231,7 @@ export const OverviewMapInner = forwardRef<OverviewMapHandle, {
         >
           <MarkerContent>
             <div className="relative" style={{ zIndex: 50 }}>
-              {/* Arrow */}
               <div className="absolute left-1/2 -translate-x-1/2 -bottom-1 w-2 h-2 rotate-45 bg-zinc-900 border-r border-b border-white/[0.08]" />
-              {/* Popup */}
               <div
                 className="absolute left-1/2 -translate-x-1/2 bottom-3 w-48 rounded-lg border border-white/[0.08] bg-zinc-900/95 backdrop-blur-xl shadow-2xl overflow-hidden"
                 onClick={(e) => e.stopPropagation()}

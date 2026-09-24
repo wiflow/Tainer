@@ -15,12 +15,6 @@ import {
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-/**
- * Streams an encrypted state-backup archive to the browser so admins can
- * keep off-host copies. Admin-only; the file name is validated against the
- * backup naming scheme (no path traversal) and served only from the
- * configured destination directory.
- */
 export async function GET(request: NextRequest) {
   const session = await getCurrentSession();
   if (!session || session.user.role !== "admin") {

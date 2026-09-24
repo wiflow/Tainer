@@ -5,8 +5,7 @@ import { runCopilotTurn } from "@/lib/copilot/run";
 import type { ChatMessage, CopilotStreamEvent } from "@/lib/copilot/types";
 
 export const dynamic = "force-dynamic";
-// Reading streamed SSE only makes sense in the Node runtime here — the
-// proxmox client uses node:https. Keep edge off.
+// The Proxmox client uses node:https, so this route cannot run on edge.
 export const runtime = "nodejs";
 
 const MAX_BODY_BYTES = 1024 * 1024;
@@ -55,7 +54,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Conversation too long. Start a new chat." }, { status: 413 });
   }
 
-  // SSE stream — one event per line, double-newline separated.
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
@@ -86,8 +84,6 @@ export async function POST(request: Request) {
       }
     },
     cancel() {
-      // Client disconnected — generator's `for await` will throw and the
-      // try/finally above will close. Nothing else to do here.
     },
   });
 

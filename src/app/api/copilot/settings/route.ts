@@ -32,8 +32,6 @@ export async function GET() {
     return NextResponse.json({ settings, usage, isAdmin });
   }
 
-  // Admin extras: the group list for the tool-policy editor, and per-user
-  // usage joined with names so the panel can show who is spending what.
   const [groups, summaries, users] = await Promise.all([
     listUserGroups(),
     listCopilotUsageSummaries(),
@@ -60,7 +58,6 @@ export async function PUT(request: Request) {
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  // The key and budgets are site-wide — only admins may change them.
   if (session.user.role !== "admin") {
     return NextResponse.json({ error: "Admin role required" }, { status: 403 });
   }
@@ -75,8 +72,6 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  // Coerce/validate. The store layer is also defensive but we don't want
-  // to pass garbage through.
   const update: CopilotSettingsInput = {};
   if (body.apiKey === null) {
     update.apiKey = null;

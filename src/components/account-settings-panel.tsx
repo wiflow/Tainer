@@ -155,7 +155,6 @@ export function AccountSettingsPanel({
 
   return (
     <div className="space-y-4">
-      {/* ── Account info strip ── */}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {[
           { label: "Account", value: account.name },
@@ -184,7 +183,6 @@ export function AccountSettingsPanel({
         ))}
       </div>
 
-      {/* ── Profile & Password ── */}
       <div className="grid gap-4 xl:grid-cols-[1fr_1fr]">
         <SectionPanel title="Profile" description="Update your account profile.">
             <Form action={profileAction} className="space-y-4">
@@ -241,7 +239,6 @@ export function AccountSettingsPanel({
         </SectionPanel>
       </div>
 
-      {/* ── Sign-in methods (SSO) ── */}
       <SectionPanel
         title="Sign-in methods"
         description="What you can use to sign in. Local password and SSO can co-exist; disabling the local password commits the account to SSO-only."
@@ -295,8 +292,6 @@ export function AccountSettingsPanel({
             )}
           </div>
 
-          {/* Disable-local-password block — only meaningful when both:
-              the user HAS a local password, AND SSO is linked. */}
           {account.hasLocalPassword && ssoProviderName ? (
             <div className="rounded-xl border border-amber-500/20 bg-amber-500/[0.06] px-4 py-3 space-y-3">
               <div className="flex items-start gap-3">
@@ -341,11 +336,9 @@ export function AccountSettingsPanel({
         </div>
       </SectionPanel>
 
-      {/* ── Two-factor authentication ── */}
       <div className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
         <SectionPanel title="Two-factor authentication" description="Add authenticator-app based TOTP for stronger sign-in protection.">
           <div className="space-y-5">
-            {/* ── Status indicator ── */}
             <div className="flex items-center gap-4 rounded-xl border border-white/5 bg-[#111113] px-4 py-4">
               <div
                 className={
@@ -400,10 +393,8 @@ export function AccountSettingsPanel({
                   </Button>
                 </Form>
 
-                {/* ── Step-by-step setup flow ── */}
                 {activeTwoFactorSetup ? (
                   <div className="space-y-5 rounded-2xl border border-white/[0.06] bg-white/[0.015] p-5">
-                    {/* Step 1: Scan */}
                     <div className="flex items-start gap-3">
                       <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-zinc-600 bg-zinc-800 text-[11px] font-bold text-zinc-300">
                         1
@@ -446,7 +437,6 @@ export function AccountSettingsPanel({
                       </div>
                     </div>
 
-                    {/* Step 2: Verify */}
                     <div className="flex items-start gap-3 border-t border-white/[0.06] pt-5">
                       <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-zinc-600 bg-zinc-800 text-[11px] font-bold text-zinc-300">
                         2
@@ -481,7 +471,6 @@ export function AccountSettingsPanel({
                   </div>
                 ) : null}
 
-                {/* ── Recovery codes ── */}
                 {confirmTwoFactorState.recoveryCodes.length > 0 ? (
                   <div className="animate-slide-up rounded-2xl border border-emerald-500/15 bg-emerald-500/[0.04] p-5">
                     <div className="flex items-start justify-between gap-4">

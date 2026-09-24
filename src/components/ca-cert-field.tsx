@@ -16,10 +16,8 @@ async function readCertFiles(files: FileList): Promise<string> {
     const text = new TextDecoder("utf-8").decode(buffer);
 
     if (text.includes("-----BEGIN CERTIFICATE-----")) {
-      // Already PEM
       pems.push(text.trim());
     } else {
-      // Assume DER — base64 encode
       const bytes = new Uint8Array(buffer);
       let binary = "";
       for (const b of bytes) binary += String.fromCharCode(b);
@@ -66,7 +64,6 @@ export function CaCertField({ id, name, defaultValue, apiUrl }: Props) {
       const newPem = await readCertFiles(files);
       const ta = textareaRef.current;
       if (ta) {
-        // Append to existing certs
         const current = ta.value.trim();
         ta.value = current ? `${current}\n${newPem}` : newPem;
         updateCertCount(ta.value);
@@ -75,7 +72,7 @@ export function CaCertField({ id, name, defaultValue, apiUrl }: Props) {
       setFetchError("Failed to read certificate file(s).");
     }
 
-    // Reset file input so the same file can be selected again
+    // Clearing the value lets the same file fire onChange again.
     e.target.value = "";
   }
 

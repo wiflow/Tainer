@@ -70,7 +70,6 @@ export function BackupListTable({
   defaultNode: string;
   defaultStorage: string;
   isAdmin: boolean;
-  /** Archive filename → verified flag, from the Storage Box off-site index. */
   offsiteArchives?: Record<string, boolean>;
 }) {
   if (archives.length === 0) {

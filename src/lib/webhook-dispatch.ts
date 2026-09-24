@@ -315,7 +315,6 @@ export async function dispatchWebhook(
 
       lastError = `Webhook returned ${response.status}: ${response.statusText || "Request failed"}`;
 
-      // Only retry on 429 or 5xx
       if (!isRetryableStatus(response.status)) {
         return { error: lastError, kind, ok: false, attempts: attempt };
       }
@@ -323,7 +322,6 @@ export async function dispatchWebhook(
       lastError = error instanceof Error ? error.message : "Webhook dispatch failed";
     }
 
-    // Exponential backoff before next retry
     if (attempt < MAX_RETRIES) {
       const backoffMs = INITIAL_BACKOFF_MS * Math.pow(2, attempt - 1);
       await sleep(backoffMs);

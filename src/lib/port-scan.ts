@@ -73,7 +73,6 @@ const KNOWN_SERVICES: Record<number, { service: string; web?: boolean }> = {
 };
 
 function isWebPort(port: number) {
-  // Known non-web ports get no URL; everything else gets one
   const NON_WEB = new Set([21, 22, 25, 53, 1433, 3306, 5432, 5900, 6379, 27017]);
   return !NON_WEB.has(port);
 }
@@ -97,7 +96,7 @@ async function resolveNodeIp(node: string): Promise<string | null> {
       const parsed = new URL(config.apiUrl);
       const aiaCerts = await getExtraCaCerts(parsed.hostname, parsed.port || "8006", config.tlsCustomCaPem);
       if (aiaCerts.length > 0) extras.push(...aiaCerts);
-    } catch { /* proceed without */ }
+    } catch {}
     if (extras.length > 0) {
       const { rootCertificates } = await import("node:tls");
       extraTlsOpts = { ca: [...new Set([...rootCertificates, ...extras])] };
@@ -239,7 +238,7 @@ async function scanViaPctExec(
 
     return parseNetstatOutput(output, ip);
   } catch {
-    return null; // Fall back to TCP scan
+    return null;
   }
 }
 

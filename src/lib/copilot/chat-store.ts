@@ -9,7 +9,6 @@ import { createStoreMutator, writeJsonFileAtomically } from "@/lib/store-utils";
 
 const DATA_FILE = "copilot-chats.json";
 
-// Bounds keep the file small enough for atomic rewrites.
 const MAX_CHATS_PER_USER = 20;
 const MAX_TURNS_PER_CHAT = 100;
 const MAX_TITLE_LENGTH = 60;
@@ -38,11 +37,6 @@ export class ChatTooLargeError extends Error {
   }
 }
 
-/**
- * Turns are stored in the client's render shape (user/assistant/error turns
- * with tool-call views) so a restored chat looks exactly like it did — cards
- * included. The server treats them as opaque JSON apart from sanitising.
- */
 export type StoredChatTurn = Record<string, unknown>;
 
 type StoredChat = {
@@ -132,11 +126,7 @@ function clampText(value: unknown): string {
   return typeof value === "string" ? value.slice(0, MAX_TEXT_LENGTH) : "";
 }
 
-/**
- * Keep only the fields the sidebar renders. Approval tokens are one-shot
- * secrets and generated passwords are shown once, so neither is stored; a
- * restored "awaiting-approval" call could never succeed, so it is marked denied.
- */
+// Approval tokens and generated passwords are one-shot secrets and must not be stored.
 function sanitizeToolCall(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== "object") return null;
   const source = value as Record<string, unknown>;
@@ -246,7 +236,6 @@ export async function saveChatForUser(
     };
     store.chats.push(chat);
 
-    // Enforce the per-user cap — drop the oldest chats beyond it.
     const mine = store.chats
       .filter((c) => c.userId === userId)
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));

@@ -25,9 +25,7 @@ function bearerToken(request: Request): string | null {
 
 function clientIp(request: Request, resolved: string | undefined): string | null {
   if (resolved) return resolved;
-  // The handler is typically reached via a same-host Caddy reverse proxy,
-  // so `127.0.0.1` is the default. We still record it for audit symmetry,
-  // but never use it for rate limiting because every node would share it.
+  // Audit only: often 127.0.0.1 behind the proxy, so never rate limit on it.
   const forwarded = request.headers.get("x-forwarded-for");
   return forwarded?.split(",")[0]?.trim() || null;
 }
@@ -38,7 +36,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Bearer token required." }, { status: 401 });
   }
 
-  // Reject oversized payloads before reading the full body.
   const declaredLength = Number(request.headers.get("content-length") ?? "0");
   if (Number.isFinite(declaredLength) && declaredLength > MAX_BODY_BYTES) {
     return NextResponse.json({ error: "Payload too large." }, { status: 413 });
@@ -58,9 +55,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
   if (token.revokedAt) {
-    // Log only this case — a revoked token in active use is the kind of
-    // signal an admin actually wants to see. Unknown-token attempts are
-    // noisy (scanner traffic) and not audited.
     recordThrottledAdminAudit(`lldp-ingest-rejected:${token.id}`, {
       action: "lldp-ingest-rejected",
       actorEmail: "system",
@@ -114,9 +108,6 @@ export async function POST(request: Request) {
     },
   });
 
-  // Event-log writes and token-stamp writes race intentionally — neither
-  // affects the ack to the agent. They're queued through their own per-store
-  // mutators so they remain consistent under concurrent pushes.
   recordLldpLinkEvents({
     siteId: token.siteId,
     agentHost,

@@ -19,7 +19,7 @@ type SchedulerState = {
   tickCount: number;
 };
 
-const TICK_INTERVAL_MS = 30_000; // 30 seconds
+const TICK_INTERVAL_MS = 30_000;
 
 const globalForScheduler = globalThis as typeof globalThis & {
   __tainerAlertScheduler?: SchedulerState;
@@ -46,13 +46,6 @@ function getState(): SchedulerState {
 async function tick() {
   const state = getState();
   state.tickCount++;
-
-  // The four checks (alerts, backups, config snapshots, heartbeat) are
-  // independent — none reads what the others wrote. Run them in parallel so
-  // the worst-case tick is the slowest single check, not the sum of all four.
-  // Each block has its own try/catch, so a failure in one does not affect the
-  // others. We collect errors and apply them to `state` after all settle, in
-  // a deterministic order, so the displayed `lastError` is stable.
 
   const collectedErrors: string[] = [];
 

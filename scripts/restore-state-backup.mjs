@@ -1,18 +1,5 @@
 #!/usr/bin/env node
-/**
- * Restore a Tainer state backup (.tsb) created by Settings → State backup.
- *
- * Usage:
- *   TAINER_BACKUP_PASSPHRASE='...' node scripts/restore-state-backup.mjs <backup.tsb> <target-dir>
- *
- * The passphrase is the one configured in the State backup settings — NOT
- * AUTH_SECRET. The target directory receives the extracted data directory
- * contents; point a fresh Tainer's TAINER_DATA_DIR at it (and set the same
- * AUTH_SECRET env var as the original instance so encrypted-at-rest values
- * like 2FA secrets and site credentials decrypt).
- *
- * File format: MAGIC "TAINERSB1" (9) | salt (16) | iv (12) | AES-256-GCM(tar.gz) | tag (16).
- */
+// Format: "TAINERSB1" | salt(16) | iv(12) | AES-256-GCM(tar.gz) | tag(16), sizes in bytes.
 
 import { createDecipheriv, scryptSync } from "node:crypto";
 import { mkdirSync, readFileSync } from "node:fs";

@@ -20,11 +20,6 @@ import { cn } from "@/lib/utils";
 const inputClassName =
   "w-full rounded-md border border-white/10 bg-zinc-900 px-2.5 py-1.5 text-[12.5px] text-zinc-200 outline-none transition-colors focus:border-zinc-500";
 
-/**
- * Per-guest Proxmox firewall: enable toggle, rule list, add/delete. The
- * guest firewall only takes effect on NICs whose firewall flag is on —
- * surfaced here because it's the #1 "why isn't my rule working" gotcha.
- */
 export function DeploymentFirewallCard({
   siteSlug,
   deploymentId,
@@ -66,7 +61,6 @@ export function DeploymentFirewallCard({
     successTitle: "Firewall rule deleted",
   });
 
-  // Re-pull server data after any successful mutation.
   const handledRef = useRef("");
   useEffect(() => {
     for (const state of [toggleState, addState, deleteState]) {

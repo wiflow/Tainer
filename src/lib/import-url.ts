@@ -107,7 +107,7 @@ function isPrivateIpv6(address: string) {
     return third === 1 || isPrivateIpv4(embeddedIpv4(words[6] ?? 0, words[7] ?? 0));
   }
 
-  // 6to4
+  // 6to4 (2002::/16)
   if (first === 0x2002) {
     return isPrivateIpv4(embeddedIpv4(second, third));
   }
@@ -214,11 +214,7 @@ async function assertSafePublicHost(
     );
   }
 
-  // Defense-in-depth against DNS rebinding: re-resolve using c-ares which
-  // bypasses the OS DNS cache. Since the actual fetch is delegated to
-  // Proxmox (which resolves independently), an attacker could serve a
-  // public IP to pass our check, then flip to a private IP before Proxmox
-  // resolves. Checking with a second resolver narrows this window.
+  // Proxmox resolves the host again itself, so re-check with c-ares to narrow DNS rebinding.
   const caresAddresses = await resolveWithCares(hostname);
   if (caresAddresses.length > 0 && caresAddresses.some((addr) => isPrivateAddress(addr))) {
     throw new Error(
@@ -307,7 +303,7 @@ const publicOnlyLookup: LookupFunction = (hostname, options, callback) => {
   });
 };
 
-// Redirects are not followed, and the address actually dialled is re-checked so DNS rebinding cannot reach private hosts.
+// Redirects are not followed and the dialled address is re-checked against DNS rebinding.
 export async function postToWebhookUrl(
   rawUrl: string,
   body: string,

@@ -1,7 +1,6 @@
 import os
 import glob
 
-# Path to the source directory
 src_dir = '/Users/NISO/Downloads/TainerV2/src'
 
 replacements = {
@@ -15,7 +14,6 @@ replacements = {
     'bg-zinc-900/40': 'bg-[#111113]',
 }
 
-# Recursively find all typescript react files
 files = glob.glob(f'{src_dir}/**/*.tsx', recursive=True)
 
 modified_files_count = 0
@@ -27,7 +25,6 @@ for file_path in files:
             
         original_content = content
         
-        # Apply all replacements
         for old, new in replacements.items():
             content = content.replace(old, new)
             

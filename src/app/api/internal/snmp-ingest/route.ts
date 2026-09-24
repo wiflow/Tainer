@@ -13,9 +13,6 @@ import { storeSnmpSnapshot } from "@/lib/lldp-snmp-snapshots";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-// SNMP walks can be large — a 48-port switch with all the OIDs we ask for
-// is ~25 KB raw text, base64 inflates that ~33%. 1 MB gives us headroom for
-// a 200-port chassis or a multi-snapshot push from a relay.
 const MAX_BODY_BYTES = 1_000_000;
 const MIN_PUSH_INTERVAL_MS = 30_000;
 const MAX_AGENT_HOST_LEN = 253;
@@ -93,9 +90,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
 
-  // Note: SNMP and LLDP share a rate-limit budget via the shared token's
-  // lastUsedAt timestamp. That's intentional — a misbehaving agent shouldn't
-  // be able to evade rate limiting by alternating endpoints.
+  // SNMP and LLDP share this rate limit so agents cannot evade it by alternating.
   if (token.lastUsedAt) {
     const sinceMs = Date.now() - new Date(token.lastUsedAt).getTime();
     if (Number.isFinite(sinceMs) && sinceMs >= 0 && sinceMs < MIN_PUSH_INTERVAL_MS) {
@@ -126,10 +121,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid payload shape." }, { status: 400 });
   }
 
-  // Resolve mgmtIp → chassisId by looking at the site's most recent LLDP
-  // snapshots. If a device's mgmt IP isn't in any LLDP advertisement, we
-  // drop its SNMP snapshot — without a chassisId there's nothing in the
-  // device list to attach it to.
   const lldpSnapshots = await getLldpSnapshotsForSite(token.siteId);
   const topology = deriveTopology(lldpSnapshots);
   const mgmtIpToChassis = new Map<string, string>();
@@ -152,8 +143,6 @@ export async function POST(request: Request) {
     }
     const chassisId = mgmtIpToChassis.get(mgmtIp);
     if (!chassisId) {
-      // Agent walked something we don't have LLDP data for. Discard rather
-      // than store an orphan — without LLDP context we can't render it.
       droppedNoLldp++;
       continue;
     }
@@ -172,8 +161,6 @@ export async function POST(request: Request) {
 
     const parsed = parseSnmpWalk(walkText);
     if (parsed.ports.length === 0 && !parsed.sysName) {
-      // Empty walk — probably wrong community string or device returned no
-      // ifTable. Not worth storing.
       parseFailures++;
       continue;
     }

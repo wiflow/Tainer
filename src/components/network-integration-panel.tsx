@@ -44,9 +44,6 @@ export function NetworkIntegrationPanel({
     initialLldpIssueTokenActionState,
   );
 
-  // Hold the just-issued plaintext locally until the operator dismisses it.
-  // The server action's success state would otherwise vanish on the next
-  // revalidation.
   const [lastIssued, setLastIssued] = useState<{
     plaintext: string;
     label: string;
@@ -62,8 +59,6 @@ export function NetworkIntegrationPanel({
     }
   }, [issueState]);
 
-  // Effective base (scheme+host[:port]) currently baked into snippets, derived
-  // from the resolved ingest URL the server handed us.
   const effectiveBase = ingestUrl.replace(/\/api\/internal\/lldp-ingest$/, "");
 
   return (
@@ -382,11 +377,6 @@ function buildSetupSnippet({
   snmpEnabled: boolean;
   snmpPollSeconds: number;
 }): string {
-  // The snippet always installs the LLDP agent. The SNMP poller is installed
-  // unconditionally too — even if the operator hasn't set a community string
-  // yet, the agent gracefully no-ops when SNMP_COMMUNITY is empty. That way
-  // they can set the community later without rerunning the install on every
-  // node.
   const pollSeconds = Math.max(60, Math.min(3600, Math.floor(snmpPollSeconds || 300)));
   const snmpCommentBlock = snmpEnabled
     ? `# SNMP polling is enabled for this site. The agent polls each LLDP-discovered
@@ -525,8 +515,6 @@ systemctl enable --now tainer-lldp.timer
 systemctl enable --now tainer-snmp.timer`;
 }
 
-// --- Agent ingest endpoint override -----------------------------------------
-
 function AgentEndpointSection({
   siteSlug,
   effectiveBase,
@@ -633,8 +621,6 @@ function AgentEndpointSection({
     </section>
   );
 }
-
-// --- SNMP community config form ---------------------------------------------
 
 function SnmpConfigSection({
   siteSlug,

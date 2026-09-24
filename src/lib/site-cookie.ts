@@ -3,7 +3,7 @@ import "server-only";
 import { cookies } from "next/headers";
 
 const COOKIE_NAME = "tainer_last_site";
-const MAX_AGE_SECONDS = 365 * 24 * 60 * 60; // 1 year
+const MAX_AGE_SECONDS = 365 * 24 * 60 * 60;
 
 export async function getLastUsedSiteSlug(): Promise<string | null> {
   const cookieStore = await cookies();

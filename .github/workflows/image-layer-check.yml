@@ -1,11 +1,5 @@
 name: image-layer-check
 
-# Build a single-arch Docker image and run scripts/check-image-layers.sh
-# against it, failing the build if any source maps, TypeScript files, or
-# debug artifacts leak into the published layers (F1/F10 class). Runs on
-# every PR that touches the build pipeline and on pushes to main so a
-# regression can't slip in unobserved.
-
 on:
   pull_request:
     paths:
@@ -41,7 +35,6 @@ jobs:
           platforms: linux/amd64
           load: true
           tags: tainer:gate
-          # No registry push — the image is consumed by the next step only.
 
       - name: Inspect image layers for source-artifact leaks
         run: scripts/check-image-layers.sh tainer:gate

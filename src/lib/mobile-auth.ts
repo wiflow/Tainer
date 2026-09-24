@@ -76,7 +76,6 @@ export async function validateMobileToken(
   const headerAndPayload = `${encodedHeader}.${encodedPayload}`;
   const expectedSignature = sign(headerAndPayload, secret);
 
-  // Timing-safe comparison to prevent signature oracle attacks
   const sigA = Buffer.from(providedSignature, "base64url");
   const sigB = Buffer.from(expectedSignature, "base64url");
 

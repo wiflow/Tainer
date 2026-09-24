@@ -43,11 +43,6 @@ const PUBLIC_PATHS = new Set([
   "/setup",
 ]);
 
-// Routes that require a valid session but should render WITHOUT the
-// sidebar / app shell — typically because the user has nothing to
-// navigate to and the empty sidebar is more confusing than helpful.
-// /no-access is the canonical example: a freshly auto-provisioned
-// guest with no group memberships hits it.
 const MINIMAL_SHELL_PATHS = new Set([
   "/no-access",
 ]);
@@ -102,8 +97,6 @@ export default async function RootLayout({
     redirect("/login");
   }
 
-  // Minimal-shell routes (e.g. /no-access) skip the sidebar+command-palette
-  // chrome — the user has nothing to navigate to from there.
   if (MINIMAL_SHELL_PATHS.has(pathname)) {
     return (
       <html className={cn(outfit.variable, plusJakarta.variable, "font-sans", geist.variable)} lang="en" style={{ background: "#0a0a0a" }} suppressHydrationWarning>
@@ -114,7 +107,6 @@ export default async function RootLayout({
     );
   }
 
-  // Resolve sites for the sidebar, filtered by user access.
   const [allSites, updateInfo] = await Promise.all([
     listEnabledSites(),
     checkForUpdate(),

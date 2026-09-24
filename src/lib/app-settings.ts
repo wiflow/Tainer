@@ -9,12 +9,6 @@ export type AppSettings = {
   defaultBackupSlaHours: number;
   defaultBackupStorage: string;
   defaultRootfsStorage: string;
-  /**
-   * Filesystem path (inside the container) for the local Docker image library.
-   * When empty, falls back to the DOCKER_LIBRARY_PATH env var. Must be a
-   * writable, container-visible directory — e.g. `/app/data/docker-library`,
-   * which lives on the already-mounted data volume.
-   */
   dockerLibraryPath: string;
   updatedAt: string | null;
 };
@@ -76,7 +70,6 @@ export async function saveAppSettings(
     >
   >,
 ): Promise<AppSettings> {
-  // Serialize writes to prevent concurrent mutations from racing.
   const prev = settingsMutationQueue;
   let release!: () => void;
   settingsMutationQueue = new Promise<void>((r) => { release = r; });

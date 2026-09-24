@@ -79,7 +79,6 @@ export function VmConsole({
             return;
           }
 
-          // Match noVNC's internal screen div to the dark theme
           const screen = currentTarget.querySelector(":scope > div") as HTMLElement | null;
           if (screen) {
             screen.style.background = "#09090b";
@@ -118,17 +117,12 @@ export function VmConsole({
     };
   }, [connectKey, deploymentId, guestType]);
 
-  // Direct keyboard forwarding using rfb.sendKey(). Captures keys at the
-  // document level, converts DOM key names to X11 keysyms, and sends them
-  // through the VNC connection. No dependency on noVNC's key utilities
-  // (the dynamic import was failing silently in production).
   useEffect(() => {
     if (state !== "connected") return;
 
     const container = screenRef.current;
     if (!container) return;
 
-    // X11 keysym lookup — covers all printable ASCII + common special keys
     const specialKeys: Record<string, number> = {
       Enter: 0xff0d, Backspace: 0xff08, Tab: 0xff09, Escape: 0xff1b,
       Delete: 0xffff, Home: 0xff50, End: 0xff57, PageUp: 0xff55,
@@ -146,10 +140,7 @@ export function VmConsole({
     };
 
     function keyToKeysym(e: KeyboardEvent): number | null {
-      // Check special keys first
       if (e.key in specialKeys) return specialKeys[e.key];
-      // Single printable character → Unicode codepoint (maps to X11 keysym
-      // for Latin-1 and Basic Latin which covers standard ASCII)
       if (e.key.length === 1) return e.key.charCodeAt(0);
       return null;
     }
@@ -165,7 +156,6 @@ export function VmConsole({
     const forwardKey = (e: KeyboardEvent) => {
       if (!consoleActiveRef.current || !rfbRef.current) return;
 
-      // Don't intercept if the user is typing in a form field
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
       if ((e.target as HTMLElement)?.isContentEditable) return;
@@ -185,7 +175,6 @@ export function VmConsole({
     document.addEventListener("keydown", forwardKey, true);
     document.addEventListener("keyup", forwardKey, true);
 
-    // Auto-activate on connect
     consoleActiveRef.current = true;
 
     return () => {

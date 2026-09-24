@@ -15,7 +15,6 @@ export function Pagination({
 }) {
   if (totalPages <= 1) return null;
 
-  // Build page numbers: always show first, last, current, and neighbors
   const pages: (number | "...")[] = [];
   for (let i = 1; i <= totalPages; i++) {
     if (

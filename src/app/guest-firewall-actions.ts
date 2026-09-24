@@ -19,8 +19,6 @@ function errorState(message: string): BasicActionState {
   return { message, requestId: randomUUID(), status: "error" };
 }
 
-// Conservative charsets for values that end up in Proxmox API params. The
-// API validates semantics; these stop obviously hostile input early.
 const PROTO_RX = /^[a-z0-9-]{1,20}$/;
 const PORT_RX = /^\d{1,5}(:\d{1,5})?(,\d{1,5}(:\d{1,5})?)*$/;
 const ADDR_RX = /^[0-9a-fA-F.:/,+-]{1,120}$/;

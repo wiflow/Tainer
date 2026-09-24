@@ -84,8 +84,7 @@ export type AdminAuditEntry = {
 const MAX_ENTRIES = 5000;
 const DATA_FILE = "admin-audit-log.json";
 
-// Events that callers can trigger without a session are capped separately so
-// they can never push authenticated admin events out of the log.
+// Actions reachable without a session; capped separately so they cannot evict admin events.
 const UNAUTHENTICATED_ACTIONS = new Set<AdminAuditAction>([
   "ldap-login-failure",
   "lldp-ingest-rejected",
@@ -127,11 +126,6 @@ const mutateStore = createStoreMutator("admin-audit-log", readStore, writeStore)
 export async function recordAdminAudit(
   input: Omit<AdminAuditEntry, "id" | "recordedAt">,
 ) {
-  // Serialise read-modify-write: without the queue two concurrent calls can
-  // both read the current store, append independently, and the second write
-  // silently overwrites the first — losing audit entries during the very
-  // bursts (parallel admin actions, mass user import, incident response)
-  // when the log is most useful.
   return mutateStore((store) => {
     const entry: AdminAuditEntry = {
       ...input,
@@ -163,11 +157,6 @@ const throttle = {
   windowStart: 0,
 };
 
-/**
- * Records at most a few entries per key and a fixed number overall per
- * window. Use for events an unauthenticated caller can repeat at will; the
- * number of dropped entries is logged once the next window starts.
- */
 export async function recordThrottledAdminAudit(
   key: string,
   input: Omit<AdminAuditEntry, "id" | "recordedAt">,

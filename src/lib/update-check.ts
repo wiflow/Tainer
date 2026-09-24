@@ -5,8 +5,8 @@ import { getRunningVersion, isDevBuild } from "./version";
 const DOCKER_HUB_TAGS_URL =
   "https://hub.docker.com/v2/repositories/tainersh/tainer/tags?page_size=100&ordering=last_updated";
 
-const SUCCESS_TTL_MS = 60 * 60 * 1000; // 1h
-const FAILURE_TTL_MS = 5 * 60 * 1000; // 5m on transient failures, so we don't hammer Docker Hub
+const SUCCESS_TTL_MS = 60 * 60 * 1000;
+const FAILURE_TTL_MS = 5 * 60 * 1000;
 const FETCH_TIMEOUT_MS = 3000;
 
 const SEMVER_RE = /^v?(\d+)\.(\d+)\.(\d+)$/;
@@ -69,16 +69,6 @@ export type UpdateCheckResult = {
   updateAvailable: boolean;
 };
 
-// Compares the running version (baked in at build time) against the
-// highest vX.Y.Z tag on Docker Hub. Cached in-memory: 1h on success,
-// 5m on failure. Skipped entirely for dev builds and when the operator
-// sets TAINER_DISABLE_UPDATE_CHECK=true.
-//
-// Debug override: TAINER_DEBUG_FAKE_UPDATE=X.Y.Z forges an
-// "update available" result without hitting Docker Hub, so the
-// emerald `→ vX.Y.Z` indicator can be screenshotted / styled
-// against a known target. Bypasses the dev-build skip on purpose
-// (dev builds never see real updates, but devs need to see the UI).
 export async function checkForUpdate(): Promise<UpdateCheckResult> {
   const current = getRunningVersion();
 

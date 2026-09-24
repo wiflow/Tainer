@@ -136,11 +136,6 @@ export function DashboardTabs({
 }
 
 function DeploymentsTable({ deployments, siteSlug }: { deployments: LiveDeployment[]; siteSlug: string }) {
-  // Page size persists in localStorage so an operator's preferred view
-  // sticks across reloads. Initialise from a hardcoded default for SSR
-  // (no localStorage on the server) and replace after hydration so the
-  // client-side preference takes effect on the first render where the
-  // user can actually see the table.
   const [pageSize, setPageSize] = useState<number>(10);
   const [page, setPage] = useState(1);
 
@@ -148,9 +143,6 @@ function DeploymentsTable({ deployments, siteSlug }: { deployments: LiveDeployme
     setPageSize(loadPageSize());
   }, []);
 
-  // If the deployments list shrinks (e.g. one was deleted) past the
-  // current page boundary, snap back to the last page that still has
-  // rows. Keeps the table from showing an empty body silently.
   const totalPages = Math.max(1, Math.ceil(deployments.length / pageSize));
   const currentPage = Math.min(page, totalPages);
   const startIdx = (currentPage - 1) * pageSize;

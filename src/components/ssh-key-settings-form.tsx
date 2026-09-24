@@ -31,7 +31,6 @@ export function SshKeySettingsForm({
   const router = useRouter();
   const siteSlug = useSiteBasePath().replace(/^\/sites\//, "");
 
-  // Generate key
   const [genState, genAction, genPending] = useActionState(
     generateSshKeyAction,
     initialBasicActionState,
@@ -41,7 +40,6 @@ export function SshKeySettingsForm({
     successTitle: "SSH authority generated",
   });
 
-  // Delete key
   const [delState, delAction, delPending] = useActionState(
     deleteSshKeyAction,
     initialBasicActionState,
@@ -51,17 +49,14 @@ export function SshKeySettingsForm({
     successTitle: "SSH authority deleted",
   });
 
-  // Refresh after generate/delete
   useEffect(() => {
     if (genState.status === "success" || delState.status === "success") {
       router.refresh();
     }
   }, [genState.status, delState.status, router]);
 
-  // Show/hide public key
   const [showPublicKey, setShowPublicKey] = useState(false);
 
-  // Confirm delete
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const delFormRef = useRef<HTMLFormElement>(null);

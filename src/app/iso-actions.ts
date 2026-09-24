@@ -39,10 +39,8 @@ export async function downloadIsoFromUrlAction(
       };
     }
 
-    // Auto-derive filename from URL if not provided
     const resolvedFilename = filename || url.split("/").pop() || "download.iso";
 
-    // Ensure filename ends with .iso
     const finalFilename = resolvedFilename.endsWith(".iso")
       ? resolvedFilename
       : `${resolvedFilename}.iso`;
