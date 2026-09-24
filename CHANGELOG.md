@@ -14,6 +14,14 @@ Sections per release:
 
 ## [Unreleased]
 
+### Added
+
+### Changed
+
+### Fixed
+
+## [2.0.0] - 2026-09-24
+
 ### Upgrade notes
 
 - **Set AUTH_SECRET before you upgrade.** Production still refuses to run without it and now checks at boot. The stock `docker-compose.yml` and the README examples will not start until it is set (for example in `.env`). Generate one with `openssl rand -base64 32` and keep it the same across upgrades. Installs that ran without it used a generated `auth-secret.txt`: the first start with AUTH_SECRET set re-encrypts everything stored under that key (site passwords, 2FA secrets, SSO, LDAP, SNMP and IPAM secrets, the Tainy API key, Storage Box and SSH keys) with the new one and removes the file, so nothing has to be entered again. Everyone is signed out once, and the migration is summarised in the server log and the audit log. The old key and the original files are kept in `pre-2.0-key-migration-<timestamp>/` in the data directory and left out of state backups; delete that folder once sign-in and your sites work, because it holds the old key.
