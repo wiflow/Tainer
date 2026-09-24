@@ -1906,6 +1906,8 @@ export type SsoSignInInput = {
 export type SsoSignInResult = {
   /** True if a brand-new Tainer user was just created. */
   provisioned: boolean;
+  /** True if a 2FA challenge was issued instead of a session. */
+  requiresTwoFactor: boolean;
   user: StoredUser;
 };
 
@@ -1927,9 +1929,8 @@ export type SsoSignInResult = {
  *     The remediation in that case is for an admin to remove the local
  *     credential or pre-link the user.
  *
- * 2FA is therefore enforced indirectly: if a user has it enrolled, SSO
- * cannot adopt that account without admin action — the local 2FA challenge
- * is what authorises the link.
+ * A user with Tainer 2FA enrolled gets the normal login challenge cookie
+ * instead of a session and must complete the TOTP step on /login.
  */
 export async function signInWithSso(
   input: SsoSignInInput,
@@ -2030,8 +2031,17 @@ export async function signInWithSso(
     return newUser;
   });
 
+  if (user.twoFactorSecret) {
+    await setLoginChallengeCookie({
+      expiresAt: addMinutes(new Date(), LOGIN_CHALLENGE_TTL_MINUTES).toISOString(),
+      nonce: randomBytes(16).toString("base64url"),
+      userId: user.id,
+    });
+    return { provisioned, requiresTwoFactor: true, user };
+  }
+
   await createSession(user.id);
-  return { provisioned, user };
+  return { provisioned, requiresTwoFactor: false, user };
 }
 
 export type LdapSignInInput = {

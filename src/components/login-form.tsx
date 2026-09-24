@@ -48,14 +48,22 @@ export function LoginForm({
   resetConfirmed = false,
   ssoError,
   ssoProviders = [],
+  twoFactorPending = false,
 }: {
   resetConfirmed?: boolean;
   ssoError?: string;
   ssoProviders?: { slug: string; name: string; brand: IdpBrand | null }[];
+  twoFactorPending?: boolean;
 }) {
   const [state, formAction, isPending] = useActionState(
     loginAction,
-    initialLoginActionState,
+    twoFactorPending
+      ? {
+          ...initialLoginActionState,
+          message: "Enter your authenticator code or one of your recovery codes to finish signing in.",
+          requiresTwoFactor: true,
+        }
+      : initialLoginActionState,
   );
 
   return (
