@@ -1,12 +1,12 @@
 # Proxmox Permissions Required for Tainer
 
-Tainer uses **API token authentication** (`PVEAPIToken` header). The token's associated user needs the privileges listed below for full functionality.
+Tainer logs in to each site with a Proxmox **username and password** (ticket authentication, `PVEAuthCookie`). API tokens are not used. The site's user needs the privileges listed below for full functionality.
 
 ---
 
 ## Quick Setup
 
-Create a custom role with all required privileges, then assign it to the API token user at path `/` with `propagate=1`:
+Create a custom role with all required privileges, then assign it to the Tainer user at path `/` with `propagate=1`:
 
 ```bash
 # Create the role
@@ -14,11 +14,9 @@ pvesh create /access/roles \
   --roleid TainerFull \
   --privs "Sys.Audit,Sys.Modify,VM.Allocate,VM.Audit,VM.Config.Disk,VM.Config.CPU,VM.Config.Memory,VM.Config.Network,VM.Config.Options,VM.PowerMgmt,VM.Migrate,VM.Snapshot,VM.Snapshot.Rollback,VM.Backup,VM.Console,Datastore.Audit,Datastore.Allocate,Datastore.AllocateSpace,Datastore.AllocateTemplate"
 
-# Create a user for the API token (if not already existing)
+# Create a user for Tainer (if not already existing) and set its password
 pvesh create /access/users --userid tainer@pve
-
-# Create the API token (save the secret — it is shown only once)
-pvesh create /access/users/tainer@pve/token/tainer-token --privsep 0
+pveum passwd tainer@pve
 
 # Assign the role at the root path with propagation
 pvesh create /access/acl \
@@ -28,7 +26,9 @@ pvesh create /access/acl \
   --propagate 1
 ```
 
-> **Note:** `--privsep 0` on the token means the token inherits the user's permissions directly. If you use `--privsep 1` (the default), you must assign the role to the token separately.
+Enter the same username and password when you add the site in Tainer.
+
+> **Note:** a `@pve` user covers everything that goes through the Proxmox API. Features that run commands on the node over SSH need a `@pam` user; see [Console and SSH access](#console-and-ssh-access).
 
 ---
 
@@ -43,6 +43,7 @@ pvesh create /access/acl \
 | `Sys.Audit` | `GET /cluster/firewall/rules` | Config backup export |
 | `Sys.Audit` | `GET /storage` | Global storage configuration |
 | `Sys.Modify` | `GET/PUT /cluster/options` | Tag color sync to Proxmox UI |
+| `Sys.Modify` | `POST/DELETE /cluster/firewall/rules` | Add and delete cluster firewall rules (Tainy) |
 
 ### Nodes
 
@@ -95,6 +96,8 @@ pvesh create /access/acl \
 | `VM.Snapshot` | `DELETE /nodes/{node}/{type}/{vmid}/snapshot/{name}` | Delete snapshot |
 | `VM.Snapshot.Rollback` | `POST .../snapshot/{name}/rollback` | Rollback to snapshot |
 | `VM.Backup` | `POST /nodes/{node}/vzdump` | Trigger on-demand backup |
+| `VM.Audit` | `GET /nodes/{node}/{type}/{vmid}/firewall/...` | Guest firewall panel |
+| `VM.Config.Network` | `PUT/POST/DELETE /nodes/{node}/{type}/{vmid}/firewall/...` | Guest firewall enable and rule edits |
 
 ### Datastore / Storage
 
@@ -112,15 +115,13 @@ pvesh create /access/acl \
 
 ---
 
-## Console Access (Separate Credentials)
+## Console and SSH access
 
-Tainer uses a **separate PVE user** (not the API token) for console/SSH access to Proxmox hosts. API tokens cannot authenticate to `termproxy`.
+The web console uses the site's own Proxmox login. There is no separate console user.
 
-Configure via:
-- `PROXMOX_CONSOLE_USER` — e.g. `root@pam`
-- `PROXMOX_CONSOLE_PASSWORD` — password for that user
+Some features run commands on the node over SSH: CVE scans, the debsecan install after container create, container port scans, and restoring custom LXC config lines. Tainer connects as the part of the site username before the `@` (so `root@pam` becomes `root`) with the same password. That only works for a `@pam` user that can log in over SSH, usually `root@pam`. With a `@pve` user these features fail and everything else keeps working.
 
-This user needs SSH access to the Proxmox node(s) and is independent of the API token permissions.
+The site's SSH host key policy decides how node host keys are checked. With the strict policy Tainer needs a `known_hosts` file in the home directory of the user running it (`/home/tainer/.ssh/known_hosts` in the Docker image) and does not fall back to accept-new.
 
 ---
 
@@ -130,7 +131,7 @@ If you don't need every feature, you can drop these privileges:
 
 | Privilege | Feature You Lose |
 |-----------|-----------------|
-| `Sys.Modify` | Tag color sync to Proxmox UI, APT index refresh |
+| `Sys.Modify` | Tag color sync to Proxmox UI, APT index refresh, cluster firewall rule changes |
 | `VM.Migrate` | Live migration between nodes |
 | `VM.Snapshot` | Snapshot create / delete / list |
 | `VM.Snapshot.Rollback` | Snapshot rollback |

@@ -2,13 +2,15 @@
 
 Self-service Proxmox LXC container management dashboard. Provides a curated template catalog, deployment lifecycle management, multi-site cluster support, and environment variable editing on top of the Proxmox VE API.
 
-Built for teams — includes user accounts, 2FA, role-based permissions, and audit logs.
+Built for teams: includes user accounts, 2FA, role-based permissions, and audit logs.
 
-**Image:** [`tainersh/tainer`](https://hub.docker.com/r/tainersh/tainer) — `linux/amd64` + `linux/arm64`
+**Image:** [`tainersh/tainer`](https://hub.docker.com/r/tainersh/tainer), `linux/amd64` + `linux/arm64`
 
 ---
 
 ## Quick start
+
+Tainer will not start without `AUTH_SECRET`. Generate one once with `openssl rand -base64 32`, store it somewhere safe and reuse the same value on every upgrade. Changing it signs everyone out and makes stored secrets unreadable.
 
 ### Docker run
 
@@ -23,7 +25,9 @@ docker run -d \
   tainersh/tainer:latest
 ```
 
-Then open [http://localhost:3000](http://localhost:3000) — the first-run wizard will prompt you to create an admin account.
+Then open [http://localhost:3000](http://localhost:3000). The first-run wizard will prompt you to create an admin account.
+
+If you open Tainer on a LAN address over plain http instead of localhost, also pass `-e APP_URL=http://<address>:3000` so the browser accepts the session cookie.
 
 ### Docker Compose
 
@@ -61,14 +65,43 @@ All variables are optional unless noted.
 
 | Variable | Description | Example |
 |---|---|---|
-| `APP_URL` | Public base URL (required for password reset links) | `https://tainer.example.com` |
+| `AUTH_SECRET` | **Required.** Key for sessions and encrypted settings. The server refuses to start without it. Keep it stable across restarts and upgrades | `openssl rand -base64 32` |
+| `APP_URL` | Public base URL. Used for password reset links, the SSO `redirect_uri`, alert links and agent setup snippets. Required for password reset in production | `https://tainer.example.com` |
 | `PORT` | HTTP port the server listens on | `3000` |
 | `TAINER_DATA_DIR` | Override the data directory path | `/data/tainer` |
-| `AUTH_SECRET` | **Required.** Key for sessions and encrypted settings. Keep it stable across restarts | `openssl rand -base64 32` |
+| `AUTH_COOKIE_SECURE` | Force the `Secure` flag on the session cookie on (`true`) or off (`false`). By default it is on, except when `APP_URL` uses http or points at a local or private address | `true` |
+| `TAINER_DISABLE_UPDATE_CHECK` | `true` skips the hourly Docker Hub check for newer Tainer tags | `true` |
+
+### Network and security
+
+| Variable | Description | Example |
+|---|---|---|
+| `TAINER_TRUST_PROXY_HEADERS` | `true` makes Tainer read the client IP from `X-Forwarded-For` / `X-Real-IP` and the public origin from `X-Forwarded-Proto` / `X-Forwarded-Host`. Only set it behind a proxy that overwrites these headers | `true` |
+| `TAINER_WEBHOOK_URL_ALLOWLIST` | Comma separated hosts that alert webhooks may reach even though they resolve to private addresses. `.example.com` or `*.example.com` also matches subdomains | `hooks.lan,.corp.example` |
+| `TAINER_DOWNLOAD_URL_ALLOWLIST` | Same format, for template, ISO and image downloads from a URL or registry | `mirror.lan` |
+| `TAINER_AGENT_BASE_URL` | Base URL (scheme, host, optional port, no path) that LLDP/SNMP agent snippets post to, when nodes cannot reach `APP_URL`. A per-site override in Network > Integrations wins over it | `http://10.0.0.5:3000` |
+| `TAINER_LDAP_ALLOW_INSECURE` | `true` allows plain `ldap://` server URLs. The bind password then crosses the network in cleartext | `true` |
+| `TAINER_LDAP_INSECURE_TLS` | `true` turns off certificate validation for LDAP over TLS. Logs a warning on every connection | `true` |
+| `TAINER_OIDC_ALLOW_INSECURE_ISSUER` | `true` allows `http://` issuer URLs for identity providers. For local testing only | `true` |
+| `TAINER_COPILOT_ALLOW_INSECURE_ENDPOINT` | `true` allows a plain `http://` custom endpoint for the Tainy assistant. Prompts and the API key then travel unencrypted | `true` |
+
+### Integrations
+
+| Variable | Description |
+|---|---|
+| `METRICS_TOKEN` | Enables `/api/metrics`. Callers send `Authorization: Bearer <token>` |
+| `ALERTS_CRON_SECRET` | Enables `GET /api/alerts/check` for an external scheduler. Callers send `Authorization: Bearer <secret>` |
+| `ISO_LIBRARY_PATH` | Local directory of ISO files offered on the ISO page |
+| `DOCKER_LIBRARY_PATH` | Local Docker image library, used when a site has no library path set |
+| `DOCKER_HUB_USERNAME` / `DOCKER_HUB_TOKEN` | Docker Hub credentials for authenticated pulls |
+| `DOCKER_HUB_DEFAULT_NAMESPACE` / `DOCKER_HUB_DEFAULT_PLATFORM` | Defaults for Docker Hub browsing, for example `library` and `linux/amd64` |
+| `GITEA_URL` / `GITEA_OWNER` / `GITEA_USERNAME` / `GITEA_TOKEN` | Gitea container registry for template pulls. `GITEA_TLS_INSECURE=true` skips certificate checks |
+| `PROXMOX_CLOUD_INIT_SNIPPET_STORAGE` | Storage used for cloud-init snippets |
+| `PROXMOX_URL` / `PROXMOX_USERNAME` / `PROXMOX_PASSWORD` | Legacy single-cluster setup. Imported as a site on first start when no sites exist. Add sites in the UI instead |
 
 ### SMTP (password reset emails)
 
-If SMTP is not configured, password reset links are written to `password-reset-debug.json` in the data directory instead.
+If SMTP is not configured, the reset link is written to the server log (`docker logs tainer`). It is never saved to disk. Send errors also show up only in the server log, since the forgot-password form always shows the same message.
 
 | Variable | Description |
 |---|---|
@@ -77,6 +110,13 @@ If SMTP is not configured, password reset links are written to `password-reset-d
 | `SMTP_USER` | SMTP username |
 | `SMTP_PASS` | SMTP password |
 | `SMTP_FROM` | From address (e.g. `tainer@example.com`) |
+
+---
+
+## Behind a reverse proxy
+
+- Set `APP_URL` to the public URL. It is used for the SSO `redirect_uri` and for links Tainer sends out. Without it the redirect URI falls back to the request URL and the identity provider may reject it.
+- Set `TAINER_TRUST_PROXY_HEADERS=true` only when a proxy you control sets `X-Forwarded-For`. Otherwise the header is ignored and login rate limiting uses the proxy's address, so all users behind it share one per-IP limit.
 
 ---
 
@@ -95,7 +135,7 @@ volumes:
 
 ## Adding your Proxmox cluster
 
-Tainer connects to Proxmox using username + password credentials entered through the UI — no environment variables needed. After creating your admin account:
+Tainer connects to Proxmox using username + password credentials entered through the UI, so no environment variables are needed. After creating your admin account:
 
 1. Go to **Settings → Sites**
 2. Click **Add Site**
@@ -119,6 +159,7 @@ services:
     restart: unless-stopped
     environment:
       APP_URL: https://tainer.example.com
+      AUTH_SECRET: ${AUTH_SECRET:?set AUTH_SECRET}
       SMTP_HOST: smtp.example.com
       SMTP_PORT: "587"
       SMTP_USER: tainer@example.com
@@ -138,4 +179,17 @@ docker compose pull
 docker compose up -d
 ```
 
-Data is preserved in the volume — no migration steps required.
+Data is preserved in the volume. Coming from 1.x, read the next section first.
+
+---
+
+## Upgrading to 2.0.0
+
+1. **Set `AUTH_SECRET`.** The server exits at boot without it. If you never set it before, Tainer used a key it generated in `auth-secret.txt`, and a new `AUTH_SECRET` is a different key. Everyone is signed out and anything stored encrypted (site passwords, 2FA secrets, SSO and LDAP secrets, the Tainy API key) can no longer be read and has to be entered again. Users with 2FA cannot finish signing in until an admin resets their 2FA on the Users page, so turn 2FA off for at least one admin before you upgrade.
+2. **Behind a reverse proxy**, set `APP_URL` (or `TAINER_TRUST_PROXY_HEADERS=true`, see above). `X-Forwarded-Proto` and `X-Forwarded-Host` are no longer trusted by default.
+3. **Identity providers that do not send `email_verified`** (Microsoft Entra ID, for example): users already linked still sign in, but matching existing users by email and auto-provisioning new ones are refused until you tick **Trust email without email_verified claim** on that provider.
+4. **Editing a site's API URL, username, TLS mode or custom CA** now needs the Proxmox password typed in again in the same save.
+5. **TLS with an untrusted issuing CA:** intermediates fetched through AIA are only used when they chain to a system root or to the site's custom CA. If a site stops connecting, paste the issuing CA into the site's custom CA field.
+6. **Sites with the strict SSH host key policy** need a `known_hosts` file for CVE scans and the post-create debsecan install. In the Docker image that is `/home/tainer/.ssh/known_hosts`. There is no fallback to accept-new any more.
+7. **Guest firewall rules** only apply on NICs that have the firewall flag on. Set it per NIC in Proxmox (`firewall=1` on the `netN` line). Tainer does not change it.
+8. **Webhooks do not follow redirects.** A 3xx response counts as a failed delivery, so point webhooks at the final URL. Hosts that resolve to private addresses need `TAINER_WEBHOOK_URL_ALLOWLIST`.
