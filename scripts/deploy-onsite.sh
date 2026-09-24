@@ -3,15 +3,19 @@
 # Deploy Tainer to the onsite server (Docker-based)
 #
 # Usage:
-#   ./scripts/deploy-onsite.sh                         # build + deploy
-#   ENV_FILE=.env.onsite ./scripts/deploy-onsite.sh    # deploy + push env file
+#   VM_HOST=host ./scripts/deploy-onsite.sh                         # build + deploy
+#   VM_HOST=host ENV_FILE=.env.onsite ./scripts/deploy-onsite.sh    # deploy + push env file
+#
+# SSH uses key auth unless DEPLOY_PASSWORD is set (then sshpass is used).
+# The server's host key must already be in ~/.ssh/known_hosts: connect once
+# with plain ssh and verify the fingerprint before the first deploy.
 #
 # First-time setup on the server:
 #   1. SSH in and install Docker + Docker Compose:
 #        curl -fsSL https://get.docker.com | sh
 #        sudo usermod -aG docker tainer
 #   2. Create the app directory:
-#        ssh tainer@192.0.2.10 "mkdir -p /home/tainer/tainer"
+#        ssh tainer@<VM_HOST> "mkdir -p /home/tainer/tainer"
 #   3. (Optional) Create .env.onsite locally for environment variables
 #
 # How it works:
@@ -30,32 +34,42 @@ IMAGE_NAME="tainersh/tainer"
 IMAGE_TAG="latest"
 IMAGE_FULL="${IMAGE_NAME}:${IMAGE_TAG}"
 
-VM_HOST="${VM_HOST:-192.0.2.10}"
+VM_HOST="${VM_HOST:-}"
 VM_USER="${VM_USER:-tainer}"
 APP_DIR="/home/tainer/tainer"
 BUILD_DIR="/home/tainer/tainer-build"
 DATA_DIR="/home/tainer/.tainer"
 CADDY_DATA_DIR="/home/tainer/.tainer-caddy"
 # Public hostname users connect to — also used for HTTPS cert SAN and as APP_URL.
-# Override with `TAINER_HOSTNAME=other.host bash scripts/deploy-onsite.sh`.
-TAINER_HOSTNAME="${TAINER_HOSTNAME:-tainer.example.com}"
+# Defaults to VM_HOST.
+TAINER_HOSTNAME="${TAINER_HOSTNAME:-${VM_HOST}}"
 ENV_FILE="${ENV_FILE:-}"
-DEPLOY_PASSWORD="${DEPLOY_PASSWORD:-REDACTED}"
+DEPLOY_PASSWORD="${DEPLOY_PASSWORD:-}"
+
+if [[ -z "${VM_HOST}" ]]; then
+  echo "Set VM_HOST to the server to deploy to." >&2
+  exit 1
+fi
 
 # ── SSH setup ──
 
-SSH_CMD=(ssh -o StrictHostKeyChecking=no)
-SCP_CMD=(scp -o StrictHostKeyChecking=no)
+SSH_CMD=(ssh -o StrictHostKeyChecking=yes)
+SCP_CMD=(scp -o StrictHostKeyChecking=yes)
+export RSYNC_RSH="ssh -o StrictHostKeyChecking=yes"
 
 if [[ -n "${DEPLOY_PASSWORD}" ]]; then
   if ! command -v sshpass >/dev/null 2>&1; then
     echo "sshpass is required when DEPLOY_PASSWORD is set. Install with: brew install sshpass" >&2
     exit 1
   fi
+  if ! ssh-keygen -F "${VM_HOST}" >/dev/null 2>&1; then
+    echo "No known host key for ${VM_HOST}. Connect once with ssh and verify the fingerprint first." >&2
+    exit 1
+  fi
   export SSHPASS="${DEPLOY_PASSWORD}"
   SSH_CMD=(sshpass -e "${SSH_CMD[@]}")
   SCP_CMD=(sshpass -e "${SCP_CMD[@]}")
-  export RSYNC_RSH="sshpass -e ssh -o StrictHostKeyChecking=no"
+  export RSYNC_RSH="sshpass -e ${RSYNC_RSH}"
 fi
 
 remote() {
@@ -90,7 +104,11 @@ echo "── Configuring docker-compose + Caddy reverse proxy ──"
 remote "mkdir -p ${APP_DIR} ${DATA_DIR} ${CADDY_DATA_DIR}"
 
 # Ensure data dir ownership matches container user (uid 1001).
-remote "printf '%s\n' '${DEPLOY_PASSWORD}' | sudo -S -p '' chown -R 1001:1001 ${DATA_DIR}"
+if [[ -n "${DEPLOY_PASSWORD}" ]]; then
+  printf '%s\n' "${DEPLOY_PASSWORD}" | remote "sudo -S -p '' chown -R 1001:1001 ${DATA_DIR}"
+else
+  "${SSH_CMD[@]}" -t "${VM_USER}@${VM_HOST}" "sudo chown -R 1001:1001 ${DATA_DIR}"
+fi
 
 # Caddy reverse proxy:
 #   - Listens on 80 + 443 publicly.
@@ -152,17 +170,12 @@ ${CADDY_SITE_ADDRESSES} {
 }
 CADDYFILE
 
-# Generate docker-compose.yml: tainer publishes 3000 (direct HTTP, legacy URLs)
-# AND caddy serves 443 (HTTPS, canonical). Both routes reach the same app.
-# Once all clients are on HTTPS we can drop the 3000 publish.
+# Generate docker-compose.yml: only caddy publishes ports. It reaches
+# tainer:3000 over the compose network, so plain HTTP is never exposed.
 remote "cat > ${APP_DIR}/docker-compose.yml" <<COMPOSE
 services:
   tainer:
     image: ${IMAGE_FULL}
-    ports:
-      # Direct HTTP access on :3000 kept for transition compatibility.
-      # Old bookmarks / scripts pointing at http://...:3000 keep working.
-      - "3000:3000"
     volumes:
       - ${DATA_DIR}:/app/data
     environment:
@@ -223,8 +236,7 @@ remote "docker logs \$(cd ${APP_DIR} && docker compose ps -q tainer) 2>&1 | tail
 
 echo ""
 echo "=== Deploy complete ==="
-echo "   HTTPS (canonical):  https://${TAINER_HOSTNAME}/"
-echo "   HTTP (legacy):      http://${VM_HOST}:3000/   ← transitional, plan to retire"
+echo "   HTTPS:  https://${TAINER_HOSTNAME}/"
 echo ""
 echo "   First-time HTTPS notes:"
 echo "   - DNS: ensure ${TAINER_HOSTNAME} resolves to ${VM_HOST}"
