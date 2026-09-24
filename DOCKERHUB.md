@@ -78,7 +78,7 @@ Data is preserved in the volume.
 
 ## Upgrading to 2.0.0
 
-- Set `AUTH_SECRET`. If you ran without it before, the new key cannot read secrets encrypted with the old generated one: users are signed out, site passwords and SSO/LDAP secrets must be entered again, and users with 2FA need an admin to reset it. Keep 2FA off on at least one admin while upgrading.
+- Set `AUTH_SECRET`. If you ran without it before, the first start with it re-encrypts the secrets stored under the old generated key (`auth-secret.txt`) and removes that file. Users are signed out once. The old key and the original files are copied to `pre-2.0-key-migration-<timestamp>/` in the data volume; delete that folder once sign-in and your sites work.
 - Behind a proxy, set `APP_URL` or `TAINER_TRUST_PROXY_HEADERS=true`.
 - Providers that do not send `email_verified` (Entra ID, for example) need **Trust email without email_verified claim** ticked for email matching and auto-provisioning.
 - Changing a site's URL, username, TLS mode or CA needs the Proxmox password entered again.

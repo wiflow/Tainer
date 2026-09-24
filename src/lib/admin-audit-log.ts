@@ -70,7 +70,8 @@ export type AdminAuditAction =
   | "state-backup-downloaded"
   | "state-backup-settings-updated"
   | "api-token-created"
-  | "api-token-revoked";
+  | "api-token-revoked"
+  | "auth-key-migrated";
 
 export type AdminAuditEntry = {
   action: AdminAuditAction;

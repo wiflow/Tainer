@@ -13,13 +13,29 @@ function pickRequestModule(url) {
 import next from "next";
 import { WebSocketServer, WebSocket } from "ws";
 
+import { migrateLegacyAuthSecret } from "./src/lib/auth-key-migration.mjs";
+
 const dev = process.env.NODE_ENV !== "production";
 
 if (!dev && !process.env.AUTH_SECRET?.trim()) {
   console.error(
     "AUTH_SECRET is required in production. Generate one with " +
       "`openssl rand -base64 32` and set it as an environment variable; " +
-      "do not rely on the on-disk fallback.",
+      "do not rely on the on-disk fallback. An auth-secret.txt left in the " +
+      "data directory by an earlier version is migrated automatically on " +
+      "the first start with AUTH_SECRET set.",
+  );
+  process.exit(1);
+}
+
+try {
+  await migrateLegacyAuthSecret({
+    authSecret: process.env.AUTH_SECRET,
+    dataDir: getDataDirectory(),
+  });
+} catch (error) {
+  console.error(
+    `[auth-key-migration] Migrating auth-secret.txt to AUTH_SECRET failed: ${error instanceof Error ? error.message : error}`,
   );
   process.exit(1);
 }

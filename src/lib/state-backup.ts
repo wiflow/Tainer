@@ -20,6 +20,7 @@ const FILE_SUFFIX = ".tsb";
 const FILE_RX = /^tainer-state-[0-9T]{15}Z\.tsb$/;
 
 const EXCLUDED_ENTRIES = new Set(["state-backups", "docker-library"]);
+const KEY_MIGRATION_BACKUP_PREFIX = "pre-2.0-key-migration-";
 
 const SCRYPT_PARAMS = { N: 16384, r: 8, p: 1, maxmem: 64 * 1024 * 1024 };
 
@@ -212,7 +213,7 @@ async function runBackup(): Promise<StateBackupResult> {
   const destinationResolved = path.resolve(destination);
 
   const entries = (await readdir(dataDir)).filter((entry) => {
-    if (EXCLUDED_ENTRIES.has(entry)) return false;
+    if (EXCLUDED_ENTRIES.has(entry) || entry.startsWith(KEY_MIGRATION_BACKUP_PREFIX)) return false;
     const entryResolved = path.resolve(dataDir, entry);
     if (destinationResolved === entryResolved) return false;
     if (destinationResolved.startsWith(`${entryResolved}${path.sep}`)) return false;

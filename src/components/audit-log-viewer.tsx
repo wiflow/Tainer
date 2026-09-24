@@ -76,6 +76,7 @@ const ACTION_META: Record<AdminAuditAction, { category: string; level: Level }> 
   "state-backup-settings-updated": { category: "settings", level: "warning" },
   "api-token-created": { category: "sessions", level: "warning" },
   "api-token-revoked": { category: "sessions", level: "warning" },
+  "auth-key-migrated": { category: "settings", level: "warning" },
 };
 
 function actionMeta(action: string): { category: string; level: Level } {

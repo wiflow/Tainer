@@ -22,7 +22,9 @@ async function loadOrCreateSecret(): Promise<Buffer> {
     throw new Error(
       "AUTH_SECRET is required in production. Generate one with " +
         "`openssl rand -base64 32` and set it as an environment variable; " +
-        "do not rely on the on-disk fallback.",
+        "do not rely on the on-disk fallback. An auth-secret.txt left in the " +
+        "data directory by an earlier version is migrated automatically on " +
+        "the first start with AUTH_SECRET set.",
     );
   }
 
