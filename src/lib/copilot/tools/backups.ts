@@ -153,7 +153,7 @@ registerTool({
     },
   }),
   describe: (args) =>
-    `RESTORE ${String(args.archiveVolid)} over ${String(args.deploymentId)} (site ${String(args.siteSlug)})`,
+    `RESTORE ${String(args.archiveVolid)} over ${String(args.deploymentId)}${args.storage ? ` onto storage ${String(args.storage)}` : ""} (site ${String(args.siteSlug)})`,
   confirmString: (args) => String(args.confirmName ?? ""),
   execute: async (args, ctx) => {
     const siteSlug = String(args.siteSlug ?? "");

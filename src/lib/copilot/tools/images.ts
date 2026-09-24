@@ -205,7 +205,7 @@ registerTool({
     startAfterCreate: { type: "boolean", description: "Start the container once created. Default true." },
   }),
   describe: (args) =>
-    `Create container "${String(args.hostname)}" from ${String(args.templateVolid)} on ${String(args.node)}`,
+    `Create container "${String(args.hostname)}" from ${String(args.templateVolid)} on ${String(args.node)}, rootfs on ${String(args.rootfsStorage)}, ${args.ipPoolId ? `static IP from pool ${String(args.ipPoolId)}${args.address ? ` (${String(args.address)})` : ""}` : `DHCP on bridge ${String(args.bridge ?? "vmbr0")}`}`,
   execute: async (args, ctx) => {
     const siteSlug = String(args.siteSlug ?? "");
     const node = String(args.node ?? "").trim();
@@ -427,7 +427,7 @@ registerTool({
     osType: { type: "string", enum: ALLOWED_OS_TYPES, description: "Guest OS type. Default l26 (Linux)." },
   }),
   describe: (args) =>
-    `Create VM "${String(args.name)}" from ${String(args.isoVolid)} on ${String(args.node)} (site ${String(args.siteSlug)})`,
+    `Create VM "${String(args.name)}" from ${String(args.isoVolid)} on ${String(args.node)}, disk on ${String(args.diskStorage)}, bridge ${String(args.bridge ?? "vmbr0")} (site ${String(args.siteSlug)})`,
   execute: async (args, ctx) => {
     const siteSlug = String(args.siteSlug ?? "");
     const node = String(args.node ?? "").trim();

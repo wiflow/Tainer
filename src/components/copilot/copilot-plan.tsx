@@ -115,6 +115,19 @@ const TOOL_LABELS: Record<string, (args: Record<string, unknown>) => string> = {
   create_vm_from_iso: (a) => `Create VM "${String(a.name ?? "?")}" from ISO`,
 };
 
+const SECRET_KEY_REGEX = /pass|secret|token|key/i;
+
+function maskSecrets(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(maskSecrets);
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(
+    Object.entries(value).map(([k, v]) => [
+      k,
+      SECRET_KEY_REGEX.test(k) && v !== null && v !== "" ? "••••••" : maskSecrets(v),
+    ]),
+  );
+}
+
 function labelForToolCall(tc: ToolCallView): string {
   const label = TOOL_LABELS[tc.name];
   return label ? label(tc.args) : tc.name;
@@ -377,7 +390,7 @@ function ToolSubtask({
                         args
                       </summary>
                       <pre className="mt-1 max-h-32 overflow-auto rounded bg-black/40 border border-white/[0.04] px-2 py-1.5 text-[10.5px] text-zinc-500">
-                        {JSON.stringify(tc.args, null, 2)}
+                        {JSON.stringify(maskSecrets(tc.args), null, 2)}
                       </pre>
                     </details>
                   )}
@@ -475,6 +488,16 @@ function ApprovalCard({
             <div className="text-[12px] text-zinc-100">{tc.describe}</div>
           )}
           {tc.plan && <ApprovalPlanTable plan={tc.plan} />}
+          {Object.keys(tc.args).length > 0 && (
+            <details open className="mt-1.5">
+              <summary className="cursor-pointer text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors select-none">
+                Parameters
+              </summary>
+              <pre className="mt-1 max-h-40 overflow-auto rounded bg-black/40 border border-white/[0.06] px-2 py-1.5 text-[10.5px] text-zinc-300">
+                {JSON.stringify(maskSecrets(tc.args), null, 2)}
+              </pre>
+            </details>
+          )}
           <div className="text-[10.5px] text-zinc-400 mt-0.5">
             This action runs with your permissions. Approve to execute or deny to cancel.
           </div>
