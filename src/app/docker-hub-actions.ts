@@ -5,7 +5,7 @@ import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 
 import type { DockerHubActionState } from "@/lib/action-states";
-import { requireSession } from "@/lib/auth";
+import { requireSession, requireSitePermission } from "@/lib/auth";
 import { fetchImageEnvVars, syncDockerImage } from "@/lib/docker-hub";
 import { saveImageEnv } from "@/lib/image-env-cache";
 import { assertSafeRemoteHost } from "@/lib/import-url";
@@ -122,13 +122,14 @@ export async function syncDockerImageAction(
   formData: FormData,
 ): Promise<DockerHubActionState> {
   try {
-    await requireSession();
+    const session = await requireSession();
 
     const siteSlug = String(formData.get("siteSlug") ?? "");
     if (!siteSlug) {
       return { message: "Missing site context.", requestId: randomUUID(), status: "error", task: null };
     }
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
+    requireSitePermission(session, siteConfig.siteId, "manage-templates");
     return await withSiteConfig(siteConfig, async () => {
 
     const namespace = String(formData.get("namespace") ?? "").trim();
@@ -191,13 +192,14 @@ export async function pullOciTemplateAction(
   formData: FormData,
 ): Promise<DockerHubActionState> {
   try {
-    await requireSession();
+    const session = await requireSession();
 
     const siteSlug = String(formData.get("siteSlug") ?? "");
     if (!siteSlug) {
       return { message: "Missing site context.", requestId: randomUUID(), status: "error", task: null };
     }
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
+    requireSitePermission(session, siteConfig.siteId, "manage-templates");
     return await withSiteConfig(siteConfig, async () => {
 
     const namespace = String(formData.get("namespace") ?? "").trim();
@@ -352,13 +354,14 @@ export async function pullCustomRegistryAction(
   formData: FormData,
 ): Promise<DockerHubActionState> {
   try {
-    await requireSession();
+    const session = await requireSession();
 
     const siteSlug = String(formData.get("siteSlug") ?? "");
     if (!siteSlug) {
       return { message: "Missing site context.", requestId: randomUUID(), status: "error", task: null };
     }
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
+    requireSitePermission(session, siteConfig.siteId, "manage-templates");
     return await withSiteConfig(siteConfig, async () => {
 
     const rawReference = String(formData.get("reference") ?? "").trim();
