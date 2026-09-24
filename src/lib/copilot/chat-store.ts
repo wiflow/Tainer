@@ -58,11 +58,35 @@ type ChatStore = {
   chats: StoredChat[];
 };
 
+let secretsOnDisk = false;
+
+function scrubStoredSecrets(chats: StoredChat[]): boolean {
+  let changed = false;
+  for (const chat of chats) {
+    if (!Array.isArray(chat.turns)) continue;
+    for (const turn of chat.turns) {
+      if (!Array.isArray(turn.toolCalls)) continue;
+      for (const tc of turn.toolCalls as unknown[]) {
+        if (!tc || typeof tc !== "object" || !("result" in tc)) continue;
+        const call = tc as Record<string, unknown>;
+        const redacted = redactCredentials(call.result);
+        if (JSON.stringify(redacted) !== JSON.stringify(call.result)) {
+          call.result = redacted;
+          changed = true;
+        }
+      }
+    }
+  }
+  return changed;
+}
+
 async function readStore(): Promise<ChatStore> {
   try {
     const raw = await readFile(await resolveDataFilePath(DATA_FILE), "utf8");
     const parsed = JSON.parse(raw) as Partial<ChatStore>;
-    return { chats: Array.isArray(parsed.chats) ? parsed.chats : [] };
+    const chats = Array.isArray(parsed.chats) ? parsed.chats : [];
+    if (scrubStoredSecrets(chats)) secretsOnDisk = true;
+    return { chats };
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return { chats: [] };
     throw error;
@@ -71,9 +95,16 @@ async function readStore(): Promise<ChatStore> {
 
 async function writeStore(store: ChatStore) {
   await writeJsonFileAtomically(await resolveDataFilePath(DATA_FILE), store);
+  secretsOnDisk = false;
 }
 
 const mutateStore = createStoreMutator("copilot-chats", readStore, writeStore);
+
+async function readScrubbedStore(): Promise<ChatStore> {
+  const store = await readStore();
+  if (secretsOnDisk) await mutateStore(() => undefined);
+  return store;
+}
 
 export type ChatSummary = {
   id: string;
@@ -170,7 +201,7 @@ function deriveTitle(turns: StoredChatTurn[]): string {
 }
 
 export async function listChatsForUser(userId: string): Promise<ChatSummary[]> {
-  const store = await readStore();
+  const store = await readScrubbedStore();
   return store.chats
     .filter((chat) => chat.userId === userId)
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
@@ -181,7 +212,7 @@ export async function getChatForUser(
   userId: string,
   chatId: string,
 ): Promise<{ id: string; title: string; turns: StoredChatTurn[] } | null> {
-  const store = await readStore();
+  const store = await readScrubbedStore();
   const chat = store.chats.find((c) => c.id === chatId && c.userId === userId);
   return chat ? { id: chat.id, title: chat.title, turns: chat.turns } : null;
 }
