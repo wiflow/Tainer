@@ -1,5 +1,5 @@
 # ── Stage 1: Build ──
-FROM node:20-alpine AS builder
+FROM node:24-alpine AS builder
 WORKDIR /app
 
 COPY package.json package-lock.json ./
@@ -23,12 +23,12 @@ RUN npm run build \
 # the file list; the runtime needs nothing under cache/ to actually serve.
 
 # Minify server.mjs to strip comments and make it harder to read
-RUN npx esbuild server.mjs --bundle --platform=node --target=node20 \
+RUN ./node_modules/.bin/esbuild server.mjs --bundle --platform=node --target=node24 \
     --minify --format=esm --outfile=server.min.mjs \
     --external:next --external:ws --banner:js="import{createRequire}from'module';const require=createRequire(import.meta.url);"
 
 # ── Stage 2: Production ──
-FROM node:20-alpine AS runtime
+FROM node:24-alpine AS runtime
 WORKDIR /app
 
 # Baked at build time by scripts/publish-docker.sh from the release tag.
