@@ -250,6 +250,13 @@ export type OidcUserClaims = {
   groups: string[];
 };
 
+function parseEmailVerified(value: unknown): boolean | null {
+  if (typeof value === "boolean") return value;
+  if (value === "true") return true;
+  if (value === "false") return false;
+  return null;
+}
+
 /**
  * Complete the authorization-code grant. Validates state/nonce/PKCE/ID-token
  * signature via openid-client, then extracts the claims we care about.
@@ -283,8 +290,25 @@ export async function completeOidcAuthorization(
   // `email_verified` claim. The `preferred_username` / `upn` fallbacks and a
   // missing `email_verified` are only honoured when the provider is opted in.
   const trustWithoutClaim = provider.trustEmailWithoutVerifiedClaim === true;
+  let emailClaim: unknown = claims.email;
+  let emailVerifiedClaim: unknown = (claims as Record<string, unknown>).email_verified;
+  const needsUserInfo =
+    typeof emailClaim !== "string" ||
+    (parseEmailVerified(emailVerifiedClaim) === null && !trustWithoutClaim);
+  if (needsUserInfo && tokens.access_token) {
+    try {
+      const info = await oidc.fetchUserInfo(config, tokens.access_token, sub);
+      if (
+        typeof info.email === "string" &&
+        (typeof emailClaim !== "string" || info.email.toLowerCase() === emailClaim.toLowerCase())
+      ) {
+        emailClaim = info.email;
+        emailVerifiedClaim = (info as Record<string, unknown>).email_verified;
+      }
+    } catch {}
+  }
   const emailCandidates = [
-    claims.email,
+    emailClaim,
     ...(trustWithoutClaim
       ? [
           (claims as Record<string, unknown>).preferred_username,
@@ -319,11 +343,7 @@ export async function completeOidcAuthorization(
     ? groupsRaw.filter((g): g is string => typeof g === "string")
     : [];
 
-  const emailVerifiedRaw = fromEmailClaim
-    ? (claims as Record<string, unknown>).email_verified
-    : undefined;
-  let emailVerified: boolean | null =
-    typeof emailVerifiedRaw === "boolean" ? emailVerifiedRaw : null;
+  let emailVerified = fromEmailClaim ? parseEmailVerified(emailVerifiedClaim) : null;
   if (emailVerified === null && trustWithoutClaim) emailVerified = true;
 
   return { sub, email, emailVerified, name, groups };
