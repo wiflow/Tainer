@@ -62,10 +62,6 @@ if [[ -n "${DEPLOY_PASSWORD}" ]]; then
     echo "sshpass is required when DEPLOY_PASSWORD is set. Install with: brew install sshpass" >&2
     exit 1
   fi
-  if ! ssh-keygen -F "${VM_HOST}" >/dev/null 2>&1; then
-    echo "No known host key for ${VM_HOST}. Connect once with ssh and verify the fingerprint first." >&2
-    exit 1
-  fi
   export SSHPASS="${DEPLOY_PASSWORD}"
   SSH_CMD=(sshpass -e "${SSH_CMD[@]}")
   SCP_CMD=(sshpass -e "${SCP_CMD[@]}")
