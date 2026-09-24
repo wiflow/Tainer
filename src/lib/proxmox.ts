@@ -1032,6 +1032,7 @@ async function buildTlsOptionsUncached(
     const aiaCerts = await getExtraCaCerts(
       parsed.hostname,
       parsed.port || "8006",
+      config.tlsCustomCaPem,
     );
     if (aiaCerts.length > 0) {
       extras.push(...aiaCerts);

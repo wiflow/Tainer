@@ -95,7 +95,7 @@ async function resolveNodeIp(node: string): Promise<string | null> {
     if (config.tlsCustomCaPem) extras.push(config.tlsCustomCaPem);
     try {
       const parsed = new URL(config.apiUrl);
-      const aiaCerts = await getExtraCaCerts(parsed.hostname, parsed.port || "8006");
+      const aiaCerts = await getExtraCaCerts(parsed.hostname, parsed.port || "8006", config.tlsCustomCaPem);
       if (aiaCerts.length > 0) extras.push(...aiaCerts);
     } catch { /* proceed without */ }
     if (extras.length > 0) {

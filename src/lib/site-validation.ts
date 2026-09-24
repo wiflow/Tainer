@@ -25,7 +25,7 @@ export async function validateSiteConnection(
       try {
         const parsed = new URL(config.apiUrl);
         const aiaCerts = await Promise.race([
-          getExtraCaCerts(parsed.hostname, parsed.port || "8006"),
+          getExtraCaCerts(parsed.hostname, parsed.port || "8006", config.tlsCustomCaPem),
           new Promise<string[]>((resolve) => setTimeout(() => resolve([]), 3000)),
         ]);
         if (aiaCerts.length > 0) extras.push(...aiaCerts);

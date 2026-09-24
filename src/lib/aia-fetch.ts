@@ -6,9 +6,10 @@ import "server-only";
 import * as tls from "node:tls";
 import * as https from "node:https";
 import * as http from "node:http";
-import { X509Certificate } from "node:crypto";
+import { createHash, X509Certificate } from "node:crypto";
 
 let systemRoots: string[] | null = null;
+let systemRootCerts: X509Certificate[] | null = null;
 
 function getSystemRoots(): string[] {
   if (!systemRoots) {
@@ -17,18 +18,34 @@ function getSystemRoots(): string[] {
   return systemRoots;
 }
 
+function getSystemRootCerts(): X509Certificate[] {
+  if (!systemRootCerts) {
+    systemRootCerts = parsePemCerts(getSystemRoots().join("\n"));
+  }
+  return systemRootCerts;
+}
+
 const cache = new Map<string, { pems: string[]; fetchedAt: number }>();
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+const CHAIN_TIMEOUT_MS = 15_000;
+const MAX_REDIRECTS = 3;
+const MAX_CERT_BYTES = 64 * 1024;
 
 const inflight = new Map<string, Promise<string[]>>();
 
 // `ca` option replaces the default trust store, so we must merge system roots with intermediates.
 // Returns [] when nothing is found so callers can skip the `ca` override entirely.
+// Fetched certificates are only returned when they chain up to a system root or to one of
+// `extraRootsPem`; they are never trust anchors themselves.
 export async function getExtraCaCerts(
   hostname: string,
   port: number | string,
+  extraRootsPem?: string | null,
 ): Promise<string[]> {
-  const key = `${hostname}:${port}`;
+  const rootsKey = extraRootsPem
+    ? createHash("sha256").update(extraRootsPem).digest("hex")
+    : "";
+  const key = `${hostname}:${port}:${rootsKey}`;
 
   const cached = cache.get(key);
   if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
@@ -38,7 +55,11 @@ export async function getExtraCaCerts(
   const existing = inflight.get(key);
   if (existing) return existing;
 
-  const promise = fetchChain(hostname, Number(port));
+  const trusted = [
+    ...getSystemRootCerts(),
+    ...(extraRootsPem ? parsePemCerts(extraRootsPem) : []),
+  ];
+  const promise = withTimeout(fetchChain(hostname, Number(port), trusted), CHAIN_TIMEOUT_MS, []);
   inflight.set(key, promise);
 
   try {
@@ -59,48 +80,74 @@ export async function getExtraCaCerts(
   }
 }
 
-async function fetchChain(hostname: string, port: number): Promise<string[]> {
-  const leafPeerCert = await getLeafCert(hostname, port);
-  if (!leafPeerCert) return [];
-
-  const pems: string[] = [];
-  let current: X509Certificate | null = leafPeerCert;
-  const seen = new Set<string>();
-
-  // Walk up to 5 levels (leaf → intermediate(s) → root)
-  for (let depth = 0; depth < 5 && current; depth++) {
-    const caIssuerUrls = extractCaIssuerUrls(current);
-    if (caIssuerUrls.length === 0) break;
-
-    let nextCert: X509Certificate | null = null;
-
-    for (const url of caIssuerUrls) {
-      if (seen.has(url)) continue;
-      seen.add(url);
-
-      try {
-        const certData = await fetchUrl(url);
-        const pem = toPem(certData);
-        if (pem) {
-          pems.push(pem);
-          nextCert = new X509Certificate(pem);
-          break; // got one, move up the chain
-        }
-      } catch {
-        // Try next URL
-      }
-    }
-
-    current = nextCert;
-  }
-
-  return pems;
+function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  const timeout = new Promise<T>((resolve) => {
+    timer = setTimeout(() => resolve(fallback), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
-function getLeafCert(hostname: string, port: number): Promise<X509Certificate | null> {
+function isSignedBy(cert: X509Certificate, issuer: X509Certificate): boolean {
+  try {
+    return cert.checkIssued(issuer) && cert.verify(issuer.publicKey);
+  } catch {
+    return false;
+  }
+}
+
+function isSignedByAny(cert: X509Certificate, issuers: X509Certificate[]): boolean {
+  return issuers.some((issuer) => isSignedBy(cert, issuer));
+}
+
+async function fetchChain(
+  hostname: string,
+  port: number,
+  trusted: X509Certificate[],
+): Promise<string[]> {
+  const leaf = await getLeafCert(hostname, port);
+  if (!leaf || isSignedByAny(leaf, trusted)) return [];
+
+  const pems: string[] = [];
+  let current = leaf;
+
+  for (let depth = 0; depth < 5; depth++) {
+    const next = await fetchIssuerCert(current);
+    if (!next || next.checkIssued(next)) return [];
+
+    pems.push(next.toString());
+    if (isSignedByAny(next, trusted)) return pems;
+    current = next;
+  }
+
+  return [];
+}
+
+// Returns the CA certificate named in `cert`'s AIA extension, only if it actually signed `cert`.
+export async function fetchIssuerCert(cert: X509Certificate): Promise<X509Certificate | null> {
+  for (const url of extractCaIssuerUrls(cert)) {
+    try {
+      const pem = toPem(await fetchUrl(url));
+      if (!pem) continue;
+      const candidate = new X509Certificate(pem);
+      if (candidate.ca && isSignedBy(cert, candidate)) {
+        return candidate;
+      }
+    } catch {
+      // Try next URL
+    }
+  }
+  return null;
+}
+
+export function getLeafCert(
+  hostname: string,
+  port: number,
+  timeoutMs = 5000,
+): Promise<X509Certificate | null> {
   return new Promise((resolve) => {
     const socket = tls.connect(
-      { host: hostname, port, rejectUnauthorized: false, timeout: 5000 },
+      { host: hostname, port, rejectUnauthorized: false, timeout: timeoutMs },
       () => {
         try {
           const raw = socket.getPeerX509Certificate?.();
@@ -140,19 +187,29 @@ function extractCaIssuerUrls(cert: X509Certificate): string[] {
   return urls;
 }
 
-function fetchUrl(url: string): Promise<Buffer> {
+function fetchUrl(url: string, redirectsLeft = MAX_REDIRECTS): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    const mod = url.startsWith("https") ? https : http;
+    const mod = url.startsWith("https:") ? https : http;
     const req = mod.get(url, { timeout: 10000 }, (res) => {
-      // Follow redirects (up to 3)
       if (
         res.statusCode &&
         res.statusCode >= 300 &&
         res.statusCode < 400 &&
         res.headers.location
       ) {
-        fetchUrl(res.headers.location).then(resolve, reject);
         res.resume();
+        let next: URL;
+        try {
+          next = new URL(res.headers.location, url);
+        } catch {
+          reject(new Error("Invalid redirect"));
+          return;
+        }
+        if (redirectsLeft <= 0 || (next.protocol !== "http:" && next.protocol !== "https:")) {
+          reject(new Error("Redirect refused"));
+          return;
+        }
+        fetchUrl(next.toString(), redirectsLeft - 1).then(resolve, reject);
         return;
       }
 
@@ -163,7 +220,16 @@ function fetchUrl(url: string): Promise<Buffer> {
       }
 
       const chunks: Buffer[] = [];
-      res.on("data", (chunk: Buffer) => chunks.push(chunk));
+      let size = 0;
+      res.on("data", (chunk: Buffer) => {
+        size += chunk.length;
+        if (size > MAX_CERT_BYTES) {
+          req.destroy();
+          reject(new Error("Response too large"));
+          return;
+        }
+        chunks.push(chunk);
+      });
       res.on("end", () => resolve(Buffer.concat(chunks)));
       res.on("error", reject);
     });
@@ -175,12 +241,32 @@ function fetchUrl(url: string): Promise<Buffer> {
   });
 }
 
-// AIA endpoints usually serve DER (.cer/.crt), sometimes PEM
+const PEM_CERT_REGEX = /-----BEGIN CERTIFICATE-----[\s\S]+?-----END CERTIFICATE-----/g;
+
+function parsePemCerts(bundle: string): X509Certificate[] {
+  const certs: X509Certificate[] = [];
+  for (const block of bundle.match(PEM_CERT_REGEX) ?? []) {
+    try {
+      certs.push(new X509Certificate(block));
+    } catch {
+      // Skip unparseable entries
+    }
+  }
+  return certs;
+}
+
+// AIA endpoints usually serve DER (.cer/.crt), sometimes PEM. Only a single certificate is accepted.
 function toPem(data: Buffer): string | null {
   const str = data.toString("utf8");
 
   if (str.includes("-----BEGIN CERTIFICATE-----")) {
-    return str;
+    const blocks = str.match(PEM_CERT_REGEX) ?? [];
+    if (blocks.length !== 1) return null;
+    try {
+      return new X509Certificate(blocks[0]).toString();
+    } catch {
+      return null;
+    }
   }
 
   try {
