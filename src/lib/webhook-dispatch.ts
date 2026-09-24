@@ -1,6 +1,6 @@
 import "server-only";
 
-import { assertSafeWebhookUrl } from "@/lib/import-url";
+import { postToWebhookUrl } from "@/lib/import-url";
 import type { AlertWebhookKind } from "@/lib/alert-settings";
 import type { AlertCategory, AlertSeverity } from "@/lib/alert-runtime-state";
 import type { NotificationState } from "@/lib/notification-log";
@@ -299,18 +299,17 @@ export async function dispatchWebhook(
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      const safeWebhookUrl = await assertSafeWebhookUrl(webhookUrl);
-      const response = await fetch(safeWebhookUrl, {
-        body: JSON.stringify(body),
-        headers: {
+      const response = await postToWebhookUrl(
+        webhookUrl,
+        JSON.stringify(body),
+        {
           "Content-Type": "application/json",
           "User-Agent": "Tainer-Alerts/2.0",
         },
-        method: "POST",
-        signal: AbortSignal.timeout(10_000),
-      });
+        10_000,
+      );
 
-      if (response.ok) {
+      if (response.status >= 200 && response.status < 300) {
         return { error: null, kind, ok: true, attempts: attempt };
       }
 

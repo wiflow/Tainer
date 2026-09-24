@@ -1,7 +1,10 @@
 import "server-only";
 
+import { lookup as lookupCallback } from "node:dns";
 import { lookup, Resolver } from "node:dns/promises";
-import { isIP } from "node:net";
+import http from "node:http";
+import https from "node:https";
+import { isIP, type LookupFunction } from "node:net";
 
 function readAllowlist(envKeys: string[]) {
   return envKeys.flatMap((envKey) =>
@@ -37,12 +40,23 @@ function isPrivateIpv4(address: string) {
     (first === 172 && second >= 16 && second <= 31) ||
     (first === 192 && second === 168) ||
     (first === 100 && second >= 64 && second <= 127) ||
+    (first === 198 && (second === 18 || second === 19)) ||
     first >= 224
   );
 }
 
-function expandIpv6(address: string) {
-  const [leftRaw, rightRaw] = address.toLowerCase().split("::");
+function expandIpv6(rawAddress: string) {
+  let address = rawAddress.toLowerCase();
+  const dottedTail = /^(.*:)([^:]+\.[^:]+)$/.exec(address);
+  if (dottedTail) {
+    if (isIP(dottedTail[2]) !== 4) {
+      return null;
+    }
+    const [a = 0, b = 0, c = 0, d = 0] = dottedTail[2].split(".").map(Number);
+    address = `${dottedTail[1]}${((a << 8) | b).toString(16)}:${((c << 8) | d).toString(16)}`;
+  }
+
+  const [leftRaw, rightRaw] = address.split("::");
   const left = leftRaw ? leftRaw.split(":").filter(Boolean) : [];
   const right = rightRaw ? rightRaw.split(":").filter(Boolean) : [];
 
@@ -70,7 +84,33 @@ function isPrivateIpv6(address: string) {
     return true;
   }
 
-  const first = Number.parseInt(groups[0] ?? "0", 16);
+  const words = groups.map((group) => (/^[0-9a-f]{1,4}$/.test(group) ? Number.parseInt(group, 16) : NaN));
+  if (words.some((word) => Number.isNaN(word))) {
+    return true;
+  }
+
+  const embeddedIpv4 = (high: number, low: number) =>
+    `${high >> 8}.${high & 0xff}.${low >> 8}.${low & 0xff}`;
+  const [first = 0, second = 0, third = 0] = words;
+
+  // IPv4-mapped, IPv4-compatible and SIIT (::ffff:0:0/96) addresses
+  if (
+    words.slice(0, 4).every((word) => word === 0) &&
+    ((words[4] === 0 && (words[5] === 0 || words[5] === 0xffff)) ||
+      (words[4] === 0xffff && words[5] === 0))
+  ) {
+    return isPrivateIpv4(embeddedIpv4(words[6] ?? 0, words[7] ?? 0));
+  }
+
+  // NAT64 (64:ff9b::/96 and the local-use 64:ff9b:1::/48)
+  if (first === 0x64 && second === 0xff9b) {
+    return third === 1 || isPrivateIpv4(embeddedIpv4(words[6] ?? 0, words[7] ?? 0));
+  }
+
+  // 6to4
+  if (first === 0x2002) {
+    return isPrivateIpv4(embeddedIpv4(second, third));
+  }
 
   return (
     (first & 0xfe00) === 0xfc00 ||
@@ -247,4 +287,64 @@ export async function assertSafeDownloadUrl(rawUrl: string) {
 
 export async function assertSafeWebhookUrl(rawUrl: string) {
   return assertSafeHttpUrl(rawUrl, "Webhook URL", ["TAINER_WEBHOOK_URL_ALLOWLIST"]);
+}
+
+const publicOnlyLookup: LookupFunction = (hostname, options, callback) => {
+  lookupCallback(hostname, { ...options, all: true }, (error, addresses) => {
+    if (error) {
+      callback(error, "");
+      return;
+    }
+    if (addresses.length === 0 || addresses.some((entry) => isPrivateAddress(entry.address))) {
+      callback(Object.assign(new Error(`Blocked private address for ${hostname}.`), { code: "EACCES" }), "");
+      return;
+    }
+    if (options.all) {
+      callback(null, addresses);
+      return;
+    }
+    callback(null, addresses[0].address, addresses[0].family);
+  });
+};
+
+// Redirects are not followed, and the address actually dialled is re-checked so DNS rebinding cannot reach private hosts.
+export async function postToWebhookUrl(
+  rawUrl: string,
+  body: string,
+  headers: Record<string, string>,
+  timeoutMs: number,
+): Promise<{ status: number; statusText: string }> {
+  const url = new URL(await assertSafeWebhookUrl(rawUrl));
+  const allowlisted = matchesAllowlist(url.hostname, readAllowlist(["TAINER_WEBHOOK_URL_ALLOWLIST"]));
+  const transport = url.protocol === "https:" ? https : http;
+
+  return new Promise((resolve, reject) => {
+    const request = transport.request(
+      url,
+      {
+        headers: { ...headers, "Content-Length": Buffer.byteLength(body) },
+        lookup: allowlisted ? undefined : publicOnlyLookup,
+        method: "POST",
+      },
+      (response) => {
+        response.resume();
+        response.on("end", () => {
+          clearTimeout(timer);
+          resolve({ status: response.statusCode ?? 0, statusText: response.statusMessage ?? "" });
+        });
+        response.on("error", (error) => {
+          clearTimeout(timer);
+          reject(error);
+        });
+      },
+    );
+    const timer = setTimeout(() => {
+      request.destroy(new Error("Webhook request timed out."));
+    }, timeoutMs);
+    request.on("error", (error) => {
+      clearTimeout(timer);
+      reject(error);
+    });
+    request.end(body);
+  });
 }
