@@ -1,5 +1,4 @@
-// Tainer — Tutorial Series Overview deck  (v2, on-brand)
-// Pure monochrome. Matches auth-shell / loading / sidebar design language.
+// Build: npm install --no-save pptxgenjs && node docs/slides/build.js
 
 const fs   = require("fs");
 const path = require("path");
