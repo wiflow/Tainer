@@ -172,6 +172,22 @@ function ProviderForm({
           />
           <span className="text-[13px] text-zinc-200">Auto-provision unknown users</span>
         </label>
+        <label className="flex items-start gap-2">
+          <input
+            defaultChecked={initial?.trustEmailWithoutVerifiedClaim ?? false}
+            className="mt-0.5 h-4 w-4 rounded border-white/10 bg-zinc-900 text-sky-400"
+            name="trustEmailWithoutVerifiedClaim"
+            type="checkbox"
+          />
+          <span>
+            <span className="block text-[13px] text-zinc-200">
+              Trust email without email_verified claim
+            </span>
+            <span className="block text-[11px] text-zinc-500">
+              Needed for Microsoft Entra ID. Also accepts preferred_username or upn as the email.
+            </span>
+          </span>
+        </label>
         <label className="flex items-center gap-2">
           <input
             defaultChecked={initial?.enabled ?? true}

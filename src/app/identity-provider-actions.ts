@@ -30,6 +30,7 @@ function parseInput(formData: FormData): IdpProviderInput {
       String(formData.get("defaultRole") ?? "operator") === "admin"
         ? "admin"
         : "operator",
+    trustEmailWithoutVerifiedClaim: formData.get("trustEmailWithoutVerifiedClaim") === "on",
     enabled: formData.get("enabled") === "on",
   };
 }

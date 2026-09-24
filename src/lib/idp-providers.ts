@@ -48,6 +48,12 @@ export type IdpProvider = {
   autoProvision: boolean;
   /** Role assigned to auto-provisioned users. */
   defaultRole: "admin" | "operator";
+  /**
+   * Treat a missing `email_verified` claim as verified and accept
+   * `preferred_username` / `upn` as the email. For IdPs such as Microsoft
+   * Entra ID that never send `email_verified`. Absent means false.
+   */
+  trustEmailWithoutVerifiedClaim?: boolean;
   createdAt: string;
   createdBy: string;
   updatedAt: string;
@@ -69,6 +75,7 @@ export type IdpProviderInput = {
   allowedEmailDomains: string;
   autoProvision: boolean;
   defaultRole: "admin" | "operator";
+  trustEmailWithoutVerifiedClaim: boolean;
   enabled: boolean;
 };
 
@@ -231,6 +238,7 @@ export async function createIdpProvider(
       allowedEmailDomains: input.allowedEmailDomains.trim(),
       autoProvision: input.autoProvision,
       defaultRole: input.defaultRole,
+      trustEmailWithoutVerifiedClaim: input.trustEmailWithoutVerifiedClaim,
       createdAt: timestamp,
       createdBy,
       updatedAt: timestamp,
@@ -267,6 +275,7 @@ export async function updateIdpProvider(
       allowedEmailDomains: input.allowedEmailDomains.trim(),
       autoProvision: input.autoProvision,
       defaultRole: input.defaultRole,
+      trustEmailWithoutVerifiedClaim: input.trustEmailWithoutVerifiedClaim,
       enabled: input.enabled,
       updatedAt: new Date().toISOString(),
     };

@@ -239,9 +239,9 @@ export type OidcUserClaims = {
   /** Most providers include this; we require it for user matching. */
   email: string;
   /**
-   * Whether the IdP asserts the email was verified. Standard OIDC claim
-   * (`email_verified`). `null` means the claim was absent — distinguish
-   * from explicit `false` so callers can apply per-provider policy.
+   * Whether the IdP asserts the email was verified (`email_verified`).
+   * `null` means the claim was absent and the provider is not opted in to
+   * trusting emails without it.
    */
   emailVerified: boolean | null;
   /** Display name; falls back to email if absent. */
@@ -279,27 +279,33 @@ export async function completeOidcAuthorization(
   const sub = typeof claims.sub === "string" ? claims.sub : "";
   if (!sub) throw new Error("ID token has no subject claim.");
 
-  // Entra/Azure AD often omits the standard `email` claim and puts the
-  // email-like value in `preferred_username` or `upn` instead. Other IdPs
-  // (Google, Okta) reliably use `email`. Try them in order and use whatever
-  // looks like an email address. We require an "@" so we don't accidentally
-  // accept a non-email username as the canonical identifier.
+  // Entra/Azure AD often omits the standard `email` claim and the
+  // `email_verified` claim. The `preferred_username` / `upn` fallbacks and a
+  // missing `email_verified` are only honoured when the provider is opted in.
+  const trustWithoutClaim = provider.trustEmailWithoutVerifiedClaim === true;
   const emailCandidates = [
     claims.email,
-    (claims as Record<string, unknown>).preferred_username,
-    (claims as Record<string, unknown>).upn,
+    ...(trustWithoutClaim
+      ? [
+          (claims as Record<string, unknown>).preferred_username,
+          (claims as Record<string, unknown>).upn,
+        ]
+      : []),
   ];
   let email = "";
-  for (const candidate of emailCandidates) {
+  let fromEmailClaim = false;
+  for (const [index, candidate] of emailCandidates.entries()) {
     if (typeof candidate === "string" && candidate.includes("@")) {
       email = candidate.toLowerCase();
+      fromEmailClaim = index === 0;
       break;
     }
   }
   if (!email) {
     throw new Error(
-      "Identity provider did not return an email-like claim (checked email, preferred_username, upn). " +
-        "For Entra, ensure the app has User.Read permission and that the user has a UPN.",
+      trustWithoutClaim
+        ? "Identity provider did not return an email-like claim (checked email, preferred_username, upn)."
+        : "Identity provider did not return an email claim.",
     );
   }
 
@@ -313,9 +319,12 @@ export async function completeOidcAuthorization(
     ? groupsRaw.filter((g): g is string => typeof g === "string")
     : [];
 
-  const emailVerifiedRaw = (claims as Record<string, unknown>).email_verified;
-  const emailVerified =
+  const emailVerifiedRaw = fromEmailClaim
+    ? (claims as Record<string, unknown>).email_verified
+    : undefined;
+  let emailVerified: boolean | null =
     typeof emailVerifiedRaw === "boolean" ? emailVerifiedRaw : null;
+  if (emailVerified === null && trustWithoutClaim) emailVerified = true;
 
   return { sub, email, emailVerified, name, groups };
 }

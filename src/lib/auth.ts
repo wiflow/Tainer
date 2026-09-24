@@ -1891,9 +1891,9 @@ export type SsoSignInInput = {
   subject: string;
   email: string;
   /**
-   * `email_verified` claim from the IdP. `null` if absent. When `false` the
-   * sign-in is refused outright — an attacker controlling a permissive IdP
-   * can otherwise assert any email.
+   * `email_verified` claim from the IdP. `null` if absent. Anything other
+   * than `true` is refused: an attacker controlling a permissive IdP can
+   * otherwise assert any email.
    */
   emailVerified: boolean | null;
   name: string;
@@ -1916,7 +1916,8 @@ export type SsoSignInResult = {
  * allowed to take over Tainer users that already have local credentials.
  * Specifically:
  *
- *   - We refuse if the IdP reported `email_verified: false`.
+ *   - We refuse unless the IdP reported `email_verified: true` (or the
+ *     provider is opted in to trusting emails without the claim).
  *   - We match by (providerId, subject) first — that's the stable, IdP-scoped
  *     identifier and survives email rotation.
  *   - We fall back to matching by email ONLY for users that are linkable:
@@ -1939,6 +1940,11 @@ export async function signInWithSso(
     throw new Error(
       "Identity provider reported the email address is not verified. " +
         "Sign-in refused.",
+    );
+  }
+  if (input.emailVerified !== true) {
+    throw new Error(
+      "Identity provider did not confirm the email address is verified. Sign-in refused.",
     );
   }
   const name = input.name.trim() || email;
