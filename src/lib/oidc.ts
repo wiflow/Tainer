@@ -72,18 +72,17 @@ async function signFlowCookie(state: OidcFlowState): Promise<string> {
 }
 
 async function verifyFlowCookie(value: string): Promise<OidcFlowState | null> {
-  const [payload, sig] = value.split(".");
+  const parts = value.split(".");
+  if (parts.length !== 2) return null;
+  const [payload, sig] = parts;
   if (!payload || !sig) return null;
   const secret = await getAuthSecret();
-  const expected = createHmac("sha256", secret)
-    .update(`${OIDC_FLOW_COOKIE_NAMESPACE}:${payload}`)
-    .digest();
-  let received: Buffer;
-  try {
-    received = Buffer.from(sig, "base64url");
-  } catch {
-    return null;
-  }
+  const expected = Buffer.from(
+    createHmac("sha256", secret)
+      .update(`${OIDC_FLOW_COOKIE_NAMESPACE}:${payload}`)
+      .digest("base64url"),
+  );
+  const received = Buffer.from(sig);
   if (received.length !== expected.length) return null;
   if (!timingSafeEqual(expected, received)) return null;
 

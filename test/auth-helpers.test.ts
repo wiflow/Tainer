@@ -53,16 +53,21 @@ const flowState = fc.record({
   returnTo: fc.string({ unit: "binary" }),
 });
 
-test("OIDC flow cookie round-trips and rejects forged payloads", async () => {
+test("OIDC flow cookie round-trips and rejects any changed character", async () => {
   await fc.assert(
     fc.asyncProperty(flowState, fc.nat(), fc.string({ minLength: 1, maxLength: 1 }), async (raw, at, ch) => {
       const state: OidcFlowState = { ...raw, issuedAt: Date.now() };
       const cookie = await oidcFlowCookieHelpers.sign(state);
       assert.deepEqual(await oidcFlowCookieHelpers.verify(cookie), state);
       const i = at % cookie.length;
+      fc.pre(ch !== cookie[i]);
       const tampered = cookie.slice(0, i) + ch + cookie.slice(i + 1);
-      const verified = await oidcFlowCookieHelpers.verify(tampered);
-      if (verified !== null) assert.deepEqual(verified, state);
+      assert.equal(await oidcFlowCookieHelpers.verify(tampered), null);
+      assert.equal(await oidcFlowCookieHelpers.verify(`${cookie}.x`), null);
+      const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+      const reencoded = cookie.slice(0, -1) + alphabet[alphabet.indexOf(cookie.at(-1)!) ^ 1];
+      assert.deepEqual(Buffer.from(reencoded.split(".")[1], "base64url"), Buffer.from(cookie.split(".")[1], "base64url"));
+      assert.equal(await oidcFlowCookieHelpers.verify(reencoded), null);
     }),
   );
 });
