@@ -5,7 +5,7 @@ import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 
 import type { ProxmoxActionState } from "@/lib/action-states";
-import { requireSession } from "@/lib/auth";
+import { requireSession, requireSitePermission } from "@/lib/auth";
 import { createDeploymentTemplate } from "@/lib/deployment-templates";
 import { getTemplateAuthoringIndex, withSiteConfig } from "@/lib/proxmox";
 import { resolveSiteConfigBySlug } from "@/lib/site-resolver";
@@ -16,13 +16,14 @@ export async function createDeploymentTemplateAction(
   formData: FormData,
 ): Promise<ProxmoxActionState> {
   try {
-    await requireSession();
+    const session = await requireSession();
 
     const siteSlug = String(formData.get("siteSlug") ?? "");
     if (!siteSlug) {
       return { message: "Missing site context.", requestId: randomUUID(), status: "error", task: null };
     }
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
+    requireSitePermission(session, siteConfig.siteId, "manage-templates");
     return await withSiteConfig(siteConfig, async () => {
 
     const name = String(formData.get("name") ?? "").trim();

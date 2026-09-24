@@ -5,7 +5,7 @@ import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 
 import type { BasicActionState } from "@/lib/action-states";
-import { requireSession } from "@/lib/auth";
+import { requireSession, requireSitePermission } from "@/lib/auth";
 import { withSiteConfig } from "@/lib/proxmox";
 import { resolveSiteConfigBySlug } from "@/lib/site-resolver";
 import { createVmTemplate, deleteVmTemplate, type VmTemplateInput } from "@/lib/vm-templates";
@@ -15,11 +15,12 @@ export async function createVmTemplateAction(
   formData: FormData,
 ): Promise<BasicActionState> {
   try {
-    await requireSession();
+    const session = await requireSession();
 
     const siteSlug = String(formData.get("siteSlug") ?? "");
     if (!siteSlug) return { message: "Missing site context.", requestId: randomUUID(), status: "error" };
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
+    requireSitePermission(session, siteConfig.siteId, "manage-templates");
     return await withSiteConfig(siteConfig, async () => {
 
     const name = String(formData.get("name") ?? "").trim();
@@ -128,11 +129,12 @@ export async function deleteVmTemplateAction(
   formData: FormData,
 ): Promise<BasicActionState> {
   try {
-    await requireSession();
+    const session = await requireSession();
 
     const siteSlug = String(formData.get("siteSlug") ?? "");
     if (!siteSlug) return { message: "Missing site context.", requestId: randomUUID(), status: "error" };
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
+    requireSitePermission(session, siteConfig.siteId, "manage-templates");
     return await withSiteConfig(siteConfig, async () => {
 
     const id = String(formData.get("id") ?? "").trim();
