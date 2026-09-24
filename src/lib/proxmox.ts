@@ -717,6 +717,21 @@ function validateStorageName(storage: string, label = "storage") {
   return normalized;
 }
 
+function validateBackupVolid(volid: string, storage: string) {
+  const normalized = volid.trim();
+  const match = /^([a-zA-Z0-9._-]{1,63}):(backup\/[a-zA-Z0-9._:/-]+)$/.exec(normalized);
+
+  if (
+    !match ||
+    match[1] !== storage ||
+    match[2].split("/").some((segment) => segment === "" || segment === "." || segment === "..")
+  ) {
+    throw new Error("Invalid backup volume ID.");
+  }
+
+  return normalized;
+}
+
 function validatePositiveInteger(value: number, label: string) {
   if (!Number.isInteger(value) || value <= 0) {
     throw new Error(`Invalid ${label}.`);
@@ -1163,6 +1178,10 @@ async function proxmoxRequest<T>(endpoint: string, options: RequestOptions = {})
   const qIdx = endpoint.indexOf("?");
   const endpointPath = qIdx >= 0 ? endpoint.slice(0, qIdx) : endpoint;
   const endpointQuery = qIdx >= 0 ? endpoint.slice(qIdx + 1) : "";
+
+  if (/(^|\/)\.{1,2}(\/|$)|%2e|\\/i.test(endpointPath)) {
+    throw new ProxmoxApiError("Invalid Proxmox API path.", endpoint);
+  }
 
   const url = buildProxmoxUrl(`/api2/json${endpointPath}`, config.apiUrl);
   const query = options.params?.toString() || endpointQuery;
@@ -4359,9 +4378,10 @@ export async function deleteBackup(
 ): Promise<string | null> {
   const validatedNode = validateNodeName(node);
   const validatedStorage = validateStorageName(storage);
+  const validatedVolid = validateBackupVolid(volid, validatedStorage);
 
   const upid = await proxmoxRequest<string | null>(
-    `/nodes/${validatedNode}/storage/${validatedStorage}/content/${volid}`,
+    `/nodes/${validatedNode}/storage/${validatedStorage}/content/${validatedVolid}`,
     { method: "DELETE" },
   );
 
