@@ -207,6 +207,12 @@ export async function bootstrapAdministratorAction(
   };
 }
 
+const CHALLENGE_GONE_ERRORS = new Set([
+  "Your login session expired. Sign in again.",
+  "This login challenge has already been used.",
+  "Two-factor authentication is not available for this account.",
+]);
+
 export async function loginAction(
   _previousState: LoginActionState,
   formData: FormData,
@@ -215,12 +221,14 @@ export async function loginAction(
   // a failed attempt even when `beginLogin` throws before we know the user.
   let attemptedEmail = "";
   let clientIp: string | undefined;
+  let twoFactorStep = false;
 
   try {
     clientIp = await getClientIpForRateLimit();
     const twoFactorCode = String(formData.get("twoFactorCode") ?? "").trim();
 
     if (twoFactorCode) {
+      twoFactorStep = true;
       let completed: Awaited<ReturnType<typeof completeTwoFactorLogin>>;
       try {
         completed = await completeTwoFactorLogin(twoFactorCode);
@@ -302,7 +310,7 @@ export async function loginAction(
     return {
       message: reason,
       requestId: randomUUID(),
-      requiresTwoFactor: false,
+      requiresTwoFactor: twoFactorStep && !CHALLENGE_GONE_ERRORS.has(reason),
       status: "error",
     };
   }

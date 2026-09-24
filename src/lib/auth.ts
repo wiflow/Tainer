@@ -1661,7 +1661,7 @@ export async function completeTwoFactorLogin(code: string) {
     const challenge = await readLoginChallengeCookie();
 
     if (!challenge) {
-      throw new Error("Your login session expired. Enter email and password again.");
+      throw new Error("Your login session expired. Sign in again.");
     }
 
     await checkTotpRateLimit(challenge.userId);
