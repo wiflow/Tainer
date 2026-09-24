@@ -1010,6 +1010,11 @@ const server = createServer(async (req, res) => {
   const requestUrl = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
 
   req.headers["x-pathname"] = requestUrl.pathname;
+  if (req.socket.remoteAddress) {
+    req.headers["x-tainer-peer-ip"] = req.socket.remoteAddress;
+  } else {
+    delete req.headers["x-tainer-peer-ip"];
+  }
 
   // "/" is now handled by the Next.js overview map page (src/app/page.tsx).
 

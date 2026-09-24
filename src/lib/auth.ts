@@ -136,6 +136,8 @@ type UsedTotpTracker = Record<string, Record<string, number>>;
 
 type AuthSecurityState = {
   loginAttempts: RateLimitTracker;
+  loginEmailFailures: RateLimitTracker;
+  loginIpFailures: RateLimitTracker;
   resetAttempts: RateLimitTracker;
   resetIpAttempts: RateLimitTracker;
   totpAttempts: RateLimitTracker;
@@ -205,6 +207,8 @@ function defaultAuthStore(): AuthStore {
 function defaultAuthSecurityState(): AuthSecurityState {
   return {
     loginAttempts: {},
+    loginEmailFailures: {},
+    loginIpFailures: {},
     resetAttempts: {},
     resetIpAttempts: {},
     totpAttempts: {},
@@ -473,6 +477,8 @@ async function readAuthSecurityState(): Promise<AuthSecurityState> {
       const state = parsed as Partial<AuthSecurityState>;
       return {
         loginAttempts: sanitizeRateLimitTracker(state.loginAttempts),
+        loginEmailFailures: sanitizeRateLimitTracker(state.loginEmailFailures),
+        loginIpFailures: sanitizeRateLimitTracker(state.loginIpFailures),
         resetAttempts: sanitizeRateLimitTracker(state.resetAttempts),
         resetIpAttempts: sanitizeRateLimitTracker(state.resetIpAttempts),
         totpAttempts: sanitizeRateLimitTracker(state.totpAttempts),
@@ -1194,6 +1200,8 @@ export async function createInitialAdministrator(input: {
   });
 }
 
+const MAX_RATE_LIMIT_KEYS = 5_000;
+
 function pruneRateLimitTracker(tracker: RateLimitTracker, windowMs: number) {
   const cutoff = Date.now() - windowMs;
 
@@ -1201,6 +1209,14 @@ function pruneRateLimitTracker(tracker: RateLimitTracker, windowMs: number) {
     if (entry.firstAttempt < cutoff) {
       delete tracker[key];
     }
+  }
+
+  const entries = Object.entries(tracker);
+  if (entries.length > MAX_RATE_LIMIT_KEYS) {
+    entries
+      .sort(([, a], [, b]) => a.firstAttempt - b.firstAttempt)
+      .slice(0, entries.length - MAX_RATE_LIMIT_KEYS)
+      .forEach(([key]) => delete tracker[key]);
   }
 }
 
@@ -1232,6 +1248,8 @@ function pruneUsedChallengeNonces(usedChallengeNonces: Record<string, number>) {
 
 function pruneAuthSecurityState(state: AuthSecurityState) {
   pruneRateLimitTracker(state.loginAttempts, LOGIN_WINDOW_MS);
+  pruneRateLimitTracker(state.loginEmailFailures, LOGIN_WINDOW_MS);
+  pruneRateLimitTracker(state.loginIpFailures, LOGIN_WINDOW_MS);
   pruneRateLimitTracker(state.resetAttempts, RESET_WINDOW_MS);
   pruneRateLimitTracker(state.resetIpAttempts, RESET_WINDOW_MS);
   pruneRateLimitTracker(state.totpAttempts, TOTP_WINDOW_MS);
@@ -1253,24 +1271,29 @@ async function checkRateLimit(
   await mutateAuthSecurityState((state) => {
     pruneAuthSecurityState(state);
 
-    const bucket = state[tracker];
-    const now = Date.now();
-    const entry = bucket[key];
+    const entry = state[tracker][key];
 
-    if (entry && now - entry.firstAttempt < windowMs) {
-      if (entry.count >= maxAttempts) {
-        throw new Error(message);
-      }
-
-      entry.count += 1;
-      return;
+    if (entry && Date.now() - entry.firstAttempt < windowMs && entry.count >= maxAttempts) {
+      throw new Error(message);
     }
 
-    bucket[key] = {
-      count: 1,
-      firstAttempt: now,
-    };
+    countRateLimitAttempt(state[tracker], key, windowMs);
   });
+}
+
+function countRateLimitAttempt(bucket: RateLimitTracker, key: string, windowMs: number) {
+  const now = Date.now();
+  const entry = bucket[key];
+
+  if (entry && now - entry.firstAttempt < windowMs) {
+    entry.count += 1;
+    return;
+  }
+
+  bucket[key] = {
+    count: 1,
+    firstAttempt: now,
+  };
 }
 
 async function clearRateLimit(
@@ -1342,19 +1365,64 @@ async function claimTotpCodeForChallenge(userId: string, code: string, nonce: st
 
 const LOGIN_MAX_ATTEMPTS = 5;
 const LOGIN_WINDOW_MS = 15 * 60_000;
+const LOGIN_SLOWDOWN_THRESHOLD = 20;
+const LOGIN_SLOWDOWN_MS = 3_000;
 
+function loginRateLimitKey(email: string, clientIp?: string) {
+  return clientIp ? `${email}:${clientIp}` : email;
+}
+
+/**
+ * Hard lockout is per (email, client IP), so a remote caller cannot lock the
+ * owner out from their own address. Failures summed per email or per IP only
+ * add a delay, which slows distributed guessing without denying access.
+ */
 async function checkLoginRateLimit(email: string, clientIp?: string) {
   await checkRateLimit(
     "loginAttempts",
-    clientIp ? `${email}:${clientIp}` : email,
+    loginRateLimitKey(email, clientIp),
     LOGIN_MAX_ATTEMPTS,
     LOGIN_WINDOW_MS,
     "Too many login attempts. Try again in a few minutes.",
   );
+
+  const state = await readAuthSecurityState();
+  const now = Date.now();
+  const recentFailures = (entry: RateLimitEntry | undefined) =>
+    entry && now - entry.firstAttempt < LOGIN_WINDOW_MS ? entry.count : 0;
+
+  if (
+    recentFailures(state.loginEmailFailures[email]) >= LOGIN_SLOWDOWN_THRESHOLD ||
+    (clientIp && recentFailures(state.loginIpFailures[clientIp]) >= LOGIN_SLOWDOWN_THRESHOLD)
+  ) {
+    await new Promise((resolve) => setTimeout(resolve, LOGIN_SLOWDOWN_MS));
+  }
+}
+
+async function recordLoginFailure(email: string, clientIp?: string) {
+  await mutateAuthSecurityState((state) => {
+    pruneAuthSecurityState(state);
+    countRateLimitAttempt(state.loginEmailFailures, email, LOGIN_WINDOW_MS);
+    if (clientIp) {
+      countRateLimitAttempt(state.loginIpFailures, clientIp, LOGIN_WINDOW_MS);
+    }
+  });
 }
 
 async function clearLoginRateLimit(email: string, clientIp?: string) {
-  await clearRateLimit("loginAttempts", clientIp ? `${email}:${clientIp}` : email);
+  await clearRateLimit("loginAttempts", loginRateLimitKey(email, clientIp));
+}
+
+let dummyPasswordHash: Promise<string> | null = null;
+
+async function verifyPasswordOrDummy(password: string, storedHash: string | undefined) {
+  if (storedHash) {
+    return verifyPassword(password, storedHash);
+  }
+
+  dummyPasswordHash ??= hashPassword(randomBytes(24).toString("base64url"));
+  await verifyPassword(password, await dummyPasswordHash);
+  return false;
 }
 
 const RESET_MAX_ATTEMPTS = 3;
@@ -1402,12 +1470,17 @@ async function clearTotpRateLimit(userId: string) {
 
 export async function beginLogin(email: string, password: string, clientIp?: string) {
   const normalizedEmail = normalizeEmail(email);
+
+  if (!isAcceptableLoginEmail(normalizedEmail)) {
+    throw new Error("Invalid email or password.");
+  }
+
   await checkLoginRateLimit(normalizedEmail, clientIp);
 
   // ── 1. Local password ──────────────────────────────────────────────
   const store = await readAuthStore();
   const localUser = store.users.find((entry) => entry.email === normalizedEmail);
-  const localOk = localUser && (await verifyPassword(password, localUser.passwordHash));
+  const localOk = await verifyPasswordOrDummy(password, localUser?.passwordHash);
 
   let authedUser: StoredUser | undefined = localOk ? localUser : undefined;
 
@@ -1480,6 +1553,7 @@ export async function beginLogin(email: string, password: string, clientIp?: str
   }
 
   if (!authedUser) {
+    await recordLoginFailure(normalizedEmail, clientIp);
     throw new Error("Invalid email or password.");
   }
 
@@ -1589,12 +1663,18 @@ export async function completeTwoFactorLogin(code: string) {
 // Mobile login — does not set cookies; returns an encrypted challenge token if 2FA is required.
 export async function beginMobileLogin(email: string, password: string, clientIp?: string) {
   const normalizedEmail = normalizeEmail(email);
+
+  if (!isAcceptableLoginEmail(normalizedEmail)) {
+    throw new Error("Invalid email or password.");
+  }
+
   await checkLoginRateLimit(normalizedEmail, clientIp);
 
   const store = await readAuthStore();
   const user = store.users.find((entry) => entry.email === normalizedEmail);
 
-  if (!user || !(await verifyPassword(password, user.passwordHash))) {
+  if (!user || !(await verifyPasswordOrDummy(password, user.passwordHash))) {
+    await recordLoginFailure(normalizedEmail, clientIp);
     throw new Error("Invalid email or password.");
   }
 
@@ -2131,7 +2211,7 @@ export async function listManagedUsers() {
  * Clear every login-lockout bucket associated with a user.
  *
  * Login attempts are tracked under keys that are either `email` (no client
- * IP available) or `email:{ip}` (when proxy headers are trusted). An admin
+ * IP available) or `email:{ip}`. An admin
  * unlocking a user from the GUI doesn't know the offending IP set, so we
  * wipe every bucket whose key starts with their email — covering all
  * IP variants in one shot.
@@ -2158,6 +2238,10 @@ export async function clearLoginLockoutsForUser(userId: string): Promise<number>
         delete state.loginAttempts[key];
         removed += 1;
       }
+    }
+    if (state.loginEmailFailures[target.email]) {
+      delete state.loginEmailFailures[target.email];
+      removed += 1;
     }
     return removed;
   });

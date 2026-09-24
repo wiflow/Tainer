@@ -11,19 +11,19 @@ import { headers } from "next/headers";
  * any direct caller can rotate the header to mint a fresh rate-limit bucket
  * per request, defeating per-IP login lockout.
  *
- * When unset (the default) this returns `undefined`, which causes downstream
- * rate-limit keys to fall back to email-only (`email` instead of
- * `email:ip`) — slower for the attacker on a single account, no false sense
- * of per-IP isolation.
+ * Otherwise this returns the TCP peer address, which `server.mjs` writes to
+ * `x-tainer-peer-ip` on every request (overwriting any client-supplied copy).
+ * Behind an untrusted proxy that is the proxy's address.
  */
 export async function getClientIpForRateLimit(): Promise<string | undefined> {
-  if (process.env.TAINER_TRUST_PROXY_HEADERS !== "true") {
-    return undefined;
-  }
   const headerStore = await headers();
-  return (
-    headerStore.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    headerStore.get("x-real-ip")?.trim() ||
-    undefined
-  );
+  if (process.env.TAINER_TRUST_PROXY_HEADERS === "true") {
+    const forwarded =
+      headerStore.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      headerStore.get("x-real-ip")?.trim();
+    if (forwarded) {
+      return forwarded;
+    }
+  }
+  return headerStore.get("x-tainer-peer-ip")?.trim().replace(/^::ffff:/, "") || undefined;
 }
