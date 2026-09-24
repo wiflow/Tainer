@@ -112,7 +112,6 @@ registerTool({
     const node = String(args.node ?? "").trim();
     const label = String(args.label ?? "").trim() || "Copilot snapshot";
     if (!node) throw new Error("node is required.");
-    requirePermission(ctx.session, "manage-settings");
     return runInSiteWithPermission(ctx.session, siteSlug, "manage-settings", async () => {
       const snap = await takeConfigSnapshot(node, ctx.session.user.email, label, {
         trigger: "manual",
