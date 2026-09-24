@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { getCurrentSession } from "@/lib/auth";
+import { getCurrentSession, hasSiteAccess } from "@/lib/auth";
 import { withSiteConfig } from "@/lib/proxmox";
 import { resolveSiteConfigBySlug } from "@/lib/site-resolver";
 import {
@@ -24,6 +24,9 @@ export async function GET(request: NextRequest) {
 
   try {
     const config = await resolveSiteConfigBySlug(siteSlug);
+    if (!hasSiteAccess(session, config.siteId)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
     const settings = await withSiteConfig(config, () => getLoadBalancerSettings());
     return NextResponse.json(settings);
   } catch (error) {

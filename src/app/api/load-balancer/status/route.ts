@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { getCurrentSession } from "@/lib/auth";
+import { getCurrentSession, hasSiteAccess } from "@/lib/auth";
 import { getLoadBalancerStatus } from "@/lib/load-balancer/observer";
 import { resolveSiteConfigBySlug } from "@/lib/site-resolver";
 
@@ -19,8 +19,12 @@ export async function GET(request: NextRequest) {
 
   try {
     const config = await resolveSiteConfigBySlug(siteSlug);
+    if (!hasSiteAccess(session, config.siteId)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
     const status = getLoadBalancerStatus(config.siteId);
-    return NextResponse.json(status, {
+    const body = session.user.role === "admin" ? status : { ...status, lastError: null };
+    return NextResponse.json(body, {
       headers: { "Cache-Control": "no-store" },
     });
   } catch (error) {
