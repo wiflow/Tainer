@@ -7,7 +7,8 @@
     "dev": "node server.mjs",
     "build": "next build",
     "start": "NODE_ENV=production node server.mjs",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test": "node --import ./test/setup.mjs --test \"test/**/*.test.ts\""
   },
   "dependencies": {
     "@next/env": "^16.3.6",
@@ -53,6 +54,7 @@
     "esbuild": "0.28.2",
     "eslint": "^9.39.4",
     "eslint-config-next": "^16.3.6",
+    "fast-check": "^4.10.2",
     "react-icons": "^5.7.0",
     "shadcn": "^4.21.0",
     "sharp": "^0.35.4",
