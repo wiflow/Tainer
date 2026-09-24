@@ -4,10 +4,11 @@ import {
   createClusterFirewallRule,
   deleteClusterFirewallRule,
   getClusterFirewallRules,
+  withSiteConfig,
 } from "@/lib/proxmox";
-import { requirePermission } from "@/lib/auth";
+import { requireSitePermission } from "@/lib/auth";
 import { registerTool } from "@/lib/copilot/registry";
-import { runInSite, runInSiteWithPermission, siteSlugSchema } from "@/lib/copilot/tools/helpers";
+import { resolveSiteForUser, runInSite, siteSlugSchema } from "@/lib/copilot/tools/helpers";
 import {
   FIREWALL_ADDR_REGEX,
   FIREWALL_COMMENT_REGEX,
@@ -91,8 +92,10 @@ registerTool({
       rule[key] = v;
     }
 
-    requirePermission(ctx.session, "manage-settings");
-    return runInSiteWithPermission(ctx.session, siteSlug, "manage-security", async () => {
+    const config = await resolveSiteForUser(ctx.session, siteSlug);
+    requireSitePermission(ctx.session, config.siteId, "manage-settings");
+    requireSitePermission(ctx.session, config.siteId, "manage-security");
+    return withSiteConfig(config, async () => {
       await createClusterFirewallRule(rule);
       return {
         ok: true,
@@ -117,8 +120,10 @@ registerTool({
     const siteSlug = String(args.siteSlug ?? "");
     const pos = Number(args.pos);
     if (!Number.isInteger(pos) || pos < 0) throw new Error("pos must be a non-negative integer.");
-    requirePermission(ctx.session, "manage-settings");
-    return runInSiteWithPermission(ctx.session, siteSlug, "manage-security", async () => {
+    const config = await resolveSiteForUser(ctx.session, siteSlug);
+    requireSitePermission(ctx.session, config.siteId, "manage-settings");
+    requireSitePermission(ctx.session, config.siteId, "manage-security");
+    return withSiteConfig(config, async () => {
       await deleteClusterFirewallRule(pos);
       return { ok: true, message: `Firewall rule at position ${pos} deleted.` };
     });
