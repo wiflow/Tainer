@@ -29,6 +29,7 @@ import type {
 
 // Hard ceilings — defense in depth on top of the configured daily budgets.
 const MAX_TOOL_CALLS_PER_TURN = 15;
+const MAX_ROUNDS_PER_TURN = 8;
 const MAX_TOKENS_PER_RESPONSE = 4096;
 
 // Burst protection: daily budgets alone let a user (or a stolen session)
@@ -173,6 +174,7 @@ export async function* runCopilotTurn(
   ];
 
   let toolCallsThisTurn = 0;
+  let rounds = 0;
   let inputTokensAccum = 0;
   let outputTokensAccum = 0;
   let externalContentSeen = historyHasExternalContent(input.messages);
@@ -193,6 +195,28 @@ export async function* runCopilotTurn(
         };
         break;
       }
+      if (rounds >= MAX_ROUNDS_PER_TURN) {
+        yield {
+          type: "error",
+          message: `Reached the per-turn round limit (${MAX_ROUNDS_PER_TURN}). Refine the question.`,
+        };
+        break;
+      }
+      if (inputTokensAccum + outputTokensAccum >= usage.tokensRemaining) {
+        yield {
+          type: "error",
+          message: `Daily token budget exhausted (${usage.tokenBudget}). Resets at 00:00 UTC.`,
+        };
+        break;
+      }
+      if (toolCallsThisTurn >= usage.toolCallsRemaining) {
+        yield {
+          type: "error",
+          message: `Daily tool-call budget exhausted (${usage.toolCallBudget}). Resets at 00:00 UTC.`,
+        };
+        break;
+      }
+      rounds++;
 
       // Stream the model response token-by-token. Content deltas run through
       // the think-tag splitter so inline <think> blocks stream as reasoning
@@ -229,7 +253,10 @@ export async function* runCopilotTurn(
           const { value, done } = await stream.next();
           if (done) {
             splitter.flush();
-            toolCalls = value.toolCalls;
+            toolCalls = value.toolCalls.slice(
+              0,
+              Math.min(MAX_TOOL_CALLS_PER_TURN, usage.toolCallsRemaining) - toolCallsThisTurn,
+            );
             finishReason = value.finishReason;
             inputTokensAccum += value.usage?.prompt_tokens ?? 0;
             outputTokensAccum += value.usage?.completion_tokens ?? 0;
@@ -299,6 +326,7 @@ export async function* runCopilotTurn(
 
         const tool = getTool(tc.function.name);
         if (!tool) {
+          toolCallsThisTurn++;
           toolResults.push(emitError(`Unknown tool: ${tc.function.name}`));
           yield {
             type: "tool_result",
@@ -322,6 +350,7 @@ export async function* runCopilotTurn(
           args = parsed as Record<string, unknown>;
         } catch {
           const message = `Malformed JSON arguments for ${tc.function.name}.`;
+          toolCallsThisTurn++;
           toolResults.push(emitError(message));
           yield {
             type: "tool_result",
@@ -346,6 +375,7 @@ export async function* runCopilotTurn(
               outcome: "denied",
               detail: "Blocked by group tool policy",
             });
+            toolCallsThisTurn++;
             toolResults.push(emitError(message));
             yield {
               type: "tool_result",
@@ -361,6 +391,7 @@ export async function* runCopilotTurn(
             const message =
               "Multiple gated tool calls in a single turn aren't allowed. " +
               "Approve the first and ask the assistant to re-issue this one.";
+            toolCallsThisTurn++;
             toolResults.push(emitError(message));
             yield {
               type: "tool_result",
@@ -378,10 +409,10 @@ export async function* runCopilotTurn(
         }
 
         const startedAt = Date.now();
+        toolCallsThisTurn++;
         yield { type: "tool_call_started", toolCallId: tc.id, name: tc.function.name, args };
         try {
           const result = await tool.execute(args, { session, via: "copilot" });
-          toolCallsThisTurn++;
           const resultJson = JSON.stringify(result ?? null);
           if (tool.returnsExternalContent) externalContentSeen = true;
           toolResults.push({
