@@ -230,17 +230,16 @@ export async function pullOciTemplateAction(
     const reference = buildDockerOciReference(namespace, repository, tag);
     const fileName = buildOciTemplateFileName(namespace, repository, tag);
     const fileNames = buildOciTemplateFileNameAliases(namespace, repository, tag);
-    const cacheEnvPromise = cacheDockerHubImageEnv({
-      aliases: buildProxmoxTemplateAliases(storage, fileNames),
-      namespace,
-      reference,
-      repository,
-      tag,
-    });
 
     try {
       const upid = await pullOciRegistryTemplate(node, storage, reference);
-      await cacheEnvPromise;
+      await cacheDockerHubImageEnv({
+        aliases: buildProxmoxTemplateAliases(storage, fileNames),
+        namespace,
+        reference,
+        repository,
+        tag,
+      });
 
       revalidatePath(`/sites/${siteSlug}/templates`);
       revalidatePath(`/sites/${siteSlug}/images/${namespace}/${repository}`);
@@ -262,7 +261,6 @@ export async function pullOciTemplateAction(
       const message = error instanceof Error ? error.message : "Failed to pull OCI template.";
 
       if (message.includes("refusing to override existing file")) {
-        await cacheEnvPromise;
         revalidatePath(`/sites/${siteSlug}/templates`);
         revalidatePath(`/sites/${siteSlug}/images/${namespace}/${repository}`);
 
@@ -403,19 +401,18 @@ export async function pullCustomRegistryAction(
           dockerHubReference.tag,
         )
       : [fileName];
-    const cacheEnvPromise = dockerHubReference
-      ? cacheDockerHubImageEnv({
+
+    try {
+      const upid = await pullOciRegistryTemplate(node, storage, reference);
+      if (dockerHubReference) {
+        await cacheDockerHubImageEnv({
           aliases: buildProxmoxTemplateAliases(storage, [...dockerHubFileNames, fileName]),
           namespace: dockerHubReference.namespace,
           reference,
           repository: dockerHubReference.repository,
           tag: dockerHubReference.tag,
-        })
-      : Promise.resolve();
-
-    try {
-      const upid = await pullOciRegistryTemplate(node, storage, reference);
-      await cacheEnvPromise;
+        });
+      }
 
       revalidatePath(`/sites/${siteSlug}/templates`);
       revalidatePath(`/sites/${siteSlug}/images`);
@@ -437,7 +434,6 @@ export async function pullCustomRegistryAction(
       const message = error instanceof Error ? error.message : "Failed to pull image.";
 
       if (message.includes("refusing to override existing file")) {
-        await cacheEnvPromise;
         revalidatePath(`/sites/${siteSlug}/templates`);
 
         return {
