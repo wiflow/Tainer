@@ -4,24 +4,10 @@ import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 
 import { recordAdminAudit } from "@/lib/admin-audit-log";
-import type { ActionStatus } from "@/lib/action-states";
+import type { ApiTokenActionState } from "@/app/api-token-action-states";
 import { createApiToken, revokeApiToken } from "@/lib/api-tokens";
 import { requireAdminSession } from "@/lib/auth";
 import { SITE_PERMISSIONS, type Permission } from "@/lib/permissions";
-
-export type ApiTokenActionState = {
-  message: string;
-  requestId: string;
-  status: ActionStatus;
-  createdToken: string | null;
-};
-
-export const initialApiTokenActionState: ApiTokenActionState = {
-  message: "",
-  requestId: "",
-  status: "idle",
-  createdToken: null,
-};
 
 function errorState(message: string): ApiTokenActionState {
   return { message, requestId: randomUUID(), status: "error", createdToken: null };
