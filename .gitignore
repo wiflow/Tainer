@@ -28,3 +28,4 @@ docs/slides/slide-*.jpg
 mobile/
 
 *.tsbuildinfo
+public/maplibre/

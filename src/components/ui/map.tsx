@@ -21,6 +21,9 @@ import { X, Minus, Plus, Locate, Maximize, Loader2 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
+// The bundler cannot follow maplibre's runtime worker URL, so the build copies the worker into public/.
+MapLibreGL.setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
+
 const defaultStyles = {
   dark: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
   light: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",

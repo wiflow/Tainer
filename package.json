@@ -4,11 +4,14 @@
   "private": true,
   "license": "AGPL-3.0-only",
   "scripts": {
+    "predev": "npm run copy-map-worker",
     "dev": "node server.mjs",
+    "prebuild": "npm run copy-map-worker",
     "build": "next build",
     "start": "NODE_ENV=production node server.mjs",
     "lint": "eslint .",
-    "test": "node --import ./test/setup.mjs --test \"test/**/*.test.ts\""
+    "test": "node --import ./test/setup.mjs --test \"test/**/*.test.ts\"",
+    "copy-map-worker": "node -e \"const fs=require('fs');fs.mkdirSync('public/maplibre',{recursive:true});for(const f of ['maplibre-gl-worker.mjs','maplibre-gl-shared.mjs'])fs.copyFileSync('node_modules/maplibre-gl/dist/'+f,'public/maplibre/'+f)\""
   },
   "dependencies": {
     "@next/env": "^16.3.6",
