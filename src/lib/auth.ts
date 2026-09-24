@@ -137,6 +137,7 @@ type UsedTotpTracker = Record<string, Record<string, number>>;
 type AuthSecurityState = {
   loginAttempts: RateLimitTracker;
   resetAttempts: RateLimitTracker;
+  resetIpAttempts: RateLimitTracker;
   totpAttempts: RateLimitTracker;
   usedChallengeNonces: Record<string, number>;
   usedTotpCodes: UsedTotpTracker;
@@ -205,6 +206,7 @@ function defaultAuthSecurityState(): AuthSecurityState {
   return {
     loginAttempts: {},
     resetAttempts: {},
+    resetIpAttempts: {},
     totpAttempts: {},
     usedChallengeNonces: {},
     usedTotpCodes: {},
@@ -217,6 +219,13 @@ function normalizeEmail(value: string) {
 
 function isValidEmail(value: string) {
   return /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/.test(value);
+}
+
+const MAX_EMAIL_LENGTH = 254;
+
+export function isAcceptableLoginEmail(value: string) {
+  const normalized = normalizeEmail(value);
+  return normalized.length <= MAX_EMAIL_LENGTH && isValidEmail(normalized);
 }
 
 function nowIso() {
@@ -465,6 +474,7 @@ async function readAuthSecurityState(): Promise<AuthSecurityState> {
       return {
         loginAttempts: sanitizeRateLimitTracker(state.loginAttempts),
         resetAttempts: sanitizeRateLimitTracker(state.resetAttempts),
+        resetIpAttempts: sanitizeRateLimitTracker(state.resetIpAttempts),
         totpAttempts: sanitizeRateLimitTracker(state.totpAttempts),
         usedChallengeNonces: isStringNumberRecord(state.usedChallengeNonces)
           ? state.usedChallengeNonces
@@ -1223,13 +1233,18 @@ function pruneUsedChallengeNonces(usedChallengeNonces: Record<string, number>) {
 function pruneAuthSecurityState(state: AuthSecurityState) {
   pruneRateLimitTracker(state.loginAttempts, LOGIN_WINDOW_MS);
   pruneRateLimitTracker(state.resetAttempts, RESET_WINDOW_MS);
+  pruneRateLimitTracker(state.resetIpAttempts, RESET_WINDOW_MS);
   pruneRateLimitTracker(state.totpAttempts, TOTP_WINDOW_MS);
   pruneUsedTotpCodes(state.usedTotpCodes);
   pruneUsedChallengeNonces(state.usedChallengeNonces);
 }
 
+type RateLimitTrackerName = {
+  [K in keyof AuthSecurityState]: AuthSecurityState[K] extends RateLimitTracker ? K : never;
+}[keyof AuthSecurityState];
+
 async function checkRateLimit(
-  tracker: keyof Pick<AuthSecurityState, "loginAttempts" | "resetAttempts" | "totpAttempts">,
+  tracker: RateLimitTrackerName,
   key: string,
   maxAttempts: number,
   windowMs: number,
@@ -1259,7 +1274,7 @@ async function checkRateLimit(
 }
 
 async function clearRateLimit(
-  tracker: keyof Pick<AuthSecurityState, "loginAttempts" | "resetAttempts" | "totpAttempts">,
+  tracker: RateLimitTrackerName,
   key: string,
 ) {
   await mutateAuthSecurityState((state) => {
@@ -1343,10 +1358,21 @@ async function clearLoginRateLimit(email: string, clientIp?: string) {
 }
 
 const RESET_MAX_ATTEMPTS = 3;
+const RESET_IP_MAX_ATTEMPTS = 20;
 const RESET_WINDOW_MS = 15 * 60_000;
 
-async function checkResetRateLimit(email: string) {
+async function checkResetRateLimit(email: string, clientIp?: string) {
   const normalized = email.toLowerCase().trim();
+
+  if (clientIp) {
+    await checkRateLimit(
+      "resetIpAttempts",
+      clientIp,
+      RESET_IP_MAX_ATTEMPTS,
+      RESET_WINDOW_MS,
+      "Too many password reset requests. Try again later.",
+    );
+  }
 
   await checkRateLimit(
     "resetAttempts",
@@ -2365,13 +2391,22 @@ export async function disableTwoFactor(input: { currentPassword: string }) {
   await clearGuestShellStepUpCookie();
 }
 
-export async function createPasswordReset(email: string, origin: string) {
+export async function createPasswordReset(
+  email: string,
+  origin: string,
+  options: { clientIp?: string; waitForDelivery?: boolean } = {},
+) {
   const normalizedEmail = normalizeEmail(email);
-  await checkResetRateLimit(normalizedEmail);
 
   if (!normalizedEmail) {
     throw new Error("Enter the email address for your account.");
   }
+
+  if (!isAcceptableLoginEmail(normalizedEmail)) {
+    throw new Error("Enter a valid email address.");
+  }
+
+  await checkResetRateLimit(normalizedEmail, options.clientIp);
 
   const resetToken = randomBytes(32).toString("base64url");
   const tokenHash = hashOpaqueValue(resetToken);
@@ -2400,19 +2435,35 @@ export async function createPasswordReset(email: string, origin: string) {
   });
 
   if (!targetUserEmail) {
-    // Perform a dummy scrypt hash to equalize response timing regardless of
-    // whether the user exists, preventing user-enumeration via timing attacks.
-    await scrypt("dummy", randomBytes(16), 64, SCRYPT_PARAMS);
     return {
-      delivery: "unavailable" as const,
+      delivery: "queued" as const,
     };
   }
 
+  const { recordAdminAudit } = await import("@/lib/admin-audit-log");
+  recordAdminAudit({
+    action: "password-reset-requested",
+    actorEmail: targetUserEmail,
+    actorName: targetUserName,
+    message: options.clientIp ? `Password reset requested from ${options.clientIp}` : "Password reset requested",
+    targetEmail: targetUserEmail,
+  }).catch(() => {});
+
   const link = `${origin.replace(/\/$/, "")}/reset-password?token=${encodeURIComponent(resetToken)}`;
-  const sent = await sendPasswordResetEmail(targetUserEmail, targetUserName, link);
+  const delivery = sendPasswordResetEmail(targetUserEmail, targetUserName, link);
+
+  // Waiting for SMTP would make known accounts measurably slower than unknown ones.
+  if (!options.waitForDelivery) {
+    delivery.catch((error) => {
+      console.error("[auth] Failed to send password reset email:", error);
+    });
+    return {
+      delivery: "queued" as const,
+    };
+  }
 
   return {
-    delivery: sent ? ("email" as const) : ("file" as const),
+    delivery: (await delivery) ? ("email" as const) : ("log" as const),
   };
 }
 
@@ -2442,7 +2493,7 @@ export async function validatePasswordResetToken(token: string) {
 export async function resetPasswordWithToken(token: string, nextPassword: string) {
   const tokenHash = hashOpaqueValue(token.trim());
 
-  await mutateAuthStore(async (store) => {
+  const resetUser = await mutateAuthStore(async (store) => {
     const reset = store.passwordResets.find(
       (entry) =>
         timingSafeHashEqual(entry.tokenHash, tokenHash) &&
@@ -2461,25 +2512,15 @@ export async function resetPasswordWithToken(token: string, nextPassword: string
     }
 
     const timestamp = nowIso();
-    const had2fa = !!user.twoFactorSecret;
     user.passwordHash = await hashPassword(nextPassword);
     user.passwordUpdatedAt = timestamp;
     user.updatedAt = timestamp;
 
-    // Revoke 2FA on password reset to prevent bypass attacks. Users who
-    // had 2FA enabled must re-enroll after resetting their password.
-    if (had2fa) {
-      user.pendingTwoFactorSecret = null;
-      user.twoFactorRecoveryCodeHashes = [];
-      user.twoFactorSecret = null;
-      user.twoFactorUpdatedAt = timestamp;
-      console.warn(
-        `[auth] Password reset completed for user ${user.email} who had 2FA enabled. ` +
-        `2FA has been revoked — user must re-enroll. All sessions revoked.`,
-      );
+    for (const entry of store.passwordResets) {
+      if (entry.userId === user.id) {
+        entry.usedAt = timestamp;
+      }
     }
-
-    reset.usedAt = timestamp;
     store.sessions = store.sessions.map((entry) =>
       entry.userId === user.id
         ? {
@@ -2488,11 +2529,19 @@ export async function resetPasswordWithToken(token: string, nextPassword: string
           }
         : entry,
     );
+
+    return {
+      email: user.email,
+      hasTwoFactor: Boolean(user.twoFactorSecret),
+      name: user.name,
+    };
   });
 
   await clearSessionCookie();
   await clearLoginChallengeCookie();
   await clearGuestShellStepUpCookie();
+
+  return resetUser;
 }
 
 export async function getAccountSettings() {

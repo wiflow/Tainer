@@ -297,13 +297,13 @@ export async function requestPasswordResetAction(
       return errorState(_previousState, "Enter the email address for your account.");
     }
 
-    const delivery = await createPasswordReset(email, await getAppOrigin());
+    await createPasswordReset(email, await getAppOrigin(), {
+      clientIp: await getClientIpForRateLimit(),
+    });
 
     return {
       message:
-        delivery.delivery === "email"
-          ? "If that account exists, a password reset email has been sent."
-          : "If that account exists, a password reset link has been written to the server logs. Ask your server administrator to retrieve it from the Tainer container output.",
+        "If that account exists, a reset link is on its way. If email is not set up on this server, ask your administrator for the link in the server logs.",
       requestId: randomUUID(),
       status: "success",
     };
@@ -332,7 +332,17 @@ export async function resetPasswordAction(
       return errorState(_previousState, "Passwords do not match.");
     }
 
-    await resetPasswordWithToken(token, password);
+    const user = await resetPasswordWithToken(token, password);
+
+    recordAdminAudit({
+      action: "password-reset-completed",
+      actorEmail: user.email,
+      actorName: user.name,
+      message: user.hasTwoFactor
+        ? "Password reset with a reset link, 2FA still required"
+        : "Password reset with a reset link",
+      targetEmail: user.email,
+    }).catch(() => {});
   } catch (error) {
     return errorState(
       _previousState,
@@ -571,13 +581,16 @@ export async function requestPasswordResetFromAccountAction(
       return errorState(previousState, "Authentication required.");
     }
 
-    const delivery = await createPasswordReset(session.user.email, await getAppOrigin());
+    const delivery = await createPasswordReset(session.user.email, await getAppOrigin(), {
+      clientIp: await getClientIpForRateLimit(),
+      waitForDelivery: true,
+    });
 
     return {
       message:
         delivery.delivery === "email"
           ? "Password reset email sent."
-          : "Password reset link saved to password-reset-debug.json in the data directory.",
+          : "Password reset link written to the server logs.",
       requestId: randomUUID(),
       status: "success",
     };
