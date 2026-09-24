@@ -398,14 +398,13 @@ async function proxmoxTicketRequest(config, endpoint, { method = "GET", params }
 const pveAuthCacheMap = new Map();
 
 async function proxmoxPasswordLogin(config) {
-  const cacheKey = config.siteId || "__env__";
+  const username = config.username || process.env.PROXMOX_USERNAME?.trim();
+  const password = config.password || process.env.PROXMOX_PASSWORD?.trim();
+  const cacheKey = [config.siteId || "__env__", config.url, username, config.tlsInsecure ? "1" : "0"].join("::");
   const cached = pveAuthCacheMap.get(cacheKey);
   if (cached && cached.expiresAt > Date.now() + 5 * 60_000) {
     return cached;
   }
-
-  const username = config.username || process.env.PROXMOX_USERNAME?.trim();
-  const password = config.password || process.env.PROXMOX_PASSWORD?.trim();
 
   if (!username || !password) {
     throw new Error(
@@ -450,6 +449,10 @@ async function proxmoxPasswordLogin(config) {
               csrfToken: parsed.data.CSRFPreventionToken || "",
               expiresAt: Date.now() + 2 * 60 * 60_000, // 2h, matches PVE ticket lifetime
             };
+            const sitePrefix = `${config.siteId || "__env__"}::`;
+            for (const key of pveAuthCacheMap.keys()) {
+              if (key.startsWith(sitePrefix)) pveAuthCacheMap.delete(key);
+            }
             pveAuthCacheMap.set(cacheKey, result);
             resolve(result);
           } catch {

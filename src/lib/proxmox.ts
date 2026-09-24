@@ -942,7 +942,7 @@ const TASK_PROGRESS_HINTS: Record<string, number> = {
 // Per-site TLS options cache — avoids re-running AIA fetch + CA bundle
 // construction on every request. Corporate setups often have an internal root CA
 // AND need AIA intermediates; we combine both into one trust store.
-const tlsOptionsCache = new Map<string, { result: { rejectUnauthorized: boolean; ca?: string[] }; expiresAt: number }>();
+const tlsOptionsCache = new Map<string, { result: { rejectUnauthorized: boolean; ca?: string[] }; expiresAt: number; connectionKey: string }>();
 const tlsOptionsInflight = new Map<string, Promise<{ rejectUnauthorized: boolean; ca?: string[] }>>();
 const TLS_OPTIONS_CACHE_TTL_MS = 30 * 60_000; // 30 minutes
 
@@ -1004,6 +1004,16 @@ function getHttpAgent(siteId: string): http.Agent {
   return agent;
 }
 
+function getSiteConnectionKey(config: ResolvedSiteConfig) {
+  return JSON.stringify([
+    config.apiUrl,
+    config.username,
+    config.tlsInsecure,
+    config.tlsFingerprint,
+    config.tlsCustomCaPem,
+  ]);
+}
+
 async function buildTlsOptions(
   config: ResolvedSiteConfig,
 ): Promise<{ rejectUnauthorized: boolean; ca?: string[] }> {
@@ -1011,24 +1021,29 @@ async function buildTlsOptions(
     return { rejectUnauthorized: false };
   }
 
-  const cacheKey = config.siteId;
-  const cached = tlsOptionsCache.get(cacheKey);
-  if (cached && cached.expiresAt > Date.now()) {
+  const connectionKey = getSiteConnectionKey(config);
+  const cached = tlsOptionsCache.get(config.siteId);
+  if (cached && cached.connectionKey === connectionKey && cached.expiresAt > Date.now()) {
     return cached.result;
   }
 
-  const existing = tlsOptionsInflight.get(cacheKey);
+  const inflightKey = `${config.siteId}\n${connectionKey}`;
+  const existing = tlsOptionsInflight.get(inflightKey);
   if (existing) return existing;
 
   const promise = buildTlsOptionsUncached(config);
-  tlsOptionsInflight.set(cacheKey, promise);
+  tlsOptionsInflight.set(inflightKey, promise);
 
   try {
     const result = await promise;
-    tlsOptionsCache.set(cacheKey, { result, expiresAt: Date.now() + TLS_OPTIONS_CACHE_TTL_MS });
+    tlsOptionsCache.set(config.siteId, {
+      result,
+      expiresAt: Date.now() + TLS_OPTIONS_CACHE_TTL_MS,
+      connectionKey,
+    });
     return result;
   } finally {
-    tlsOptionsInflight.delete(cacheKey);
+    tlsOptionsInflight.delete(inflightKey);
   }
 }
 
@@ -1074,18 +1089,20 @@ async function buildTlsOptionsUncached(
 }
 
 type PveTicket = { ticket: string; csrfToken: string; expiresAt: number };
-const pveTicketCache = new Map<string, PveTicket>();
+const pveTicketCache = new Map<string, PveTicket & { connectionKey: string }>();
 const pveTicketInflight = new Map<string, Promise<PveTicket>>();
 
 export async function getPveTicket(config: ResolvedSiteConfig): Promise<PveTicket> {
   const cacheKey = config.siteId;
+  const connectionKey = getSiteConnectionKey(config);
   const cached = pveTicketCache.get(cacheKey);
   // Return cached ticket if still valid (with 5-min safety buffer)
-  if (cached && cached.expiresAt > Date.now() + 5 * 60_000) {
+  if (cached && cached.connectionKey === connectionKey && cached.expiresAt > Date.now() + 5 * 60_000) {
     return cached;
   }
 
-  const existing = pveTicketInflight.get(cacheKey);
+  const inflightKey = `${cacheKey}\n${connectionKey}`;
+  const existing = pveTicketInflight.get(inflightKey);
   if (existing) return existing;
 
   const promise = (async (): Promise<PveTicket> => {
@@ -1144,15 +1161,15 @@ export async function getPveTicket(config: ResolvedSiteConfig): Promise<PveTicke
       csrfToken: data.CSRFPreventionToken || "",
       expiresAt: Date.now() + 2 * 60 * 60_000, // tickets are valid for 2h
     };
-    pveTicketCache.set(cacheKey, result);
+    pveTicketCache.set(cacheKey, { ...result, connectionKey });
     return result;
   })();
 
-  pveTicketInflight.set(cacheKey, promise);
+  pveTicketInflight.set(inflightKey, promise);
   try {
     return await promise;
   } finally {
-    pveTicketInflight.delete(cacheKey);
+    pveTicketInflight.delete(inflightKey);
   }
 }
 
