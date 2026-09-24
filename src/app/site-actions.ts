@@ -11,6 +11,7 @@ import {
 } from "@/lib/auth";
 import type { BasicActionState } from "@/lib/action-states";
 import { geocodeAddress } from "@/lib/geocode";
+import { resetSiteConnection } from "@/lib/proxmox";
 import { resolveSiteConfigBySlug } from "@/lib/site-resolver";
 import {
   createSite,
@@ -18,6 +19,7 @@ import {
   disableSite,
   enableSite,
   findOverlappingSite,
+  getSiteById,
   setDefaultSite,
   updateSite,
   updateSiteValidation,
@@ -378,6 +380,25 @@ export async function updateSiteAction(
       return errorState(_previousState, "Missing site ID.");
     }
 
+    const existing = await getSiteById(siteId);
+    if (!existing) {
+      return errorState(_previousState, "Site not found.");
+    }
+
+    const normalizePem = (pem: string | null | undefined) => (pem ?? "").replace(/\r\n/g, "\n").trim();
+    const connectionChanged =
+      (apiUrl !== "" && apiUrl.replace(/\/+$/, "") !== existing.payload.apiUrl) ||
+      (username !== "" && username !== existing.payload.username) ||
+      tlsMode !== existing.payload.tlsMode ||
+      normalizePem(tlsCustomCaPem) !== normalizePem(existing.payload.tlsCustomCaPem);
+
+    if (connectionChanged && !pvePassword) {
+      return errorState(
+        _previousState,
+        "Re-enter the Proxmox password to change the API URL, username, TLS or CA settings.",
+      );
+    }
+
     const addressRaw = String(formData.get("address") ?? "").trim();
 
     const updates: Record<string, unknown> = {};
@@ -418,6 +439,10 @@ export async function updateSiteAction(
 
     if (!result) {
       return errorState(_previousState, "Site not found.");
+    }
+
+    if (connectionChanged || pvePassword) {
+      resetSiteConnection(siteId);
     }
 
     revalidatePath("/sites");

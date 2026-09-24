@@ -152,6 +152,9 @@ function EditSiteForm({ site, onClose }: { site: SiteInfo; onClose: () => void }
             <input className={inputClassName} name="password" type="password" placeholder="Unchanged" />
           </label>
         </div>
+        <p className="text-[10.5px] text-zinc-500">
+          Changing the API URL, username, TLS or CA settings requires the password.
+        </p>
 
         <label className="block">
           <span className="flex items-center gap-1.5 text-[11px] font-medium text-zinc-500">

@@ -1160,6 +1160,15 @@ function clearPveTicket(siteId: string) {
   pveTicketCache.delete(siteId);
 }
 
+export function resetSiteConnection(siteId: string) {
+  pveTicketCache.delete(siteId);
+  tlsOptionsCache.delete(siteId);
+  httpsAgentCache.get(siteId)?.agent.destroy();
+  httpsAgentCache.delete(siteId);
+  httpAgentCache.get(siteId)?.destroy();
+  httpAgentCache.delete(siteId);
+}
+
 async function proxmoxRequest<T>(endpoint: string, options: RequestOptions = {}) {
   const config = getActiveSiteConfig();
 
