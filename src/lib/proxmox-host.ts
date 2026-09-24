@@ -161,7 +161,7 @@ async function resolveNodeIp(node: string): Promise<string> {
   });
 }
 
-async function getHostKeyOptions() {
+export async function getHostKeyOptions() {
   const config = getActiveSiteConfig();
   const policy = config.sshHostKeyPolicy || "strict";
 
