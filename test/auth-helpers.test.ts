@@ -64,6 +64,10 @@ test("OIDC flow cookie round-trips and rejects any changed character", async () 
       const tampered = cookie.slice(0, i) + ch + cookie.slice(i + 1);
       assert.equal(await oidcFlowCookieHelpers.verify(tampered), null);
       assert.equal(await oidcFlowCookieHelpers.verify(`${cookie}.x`), null);
+      const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+      const reencoded = cookie.slice(0, -1) + alphabet[alphabet.indexOf(cookie.at(-1)!) ^ 1];
+      assert.deepEqual(Buffer.from(reencoded.split(".")[1], "base64url"), Buffer.from(cookie.split(".")[1], "base64url"));
+      assert.equal(await oidcFlowCookieHelpers.verify(reencoded), null);
     }),
   );
 });
