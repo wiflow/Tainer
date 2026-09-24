@@ -10,6 +10,7 @@ import { MetricCard } from "@/components/ui/metric-card";
 import { SectionPanel } from "@/components/ui/section-panel";
 import { requirePermission, requireSession } from "@/lib/auth";
 import { withSiteConfig } from "@/lib/proxmox";
+import { requireSitePageAccess } from "@/lib/page-guard";
 import { ensureSiteConfig } from "@/lib/site-context";
 import { getClusterUpdates, type NodeUpdateSummary } from "@/lib/update-manager";
 import { CheckForUpdatesButton, RefreshAptButton, UpgradeNodeButton } from "./refresh-apt-button";
@@ -99,6 +100,7 @@ export default async function UpdatesPage({
   params: Promise<{ siteSlug: string }>;
 }) {
   const { siteSlug } = await params;
+  await requireSitePageAccess(siteSlug);
   const siteConfig = await ensureSiteConfig(siteSlug);
 
   const session = await requireSession();

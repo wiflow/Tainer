@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { getDockerHubRepositoryDetail } from "@/lib/docker-hub";
 import { matchesOciTemplateFileName } from "@/lib/oci-template";
 import { getTemplateLibraryIndex, withSiteConfig } from "@/lib/proxmox";
+import { requireSitePageAccess } from "@/lib/page-guard";
 import { ensureSiteConfig } from "@/lib/site-context";
 import { cn, truncateMiddle } from "@/lib/utils";
 
@@ -25,6 +26,7 @@ type ImageDetailPageProps = {
 
 export default async function ImageDetailPage({ params }: ImageDetailPageProps) {
   const { siteSlug, namespace, repository } = await params;
+  await requireSitePageAccess(siteSlug);
   const siteConfig = await ensureSiteConfig(siteSlug);
 
   const [detail, templateIndex] = await withSiteConfig(siteConfig, () =>

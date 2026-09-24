@@ -20,6 +20,7 @@ import {
   getStorageConfig,
   withSiteConfig,
 } from "@/lib/proxmox";
+import { requireSitePageAccess } from "@/lib/page-guard";
 import { ensureSiteConfig } from "@/lib/site-context";
 
 import { RestoreForm } from "./restore-form";
@@ -62,6 +63,7 @@ export default async function RestoreSnapshotPage({
   searchParams: Promise<{ id?: string }>;
 }) {
   const { siteSlug } = await params;
+  await requireSitePageAccess(siteSlug);
   const { id } = await searchParams;
   if (!id) notFound();
 

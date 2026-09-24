@@ -10,6 +10,7 @@ import { requirePermission, requireSession } from "@/lib/auth";
 import { listConfigSnapshotPolicies } from "@/lib/config-snapshot-policies";
 import { listConfigSnapshots, compareConfigSnapshots, getConfigSnapshot } from "@/lib/node-config-backup";
 import { getNodes, withSiteConfig } from "@/lib/proxmox";
+import { requireSitePageAccess } from "@/lib/page-guard";
 import { ensureSiteConfig } from "@/lib/site-context";
 import { ConfigSnapshotSchedules } from "./config-snapshot-schedules";
 import { NodeConfigSnapshots } from "./node-config-snapshots";
@@ -24,6 +25,7 @@ export default async function NodeConfigsPage({
   searchParams: Promise<{ compare_a?: string; compare_b?: string }>;
 }) {
   const { siteSlug } = await params;
+  await requireSitePageAccess(siteSlug);
   const siteConfig = await ensureSiteConfig(siteSlug);
 
   const session = await requireSession();

@@ -5,6 +5,7 @@ import { VmTemplateCreateForm } from "@/components/vm-template-create-form";
 import { ProxmoxIssues } from "@/components/proxmox-issues";
 import { buttonVariants } from "@/components/ui/button";
 import { getDiskStorageTargets, getNodes, listIsoImages, withSiteConfig } from "@/lib/proxmox";
+import { requireSitePageAccess } from "@/lib/page-guard";
 import { ensureSiteConfig } from "@/lib/site-context";
 import { cn } from "@/lib/utils";
 
@@ -16,6 +17,7 @@ export default async function CreateVmTemplatePage({
   params: Promise<{ siteSlug: string }>;
 }) {
   const { siteSlug } = await params;
+  await requireSitePageAccess(siteSlug);
   const siteConfig = await ensureSiteConfig(siteSlug);
 
   const { nodes, metrics, isoResult, diskResult } = await withSiteConfig(siteConfig, async () => {

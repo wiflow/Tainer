@@ -3,6 +3,7 @@ import { ArrowLeft, Box, Play, Square } from "lucide-react";
 import { notFound } from "next/navigation";
 import { unstable_cache } from "next/cache";
 
+import { requireSitePageAccess } from "@/lib/page-guard";
 import { ensureSiteConfig } from "@/lib/site-context";
 import { resolveSiteConfigBySlug } from "@/lib/site-resolver";
 
@@ -42,6 +43,7 @@ type TagDetailPageProps = {
 
 export default async function TagDetailPage({ params }: TagDetailPageProps) {
   const { siteSlug, slug } = await params;
+  await requireSitePageAccess(siteSlug);
   await ensureSiteConfig(siteSlug);
 
   const [tag, allTags, { deployments }] = await getTagDetailData(siteSlug, slug);

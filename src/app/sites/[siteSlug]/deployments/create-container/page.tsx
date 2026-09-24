@@ -5,6 +5,7 @@ import { ContainerImagePicker } from "@/components/container-image-picker";
 import { ProxmoxIssues } from "@/components/proxmox-issues";
 import { buttonVariants } from "@/components/ui/button";
 import { getTemplateInventory, withSiteConfig } from "@/lib/proxmox";
+import { requireSitePageAccess } from "@/lib/page-guard";
 import { ensureSiteConfig } from "@/lib/site-context";
 import { cn } from "@/lib/utils";
 
@@ -16,6 +17,7 @@ export default async function CreateContainerPage({
   params: Promise<{ siteSlug: string }>;
 }) {
   const { siteSlug } = await params;
+  await requireSitePageAccess(siteSlug);
   const siteConfig = await ensureSiteConfig(siteSlug);
 
   const { issues, templates } = await withSiteConfig(siteConfig, () =>

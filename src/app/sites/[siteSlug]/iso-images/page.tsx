@@ -7,6 +7,7 @@ import { MetricCard } from "@/components/ui/metric-card";
 import { SectionPanel } from "@/components/ui/section-panel";
 import { isIsoLibraryConfigured, listLocalIsoFiles } from "@/lib/iso-library";
 import { getIsoStorageTargets, getNodes, listIsoImages, withSiteConfig } from "@/lib/proxmox";
+import { requireSitePageAccess } from "@/lib/page-guard";
 import { ensureSiteConfig } from "@/lib/site-context";
 import { resolveSiteConfigBySlug } from "@/lib/site-resolver";
 
@@ -41,6 +42,7 @@ export default async function IsoImagesPage({
   params: Promise<{ siteSlug: string }>;
 }) {
   const { siteSlug } = await params;
+  await requireSitePageAccess(siteSlug);
   await ensureSiteConfig(siteSlug);
 
   const { isoResult, isoTargetResult, localFiles, nodes } =

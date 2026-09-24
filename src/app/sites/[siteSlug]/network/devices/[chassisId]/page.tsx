@@ -19,6 +19,7 @@ import {
 } from "@/lib/lldp-snapshots";
 import { getSnmpSnapshotForChassis } from "@/lib/lldp-snmp-snapshots";
 import type { LldpDevice } from "@/lib/lldp-types";
+import { requireSitePageAccess } from "@/lib/page-guard";
 import { ensureSiteConfig } from "@/lib/site-context";
 
 export const dynamic = "force-dynamic";
@@ -29,6 +30,7 @@ export default async function DeviceDetailPage({
   params: Promise<{ siteSlug: string; chassisId: string }>;
 }) {
   const { siteSlug, chassisId: chassisIdRaw } = await params;
+  await requireSitePageAccess(siteSlug);
   const chassisId = decodeURIComponent(chassisIdRaw);
 
   const siteConfig = await ensureSiteConfig(siteSlug);

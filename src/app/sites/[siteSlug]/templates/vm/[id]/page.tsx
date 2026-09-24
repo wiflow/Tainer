@@ -8,6 +8,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getSuggestedNode } from "@/lib/load-balancer";
 import { getDiskStorageTargets, getNextId, getNodes, listIsoImages, withSiteConfig } from "@/lib/proxmox";
+import { requireSitePageAccess } from "@/lib/page-guard";
 import { ensureSiteConfig } from "@/lib/site-context";
 import { getVmTemplate } from "@/lib/vm-templates";
 import { cn } from "@/lib/utils";
@@ -20,6 +21,7 @@ type VmTemplatePageProps = {
 
 export default async function VmTemplateDetailPage({ params }: VmTemplatePageProps) {
   const { siteSlug, id } = await params;
+  await requireSitePageAccess(siteSlug);
   const siteConfig = await ensureSiteConfig(siteSlug);
 
   const template = await getVmTemplate(id);

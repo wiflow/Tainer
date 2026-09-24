@@ -18,6 +18,7 @@ import { getActiveAlertRuntimeEntries } from "@/lib/alert-runtime-state";
 import { getCurrentSession } from "@/lib/auth";
 import { listContainerTags } from "@/lib/container-groups";
 import { getRecentNotifications } from "@/lib/notification-log";
+import { requireSitePageAccess } from "@/lib/page-guard";
 import { ensureSiteConfig } from "@/lib/site-context";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +29,7 @@ export default async function AlertsPage({
   params: Promise<{ siteSlug: string }>;
 }) {
   const { siteSlug } = await params;
+  await requireSitePageAccess(siteSlug);
   await ensureSiteConfig(siteSlug);
 
   const session = await getCurrentSession();

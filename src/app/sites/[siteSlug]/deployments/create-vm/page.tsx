@@ -6,6 +6,7 @@ import { ProxmoxIssues } from "@/components/proxmox-issues";
 import { buttonVariants } from "@/components/ui/button";
 import { getSuggestedNode } from "@/lib/load-balancer";
 import { getDiskStorageTargets, getNextId, getNodes, listIsoImages, withSiteConfig } from "@/lib/proxmox";
+import { requireSitePageAccess } from "@/lib/page-guard";
 import { ensureSiteConfig } from "@/lib/site-context";
 import { cn } from "@/lib/utils";
 
@@ -17,6 +18,7 @@ export default async function CreateVmPage({
   params: Promise<{ siteSlug: string }>;
 }) {
   const { siteSlug } = await params;
+  await requireSitePageAccess(siteSlug);
   const siteConfig = await ensureSiteConfig(siteSlug);
 
   const { nextId, nodes, metrics, isoResult, diskResult } = await withSiteConfig(siteConfig, async () => {

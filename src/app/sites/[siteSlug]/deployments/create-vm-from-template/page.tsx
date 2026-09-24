@@ -3,6 +3,7 @@ import { ArrowLeft, Layers3, Monitor } from "lucide-react";
 
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { requireSitePageAccess } from "@/lib/page-guard";
 import { ensureSiteConfig } from "@/lib/site-context";
 import { listVmTemplates } from "@/lib/vm-templates";
 import { cn } from "@/lib/utils";
@@ -15,6 +16,7 @@ export default async function CreateVmFromTemplatePage({
   params: Promise<{ siteSlug: string }>;
 }) {
   const { siteSlug } = await params;
+  await requireSitePageAccess(siteSlug);
   await ensureSiteConfig(siteSlug);
 
   const templates = await listVmTemplates();

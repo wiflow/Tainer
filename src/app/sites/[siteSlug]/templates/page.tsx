@@ -9,6 +9,7 @@ import { MetricCard } from "@/components/ui/metric-card";
 import { getAppSettings, resolveDefaultRootfsStorage } from "@/lib/app-settings";
 import { listDeploymentTemplates } from "@/lib/deployment-templates";
 import { getTemplateAuthoringIndex, withSiteConfig } from "@/lib/proxmox";
+import { requireSitePageAccess } from "@/lib/page-guard";
 import { ensureSiteConfig } from "@/lib/site-context";
 import { resolveSiteConfigBySlug } from "@/lib/site-resolver";
 import { listVmTemplates } from "@/lib/vm-templates";
@@ -36,6 +37,7 @@ export default async function TemplatesPage({
   params: Promise<{ siteSlug: string }>;
 }) {
   const { siteSlug } = await params;
+  await requireSitePageAccess(siteSlug);
   await ensureSiteConfig(siteSlug);
 
   const [{ issues, rootfsTargets, templates }, deploymentTemplates, vmTemplates, settings] =

@@ -25,6 +25,7 @@ import {
 } from "@/lib/lldp-snmp-config";
 import { getPublicOrigin } from "@/lib/oidc";
 import { withSiteConfig } from "@/lib/proxmox";
+import { requireSitePageAccess } from "@/lib/page-guard";
 import { ensureSiteConfig } from "@/lib/site-context";
 
 type Tab = "topology" | "devices" | "ip-pools" | "integrations";
@@ -39,6 +40,7 @@ export default async function NetworkPage({
   searchParams: Promise<{ tab?: string }>;
 }) {
   const { siteSlug } = await params;
+  await requireSitePageAccess(siteSlug);
   const { tab: tabParam } = await searchParams;
   const tab: Tab = VALID_TABS.includes(tabParam as Tab) ? (tabParam as Tab) : "topology";
 

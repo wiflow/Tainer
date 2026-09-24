@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRight, Box, Layers3, Tag } from "lucide-react";
 import { unstable_cache } from "next/cache";
 
+import { requireSitePageAccess } from "@/lib/page-guard";
 import { ensureSiteConfig } from "@/lib/site-context";
 import { resolveSiteConfigBySlug } from "@/lib/site-resolver";
 
@@ -34,6 +35,7 @@ export default async function TagsPage({
   params: Promise<{ siteSlug: string }>;
 }) {
   const { siteSlug } = await params;
+  await requireSitePageAccess(siteSlug);
   await ensureSiteConfig(siteSlug);
 
   const [tags, { deployments }] = await getTagsPageData(siteSlug);

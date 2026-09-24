@@ -32,6 +32,7 @@ import { getDeploymentActivities } from "@/lib/deployment-activity-log";
 import { getDeploymentBackupInfo, getDeploymentDetail, getDeploymentNetSpecs, getGuestFirewallOptions, getLatestDeploymentActivity, getNodes, getTemplateFileInfo, listGuestFirewallRules, listSnapshots, withSiteConfig } from "@/lib/proxmox";
 import { resolveDeploymentNetworkPath } from "@/lib/lldp-deployment-path";
 import { getLldpSnapshotsForSite } from "@/lib/lldp-snapshots";
+import { requireSitePageAccess } from "@/lib/page-guard";
 import { ensureSiteConfig } from "@/lib/site-context";
 import { cn, formatBytes } from "@/lib/utils";
 
@@ -81,6 +82,7 @@ export default async function DeploymentDetailPage({
   params,
 }: DeploymentPageProps) {
   const { siteSlug, id } = await params;
+  await requireSitePageAccess(siteSlug);
   const siteConfig = await ensureSiteConfig(siteSlug);
 
   // Phase 1: Fetch everything that only needs the deployment id / no dependencies

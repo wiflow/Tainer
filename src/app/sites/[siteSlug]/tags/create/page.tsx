@@ -1,3 +1,4 @@
+import { requireSitePageAccess } from "@/lib/page-guard";
 import { ensureSiteConfig } from "@/lib/site-context";
 
 import { TagCreateForm } from "@/components/tag-create-form";
@@ -8,6 +9,7 @@ export default async function TagCreatePage({
   params: Promise<{ siteSlug: string }>;
 }) {
   const { siteSlug } = await params;
+  await requireSitePageAccess(siteSlug);
   await ensureSiteConfig(siteSlug);
 
   return (

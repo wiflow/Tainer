@@ -10,6 +10,7 @@ import { DashboardCharts } from "@/components/dashboard-charts";
 import { DashboardTabs } from "@/components/dashboard-tabs";
 import { ArrowUpRight, ArrowDownRight, Cpu, MemoryStick, HardDrive, RefreshCw } from "lucide-react";
 import { MetricCard } from "@/components/ui/metric-card";
+import { requireSitePageAccess } from "@/lib/page-guard";
 
 // Note: do NOT add `export const dynamic = "force-dynamic"` here. It silently
 // disables `unstable_cache` and the `revalidate` value below becomes a no-op,
@@ -49,6 +50,7 @@ export default async function HomePage({
   params: Promise<{ siteSlug: string }>;
 }) {
   const { siteSlug } = await params;
+  await requireSitePageAccess(siteSlug);
   const [overview, deploymentTemplates, activeAlerts] = await getHomePageData(siteSlug);
   const cluster = overview.clusterResources;
 

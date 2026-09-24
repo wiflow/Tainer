@@ -16,6 +16,7 @@ import { getImageEnv } from "@/lib/image-env-cache";
 import { getIpPoolCatalog } from "@/lib/ip-pools";
 import { getSuggestedNode } from "@/lib/load-balancer";
 import { getNodes, getRootfsTargets, getTemplateDetail, withSiteConfig } from "@/lib/proxmox";
+import { requireSitePageAccess } from "@/lib/page-guard";
 import { ensureSiteConfig } from "@/lib/site-context";
 
 export const dynamic = "force-dynamic";
@@ -118,6 +119,7 @@ async function renderBaseImageDetail(slug: string, siteSlug: string, siteConfig:
 
 export default async function TemplateDetailPage({ params }: TemplatePageProps) {
   const { siteSlug, slug } = await params;
+  await requireSitePageAccess(siteSlug);
   const siteConfig = await ensureSiteConfig(siteSlug);
 
   const deploymentTemplate = await getDeploymentTemplate(slug);

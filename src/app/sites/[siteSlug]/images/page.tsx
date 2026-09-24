@@ -13,6 +13,7 @@ import { MetricCard } from "@/components/ui/metric-card";
 import { getDockerHubOverview } from "@/lib/docker-hub";
 import { getGiteaOverview, isGiteaConfigured } from "@/lib/gitea";
 import { getTemplateLibraryIndex, withSiteConfig } from "@/lib/proxmox";
+import { requireSitePageAccess } from "@/lib/page-guard";
 import { ensureSiteConfig } from "@/lib/site-context";
 import { resolveSiteConfigBySlug } from "@/lib/site-resolver";
 import { cn } from "@/lib/utils";
@@ -72,6 +73,7 @@ type ImagesPageProps = {
 
 export default async function ImagesPage({ params, searchParams }: ImagesPageProps) {
   const { siteSlug } = await params;
+  await requireSitePageAccess(siteSlug);
   await ensureSiteConfig(siteSlug);
 
   const searchParamsResolved = await searchParams;

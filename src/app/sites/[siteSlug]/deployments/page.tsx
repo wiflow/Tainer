@@ -1,6 +1,7 @@
 import { Activity, Layers3, Server, ShieldAlert } from "lucide-react";
 import { unstable_cache } from "next/cache";
 
+import { requireSitePageAccess } from "@/lib/page-guard";
 import { ensureSiteConfig } from "@/lib/site-context";
 import { resolveSiteConfigBySlug } from "@/lib/site-resolver";
 
@@ -35,6 +36,7 @@ export default async function DeploymentsPage({
   params: Promise<{ siteSlug: string }>;
 }) {
   const { siteSlug } = await params;
+  await requireSitePageAccess(siteSlug);
   await ensureSiteConfig(siteSlug);
 
   const [{ deployments, issues }, templates, tags] = await getDeploymentsPageData(siteSlug);

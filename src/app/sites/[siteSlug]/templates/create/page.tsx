@@ -7,6 +7,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { getAppSettings, resolveDefaultRootfsStorage } from "@/lib/app-settings";
 import { getImageEnvMap } from "@/lib/image-env-cache";
 import { getTemplateAuthoringIndex, withSiteConfig } from "@/lib/proxmox";
+import { requireSitePageAccess } from "@/lib/page-guard";
 import { ensureSiteConfig } from "@/lib/site-context";
 import { cn } from "@/lib/utils";
 
@@ -18,6 +19,7 @@ export default async function CreateTemplatePage({
   params: Promise<{ siteSlug: string }>;
 }) {
   const { siteSlug } = await params;
+  await requireSitePageAccess(siteSlug);
   const siteConfig = await ensureSiteConfig(siteSlug);
 
   const [{ issues, rootfsTargets, templates }, settings, imageEnvMap] =

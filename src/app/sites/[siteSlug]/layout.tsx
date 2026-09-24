@@ -22,7 +22,10 @@ export default async function SiteLayout({
 
   // Check site access for non-admin users
   const session = await getCurrentSession();
-  if (session && !hasSiteAccess(session, site.id)) {
+  if (!session) {
+    redirect("/login");
+  }
+  if (!hasSiteAccess(session, site.id)) {
     // Redirect to first accessible site
     const allSites = await listEnabledSites();
     const accessible = allSites.filter((s) =>

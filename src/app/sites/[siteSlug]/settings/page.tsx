@@ -13,6 +13,7 @@ import { MetricCard } from "@/components/ui/metric-card";
 import { getAppSettings, resolveDefaultRootfsStorage } from "@/lib/app-settings";
 import { getCurrentSession } from "@/lib/auth";
 import { getRootfsTargets, listBackupStoragePools, withSiteConfig } from "@/lib/proxmox";
+import { requireSitePageAccess } from "@/lib/page-guard";
 import { ensureSiteConfig } from "@/lib/site-context";
 import { resolveSiteConfigBySlug } from "@/lib/site-resolver";
 import { getSshKeyInfo } from "@/lib/ssh-keys";
@@ -47,6 +48,7 @@ export default async function SettingsPage({
   params: Promise<{ siteSlug: string }>;
 }) {
   const { siteSlug } = await params;
+  await requireSitePageAccess(siteSlug);
   await ensureSiteConfig(siteSlug);
 
   const session = await getCurrentSession();

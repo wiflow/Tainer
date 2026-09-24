@@ -8,6 +8,7 @@ import { SectionPanel } from "@/components/ui/section-panel";
 import { requirePermission, requireSession } from "@/lib/auth";
 import { getConfigSnapshot } from "@/lib/node-config-backup";
 import { withSiteConfig } from "@/lib/proxmox";
+import { requireSitePageAccess } from "@/lib/page-guard";
 import { ensureSiteConfig } from "@/lib/site-context";
 
 export const dynamic = "force-dynamic";
@@ -156,6 +157,7 @@ export default async function ViewSnapshotPage({
   searchParams: Promise<{ id?: string }>;
 }) {
   const { siteSlug } = await params;
+  await requireSitePageAccess(siteSlug);
   const { id } = await searchParams;
   if (!id) notFound();
 

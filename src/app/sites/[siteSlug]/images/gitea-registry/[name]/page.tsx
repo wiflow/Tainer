@@ -8,6 +8,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getGiteaPackageDetail } from "@/lib/gitea";
 import { getTemplateLibraryIndex, withSiteConfig } from "@/lib/proxmox";
+import { requireSitePageAccess } from "@/lib/page-guard";
 import { ensureSiteConfig } from "@/lib/site-context";
 import { cn } from "@/lib/utils";
 
@@ -19,6 +20,7 @@ type GiteaImageDetailPageProps = {
 
 export default async function GiteaImageDetailPage({ params }: GiteaImageDetailPageProps) {
   const { siteSlug, name } = await params;
+  await requireSitePageAccess(siteSlug);
   const siteConfig = await ensureSiteConfig(siteSlug);
 
   const [detail, templateIndex] = await withSiteConfig(siteConfig, () =>

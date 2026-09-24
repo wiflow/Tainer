@@ -27,6 +27,7 @@ import { listContainerTags } from "@/lib/container-groups";
 import { getBackupOverview, getProxmoxDefaults, getRootfsTargets, getStorageConfig, withSiteConfig } from "@/lib/proxmox";
 import { getOffsiteIndex, getStorageBoxSummary, listOffloadLog } from "@/lib/storage-box";
 import { StorageBoxCard } from "@/components/storage-box-card";
+import { requireSitePageAccess } from "@/lib/page-guard";
 import { ensureSiteConfig } from "@/lib/site-context";
 import { resolveSiteConfigBySlug } from "@/lib/site-resolver";
 import { cn, formatBytes } from "@/lib/utils";
@@ -57,6 +58,7 @@ export default async function BackupsPage({
   params: Promise<{ siteSlug: string }>;
 }) {
   const { siteSlug } = await params;
+  await requireSitePageAccess(siteSlug);
   await ensureSiteConfig(siteSlug);
 
   const session = await getCurrentSession();

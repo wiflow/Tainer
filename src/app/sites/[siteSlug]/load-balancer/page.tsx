@@ -15,6 +15,7 @@ import { getRebalancePlan } from "@/lib/load-balancer/plan-store";
 import { InfoTip } from "@/components/ui/info-tip";
 import { MetricCard } from "@/components/ui/metric-card";
 import { getCurrentSession } from "@/lib/auth";
+import { requireSitePageAccess } from "@/lib/page-guard";
 import { ensureSiteConfig } from "@/lib/site-context";
 import { resolveSiteConfigBySlug } from "@/lib/site-resolver";
 import { listLbEvents } from "@/lib/load-balancer/event-log";
@@ -30,6 +31,7 @@ export default async function LoadBalancerPage({
   params: Promise<{ siteSlug: string }>;
 }) {
   const { siteSlug } = await params;
+  await requireSitePageAccess(siteSlug);
   await ensureSiteConfig(siteSlug);
 
   const session = await getCurrentSession();
