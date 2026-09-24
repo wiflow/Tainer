@@ -1836,11 +1836,6 @@ export async function signInWithSso(
         "Sign-in refused.",
     );
   }
-  if (input.emailVerified !== true) {
-    throw new Error(
-      "Identity provider did not confirm the email address is verified. Sign-in refused.",
-    );
-  }
   const name = input.name.trim() || email;
 
   let provisioned = false;
@@ -1848,6 +1843,14 @@ export async function signInWithSso(
     let existing = store.users.find(
       (u) => u.ssoProviderId === input.providerId && u.ssoSubject === input.subject,
     );
+
+    if (!existing && input.emailVerified !== true) {
+      throw new Error(
+        `${input.providerName} did not confirm that ${email} is verified, so it cannot be ` +
+          "used to find or create a Tainer account. Ask an administrator to add you and " +
+          "link your identity provider account.",
+      );
+    }
 
     if (!existing) {
       const candidate = store.users.find((u) => u.email === email);
