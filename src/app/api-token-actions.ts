@@ -74,12 +74,12 @@ export async function createApiTokenAction(
       action: "api-token-created",
       actorEmail: session.user.email,
       actorName: session.user.name,
-      message: `API token "${record.name}" created (${record.displayPrefix}…) — permissions: ${permissions.join(", ")}; sites: ${siteIds.length ? siteIds.length : "all"}${expiresAt ? `; expires ${expiresAt.slice(0, 10)}` : "; no expiry"}`,
+      message: `API token "${record.name}" created (${record.displayPrefix}…), permissions: ${permissions.join(", ")}; sites: ${siteIds.length ? siteIds.length : "all"}${expiresAt ? `; expires ${expiresAt.slice(0, 10)}` : "; no expiry"}`,
     });
 
     revalidatePath("/sites");
     return {
-      message: `Token "${record.name}" created — copy it now, it won't be shown again.`,
+      message: `Token "${record.name}" created. Copy it now, it won't be shown again.`,
       requestId: randomUUID(),
       status: "success",
       createdToken: token,

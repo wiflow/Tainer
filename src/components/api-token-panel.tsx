@@ -61,7 +61,7 @@ export function ApiTokenPanel({
         {createState.createdToken ? (
           <div className="rounded-lg border border-emerald-500/25 bg-emerald-500/[0.06] px-4 py-3">
             <p className="text-[12px] font-medium text-emerald-200">
-              Copy this token now — it is shown exactly once and stored only as a hash:
+              Copy this token now. It is shown exactly once and stored only as a hash:
             </p>
             <div className="mt-2">
               <CopyableText className="font-mono text-[12px] text-zinc-100" text={createState.createdToken} />
@@ -103,7 +103,7 @@ export function ApiTokenPanel({
               <legend className="flex items-center gap-1.5 text-[12px] text-zinc-400">
                 Permissions
                 <InfoTip label="Permissions" side="right">
-                  Tokens act as operators with only the permissions you grant — user, group, and
+                  Tokens act as operators with only the permissions you grant. User, group, and
                   site management are never token-accessible.
                 </InfoTip>
               </legend>

@@ -78,7 +78,7 @@ export function IpamForm({
           type="url"
         />
         <span className="mt-1 block text-[11px] text-zinc-600">
-          Root of the phpIPAM install — Tainer will append{" "}
+          Root of the phpIPAM install. Tainer will append{" "}
           <code>/api/&#123;app&#125;</code> when calling.
         </span>
       </label>

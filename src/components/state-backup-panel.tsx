@@ -131,7 +131,7 @@ export function StateBackupPanel({
               <label htmlFor="passphrase">Backup passphrase</label>
               {config.hasPassphrase ? (
                 <span className="text-emerald-400/80">
-                  (set — leave empty to keep the current one)
+                  (set, leave empty to keep the current one)
                 </span>
               ) : (
                 <span className="text-amber-300/90">(required before backups can run)</span>
@@ -152,8 +152,8 @@ export function StateBackupPanel({
           </div>
           <p className="text-[11px] leading-relaxed text-zinc-500">
             <ShieldCheck className="mr-1 inline h-3 w-3 align-[-2px]" />
-            Store the passphrase somewhere that survives losing this host (a password manager) —
-            without it a backup cannot be restored.
+            Store the passphrase somewhere that survives losing this host (a password manager).
+            Without it a backup cannot be restored.
           </p>
 
           <div className="flex items-center gap-2 border-t border-white/5 pt-4">
@@ -174,7 +174,7 @@ export function StateBackupPanel({
                   </span>{" "}
                   · {new Date(config.lastRun.at).toLocaleString()}
                   {!config.lastRun.ok ? (
-                    <span className="text-zinc-500"> — {config.lastRun.message}</span>
+                    <span className="text-zinc-500"> · {config.lastRun.message}</span>
                   ) : null}
                 </>
               ) : (

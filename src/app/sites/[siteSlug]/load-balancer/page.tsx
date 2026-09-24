@@ -113,8 +113,8 @@ export default async function LoadBalancerPage({
             ({events.length} of last 10,000 events)
           </span>
           <InfoTip label="Activity log" side="right">
-            Every migration the balancer has triggered — including the ones it only recommended
-            in dry-run — plus failures and tick errors. Stored on disk, so it survives Tainer
+            Every migration the balancer has triggered (including the ones it only recommended
+            in dry-run), plus failures and tick errors. Stored on disk, so it survives Tainer
             restarts.
           </InfoTip>
         </div>

@@ -66,12 +66,12 @@ registerTool({
   category: "Containers",
   klass: "write",
   description:
-    "Create a NEW LXC container by launching one of the user-defined deployment templates (from list_deployment_templates). Picks the next free VMID, applies the template's defaults (OS image, cores, memory, rootfs storage, bridge), merges in any env overrides you pass, generates a random root password, and starts the container. Use this for 'create another grafana on port 3030', 'spin up a copy of X', or 'deploy a new container from the Y template'. By default the container gets a DHCP address. For a STATIC IP from an IP pool, pass ipPoolId (call list_ip_pools first) — the pool's bridge/gateway/prefix/DNS are used and either the address you pass or the first free one in the pool is assigned. Returns the new deployment + a one-time root password.",
+    "Create a NEW LXC container by launching one of the user-defined deployment templates (from list_deployment_templates). Picks the next free VMID, applies the template's defaults (OS image, cores, memory, rootfs storage, bridge), merges in any env overrides you pass, generates a random root password, and starts the container. Use this for 'create another grafana on port 3030', 'spin up a copy of X', or 'deploy a new container from the Y template'. By default the container gets a DHCP address. For a STATIC IP from an IP pool, pass ipPoolId (call list_ip_pools first). The pool's bridge/gateway/prefix/DNS are used and either the address you pass or the first free one in the pool is assigned. Returns the new deployment + a one-time root password.",
   input_schema: siteSlugSchema({
     templateId: {
       type: "string",
       description:
-        "Deployment template id from list_deployment_templates. NOT an OS template — must be the curated launch preset.",
+        "Deployment template id from list_deployment_templates. NOT an OS template. It must be the curated launch preset.",
     },
     hostname: {
       type: "string",
@@ -106,7 +106,7 @@ registerTool({
         ? ` with env ${Object.keys(overrides).join(", ")}`
         : "";
     const ipSummary = args.ipPoolId
-      ? ` — static IP ${args.address ? String(args.address) : "(first free)"} from pool`
+      ? `, static IP ${args.address ? String(args.address) : "(first free)"} from pool`
       : "";
     return `Launch new container "${String(args.hostname)}" from template ${String(args.templateId)} (site ${String(args.siteSlug)})${envSummary}${ipSummary}`;
   },
@@ -162,7 +162,7 @@ registerTool({
       }
 
       const vmidStr = await getNextId();
-      if (!vmidStr) throw new Error("Couldn't allocate a VMID — cluster may be exhausted.");
+      if (!vmidStr) throw new Error("Couldn't allocate a VMID. The cluster may be exhausted.");
       const vmid = Number(vmidStr);
       if (!Number.isInteger(vmid) || vmid <= 0) {
         throw new Error("Allocated VMID is invalid.");
@@ -261,7 +261,7 @@ registerTool({
           type: "root-password" as const,
           username: "root",
           value: password,
-          warning: "Save this — Tainer won't show it again.",
+          warning: "Save this. Tainer won't show it again.",
         },
         envApplied: envOverrides ?? null,
         willAutoStart: startAfterCreate,
@@ -315,16 +315,16 @@ async function computeBatchPlan(rawArgs: Record<string, unknown>): Promise<Batch
   for (let i = 0; i < count; i += 1) {
     const hostname = `${prefix}${String(startIndex + i).padStart(width, "0")}`;
     if (!HOSTNAME_REGEX.test(hostname)) {
-      throw new Error(`Generated hostname "${hostname}" is invalid — pick a simpler prefix.`);
+      throw new Error(`Generated hostname "${hostname}" is invalid. Pick a simpler prefix.`);
     }
     if (existingNames.has(hostname)) {
-      throw new Error(`Hostname "${hostname}" is already in use — choose a different prefix or start index.`);
+      throw new Error(`Hostname "${hostname}" is already in use. Choose a different prefix or start index.`);
     }
     hostnames.push(hostname);
   }
 
   const baseStr = await getNextId();
-  if (!baseStr) throw new Error("Couldn't allocate VMIDs — cluster may be exhausted.");
+  if (!baseStr) throw new Error("Couldn't allocate VMIDs. The cluster may be exhausted.");
   let candidate = Number(baseStr);
   const vmids: number[] = [];
   while (vmids.length < count) {
@@ -390,7 +390,7 @@ registerTool({
   category: "Containers",
   klass: "write",
   description:
-    "Create MULTIPLE LXC containers at once from a deployment template — one approval for the whole set. Use this for 'create 10 from the grafana template', 'spin up 5 web servers', etc. Hostnames are generated as <prefix><zero-padded index> (e.g. prefix 'web', count 5 → web01..web05). Pass ipPoolId to give each a STATIC IP from a pool (the first N free addresses are reserved in order; fails if the pool doesn't have enough); omit it for DHCP. The approval card shows the exact hostname + IP for every container before you confirm once. Returns each new container with its own one-time root password.",
+    "Create MULTIPLE LXC containers at once from a deployment template, with one approval for the whole set. Use this for 'create 10 from the grafana template', 'spin up 5 web servers', etc. Hostnames are generated as <prefix><zero-padded index> (e.g. prefix 'web', count 5 → web01..web05). Pass ipPoolId to give each a STATIC IP from a pool (the first N free addresses are reserved in order; fails if the pool doesn't have enough); omit it for DHCP. The approval card shows the exact hostname + IP for every container before you confirm once. Returns each new container with its own one-time root password.",
   input_schema: siteSlugSchema({
     templateId: {
       type: "string",
@@ -415,7 +415,7 @@ registerTool({
     ipPoolId: {
       type: "string",
       description:
-        "Optional IP pool id (from list_ip_pools). When set, each container gets a static IP — the first N free addresses in the pool, in order. Omit for DHCP.",
+        "Optional IP pool id (from list_ip_pools). When set, each container gets a static IP: the first N free addresses in the pool, in order. Omit for DHCP.",
     },
     startAfterCreate: {
       type: "boolean",

@@ -129,7 +129,7 @@ export function IntegrationsSection({ ipam, storageBoxSites }: IntegrationsSecti
     {
       name: "phpIPAM",
       description:
-        "IP address management — reserve subnets and allocations during deployment.",
+        "IP address management. Reserve subnets and allocations during deployment.",
       icon: <Database className="size-9" />,
       status: ipamConfigured ? "configured" : "available",
       onClick: () => setIpamOpen(true),
@@ -137,7 +137,7 @@ export function IntegrationsSection({ ipam, storageBoxSites }: IntegrationsSecti
     {
       name: "Hetzner Storage Box",
       description:
-        "Off-site backup target — verified offload, native CIFS mount, box management via the Hetzner API.",
+        "Off-site backup target with verified offload, native CIFS mount, box management via the Hetzner API.",
       icon: <Cloud className="size-9" />,
       status: storageBoxConfigured ? "configured" : "available",
       onClick: () => setStorageBoxOpen(true),
@@ -173,7 +173,7 @@ export function IntegrationsSection({ ipam, storageBoxSites }: IntegrationsSecti
     {
       name: "Penpot",
       description:
-        "Open-source design platform — link mockups to deployment templates.",
+        "Open-source design platform. Link mockups to deployment templates.",
       icon: <PenTool className="size-9" />,
       status: "coming-soon",
     },
@@ -226,7 +226,7 @@ export function IntegrationsSection({ ipam, storageBoxSites }: IntegrationsSecti
             ))}
             {storageBoxSites.length === 0 && (
               <p className="text-[12.5px] text-zinc-500">
-                No enabled sites — add a Proxmox site first.
+                No enabled sites. Add a Proxmox site first.
               </p>
             )}
           </div>

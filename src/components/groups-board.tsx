@@ -188,7 +188,7 @@ function GroupTableRow({
             consequences={[
               <>
                 <span className="text-zinc-200">{memberCount}</span> member
-                {memberCount === 1 ? "" : "s"} lose the permissions this group grants — their
+                {memberCount === 1 ? "" : "s"} lose the permissions this group grants. Their
                 accounts stay.
               </>,
             ]}

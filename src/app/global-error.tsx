@@ -41,7 +41,7 @@ export default function GlobalError({
           <h1 style={{ fontSize: 15, fontWeight: 500, margin: 0 }}>Tainer failed to start</h1>
           <p style={{ color: "#71717a", fontSize: 13, lineHeight: 1.6, marginTop: 8 }}>
             The application shell could not render. This usually means the server is
-            misconfigured or a required service is unreachable — check the container log.
+            misconfigured or a required service is unreachable. Check the container log.
           </p>
           {error.digest && (
             <p

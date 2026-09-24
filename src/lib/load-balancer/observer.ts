@@ -157,7 +157,7 @@ async function executeRebalancePlanStep(params: {
           siteName: config.siteName,
           node: next.sourceNode,
           vmid: next.vmid,
-          message: `Rebalance plan: skipped move of ${next.type.toUpperCase()} ${next.vmid} (${next.sourceNode} → ${next.targetNode}) — ${skipReason}.`,
+          message: `Rebalance plan: skipped move of ${next.type.toUpperCase()} ${next.vmid} (${next.sourceNode} → ${next.targetNode}): ${skipReason}.`,
           details: { planId: plan.id },
         }).catch(() => {});
       } else {
@@ -330,7 +330,7 @@ async function tickSite(siteId: string, settings: LoadBalancerSettings): Promise
           siteName: config.siteName,
           node,
           vmid: null,
-          message: `Circuit breaker opened for node ${node} — repeated metric failures; node excluded from scoring until it recovers.`,
+          message: `Circuit breaker opened for node ${node} after repeated metric failures. Node excluded from scoring until it recovers.`,
         }).catch(() => {});
       }
     }
@@ -343,7 +343,7 @@ async function tickSite(siteId: string, settings: LoadBalancerSettings): Promise
           siteName: config.siteName,
           node,
           vmid: null,
-          message: `Circuit breaker closed for node ${node} — metrics recovered; node rejoined scoring.`,
+          message: `Circuit breaker closed for node ${node}. Metrics recovered and the node rejoined scoring.`,
         }).catch(() => {});
       }
     }
@@ -518,7 +518,7 @@ async function tickSite(siteId: string, settings: LoadBalancerSettings): Promise
             siteName: config.siteName,
             node: decision.sourceNode,
             vmid: decision.vmid,
-            message: `Dry-run: would migrate ${decision.type.toUpperCase()} ${decision.vmid} from ${decision.sourceNode} → ${decision.targetNode}${decision.type === "lxc" ? " (restart migration — brief downtime)" : ""}`,
+            message: `Dry-run: would migrate ${decision.type.toUpperCase()} ${decision.vmid} from ${decision.sourceNode} → ${decision.targetNode}${decision.type === "lxc" ? " (restart migration, brief downtime)" : ""}`,
             details: {
               type: decision.type,
               targetNode: decision.targetNode,

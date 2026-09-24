@@ -134,7 +134,7 @@ export async function PUT(request: Request) {
     action: "copilot-settings-updated",
     actorEmail: session.user.email,
     actorName: session.user.name,
-    message: `Updated site-wide copilot settings — model=${updated.modelId}, endpoint=${updated.baseUrl ?? "deepinfra"}, enabled=${updated.enabled}, tokenBudget=${updated.dailyTokenBudget}, hasKey=${updated.hasKey}, restrictedGroups=${Object.keys(updated.groupPolicies).length}`,
+    message: `Updated site-wide copilot settings: model=${updated.modelId}, endpoint=${updated.baseUrl ?? "deepinfra"}, enabled=${updated.enabled}, tokenBudget=${updated.dailyTokenBudget}, hasKey=${updated.hasKey}, restrictedGroups=${Object.keys(updated.groupPolicies).length}`,
   });
 
   return NextResponse.json({ settings: updated });

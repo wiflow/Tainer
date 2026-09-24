@@ -12,7 +12,7 @@ registerTool({
   klass: "read",
   returnsExternalContent: true,
   description:
-    "Trace a container/VM's physical network path: for each interface, the bridge on the host, the uplink NIC, and — from LLDP — the upstream switch + port + VLAN it terminates at. Answers 'what switch is CT 101 behind?', 'which port does web01 use?', 'are these two containers on the same switch?'. Requires an LLDP agent to have reported from the hosting node; otherwise returns the local chain only.",
+    "Trace a container/VM's physical network path: for each interface, the bridge on the host, the uplink NIC, and (from LLDP) the upstream switch + port + VLAN it terminates at. Answers 'what switch is CT 101 behind?', 'which port does web01 use?', 'are these two containers on the same switch?'. Requires an LLDP agent to have reported from the hosting node; otherwise returns the local chain only.",
   input_schema: siteSlugSchema({
     deploymentId: {
       type: "string",

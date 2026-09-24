@@ -63,7 +63,7 @@ function LldpInferredPanel({
         <div className="rounded-lg border border-white/[0.06] bg-zinc-950/40 px-4 py-3">
           <div className="text-[11px] text-zinc-500">
             This device advertises ports by MAC address, not switch-style port
-            names — typical of a Linux host or another Proxmox node. No physical
+            names, which is typical of a Linux host or another Proxmox node. No physical
             chassis to draw; the observed links are listed below. Enable SNMP
             polling for a real port inventory if this is a managed switch.
           </div>

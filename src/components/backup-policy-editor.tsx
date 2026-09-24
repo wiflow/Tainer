@@ -364,7 +364,7 @@ export function BackupPolicyEditor({
                   <input name="policyId" type="hidden" value={policy.id} />
                   <ConfirmSubmitButton
                     consequences={[
-                      "Backups already taken by this policy are kept — only the schedule is removed.",
+                      "Backups already taken by this policy are kept. Only the schedule is removed.",
                       "Nothing will be backed up on this schedule again unless you recreate it.",
                     ]}
                     description={`Delete the backup policy "${policy.name}"?`}

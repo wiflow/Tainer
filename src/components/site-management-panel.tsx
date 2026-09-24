@@ -159,7 +159,7 @@ function EditSiteForm({ site, onClose }: { site: SiteInfo; onClose: () => void }
         <label className="block">
           <span className="flex items-center gap-1.5 text-[11px] font-medium text-zinc-500">
             <MapPin className="h-3.5 w-3.5" />
-            Location (address — geocoded automatically)
+            Location (address, geocoded automatically)
           </span>
           <input
             className={inputClassName}
@@ -170,8 +170,8 @@ function EditSiteForm({ site, onClose }: { site: SiteInfo; onClose: () => void }
           />
           {site.location && !site.location.address && (
             <span className="mt-1 block text-[10.5px] text-zinc-500">
-              Currently pinned at {site.location.latitude.toFixed(4)}, {site.location.longitude.toFixed(4)} —
-              enter an address to replace it, or leave empty to clear.
+              Currently pinned at {site.location.latitude.toFixed(4)}, {site.location.longitude.toFixed(4)}.
+              Enter an address to replace it, or leave empty to clear.
             </span>
           )}
         </label>
@@ -186,7 +186,7 @@ function EditSiteForm({ site, onClose }: { site: SiteInfo; onClose: () => void }
             defaultValue={site.countryCode ?? ""}
             name="countryCode"
           >
-            <option value="">— None</option>
+            <option value="">None</option>
             {COUNTRIES.map((c) => (
               <option key={c.code} value={c.code}>
                 {c.name} ({c.code})
@@ -559,7 +559,7 @@ export function SiteManagementPanel({
             <label className="block">
               <span className="flex items-center gap-1.5 text-[12px] font-medium text-zinc-400">
                 <MapPin className="h-3.5 w-3.5" />
-                Location (address — geocoded automatically)
+                Location (address, geocoded automatically)
               </span>
               <input
                 className={inputClassName}
@@ -579,7 +579,7 @@ export function SiteManagementPanel({
                 defaultValue=""
                 name="countryCode"
               >
-                <option value="">— None</option>
+                <option value="">None</option>
                 {COUNTRIES.map((c) => (
                   <option key={c.code} value={c.code}>
                     {c.name} ({c.code})

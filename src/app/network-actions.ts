@@ -69,7 +69,7 @@ export async function issueLldpTokenAction(
     revalidatePath(`/sites/${siteSlug}/network`);
 
     return {
-      message: `Token issued. Copy it now — it will not be shown again.`,
+      message: `Token issued. Copy it now. It will not be shown again.`,
       requestId: randomUUID(),
       status: "success",
       plaintext,
@@ -392,7 +392,7 @@ export async function saveAgentEndpointAction(
     return {
       message: result.agentBaseUrl
         ? `Agent ingest URL set to ${result.agentBaseUrl}. Re-issue a token (or edit /etc/tainer-lldp.env) on each node to pick it up.`
-        : "Agent ingest URL override cleared — falls back to APP_URL / TAINER_AGENT_BASE_URL.",
+        : "Agent ingest URL override cleared. Falls back to APP_URL / TAINER_AGENT_BASE_URL.",
       requestId: randomUUID(),
       status: "success",
     };

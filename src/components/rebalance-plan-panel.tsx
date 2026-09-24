@@ -136,7 +136,7 @@ function ComputeForm({ siteSlug }: { siteSlug: string }) {
           </label>
           <InfoTip label="Include containers" side="right">
             Lets the plan move LXC containers as well as VMs. Proxmox cannot live-migrate a
-            container, so each one is stopped, transferred and started again — real downtime for
+            container, so each one is stopped, transferred and started again, which means real downtime for
             whatever runs inside it.
           </InfoTip>
         </div>
@@ -240,7 +240,7 @@ export function RebalancePlanPanel({
                 <span className="font-mono text-emerald-400">{plan.imbalanceAfter.toFixed(3)}</span>
                 <InfoTip label="Projected imbalance" side="bottom">
                   How unevenly load sits across the cluster, as the coefficient of variation of
-                  the node scores — lower is more even. The second figure is where the plan
+                  the node scores (lower is more even). The second figure is where the plan
                   expects to land once every move has been applied.
                 </InfoTip>
               </span>
@@ -266,7 +266,7 @@ export function RebalancePlanPanel({
           </div>
         ) : (
           <p className="text-[12px] text-zinc-500">
-            No plan yet. Compute one to see which moves would even out the cluster — nothing
+            No plan yet. Compute one to see which moves would even out the cluster. Nothing
             migrates until you apply it.
           </p>
         )}

@@ -734,7 +734,7 @@ function getLegacyEnvConfig(): ResolvedSiteConfig | null {
   if (tlsInsecure && !tlsWarningLogged) {
     tlsWarningLogged = true;
     console.warn(
-      "[proxmox] WARNING: PROXMOX_TLS_INSECURE=true — TLS certificate validation is disabled. " +
+      "[proxmox] WARNING: PROXMOX_TLS_INSECURE=true. TLS certificate validation is disabled. " +
       "This exposes credentials to MITM attacks. Use proper certificates in production.",
     );
   }
@@ -1092,7 +1092,7 @@ export async function getPveTicket(config: ResolvedSiteConfig): Promise<PveTicke
               const parsed = JSON.parse(raw);
               if (!parsed.data?.ticket) {
                 reject(new Error(
-                  `Proxmox login failed (HTTP ${res.statusCode}) — check username and password.`,
+                  `Proxmox login failed (HTTP ${res.statusCode}). Check username and password.`,
                 ));
                 return;
               }
@@ -1143,7 +1143,7 @@ async function proxmoxRequest<T>(endpoint: string, options: RequestOptions = {})
 
   if (checkAuthCircuitBreaker(config.siteId)) {
     throw new ProxmoxApiError(
-      "Authentication failed — credentials may be invalid or expired. Requests paused to avoid delays. Will retry automatically.",
+      "Authentication failed. Credentials may be invalid or expired. Requests paused to avoid delays. Will retry automatically.",
       endpoint,
     );
   }

@@ -151,7 +151,7 @@ export function validateCopilotBaseUrl(raw: string): string {
     );
   }
   if (url.search || url.hash || url.username || url.password) {
-    throw new Error("Endpoint must be a bare base URL — no query, fragment, or credentials.");
+    throw new Error("Endpoint must be a bare base URL, with no query, fragment, or credentials.");
   }
   return trimmed;
 }

@@ -251,8 +251,8 @@ export function AccountSettingsPanel({
                 <p className="text-[13px] font-medium text-zinc-200">Local password</p>
                 <p className="text-[11px] text-zinc-500">
                   {account.hasLocalPassword
-                    ? "Active — you can sign in with email + password."
-                    : "Disabled — sign in via SSO only. Password reset email still works as a recovery path."}
+                    ? "Active. You can sign in with email + password."
+                    : "Disabled. Sign in via SSO only. Password reset email still works as a recovery path."}
                 </p>
               </div>
             </div>

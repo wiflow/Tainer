@@ -35,7 +35,7 @@ registerTool({
   category: "Templates",
   klass: "read",
   description:
-    "List user-defined deployment templates for a site (curated launch presets for containers — preset image + resources + env vars). Different from list_templates which is raw OS templates. Deployment templates are stored per-site.",
+    "List user-defined deployment templates for a site (curated launch presets for containers: preset image + resources + env vars). Different from list_templates which is raw OS templates. Deployment templates are stored per-site.",
   input_schema: siteSlugSchema(),
   describe: (args) => `List deployment templates in site ${String(args.siteSlug)}`,
   execute: async (args, ctx) => {

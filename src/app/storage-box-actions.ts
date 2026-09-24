@@ -65,7 +65,7 @@ export async function connectStorageBoxAction(
       revalidatePath(`/sites/${siteSlug}/backups`);
       return actionSuccess(
         summary.keyInstalled
-          ? `Connected to ${summary.host} — transfer key installed.`
+          ? `Connected to ${summary.host}. Transfer key installed.`
           : `Connected to ${summary.host}, but SSH key installation failed; check that SSH is enabled for the box.`,
       );
     });
@@ -138,7 +138,7 @@ export async function registerCifsStorageAction(
       await markCifsStorageRegistered(storageId);
       revalidatePath(`/sites/${siteSlug}/backups`);
       return actionSuccess(
-        `Storage "${storageId}" registered cluster-wide — backup policies can now target it directly.`,
+        `Storage "${storageId}" registered cluster-wide. Backup policies can now target it directly.`,
       );
     });
   } catch (error) {
@@ -190,7 +190,7 @@ export async function retrieveArchiveAction(
 
       const localPath = await retrieveArchive({ archiveName, node, targetStorage, vmid });
       revalidatePath(`/sites/${siteSlug}/backups`);
-      return actionSuccess(`Archive retrieved to ${localPath} — it now appears among the storage's backups.`);
+      return actionSuccess(`Archive retrieved to ${localPath}. It now appears among the storage's backups.`);
     });
   } catch (error) {
     return actionError(error instanceof Error ? error.message : "Failed to retrieve the archive.");
@@ -208,7 +208,7 @@ export async function setHetznerTokenAction(
     return await withBackupPermission(siteSlug, async () => {
       const { boxName } = await setHetznerApiToken(String(formData.get("token") ?? ""));
       revalidatePath("/integrations");
-      return actionSuccess(`Hetzner API connected — managing box "${boxName}".`);
+      return actionSuccess(`Hetzner API connected, managing box "${boxName}".`);
     });
   } catch (error) {
     return actionError(error instanceof Error ? error.message : "Failed to save the API token.");
@@ -257,7 +257,7 @@ export async function toggleHetznerServiceAction(
       if (!context) return actionError("Connect the Hetzner API first.");
 
       if (service === "ssh_enabled" && !enabled) {
-        return actionError("SSH stays on — offload transfers and the panel connection require it.");
+        return actionError("SSH stays on: offload transfers and the panel connection require it.");
       }
 
       await updateHetznerAccessSettings(context.token, context.boxId, { [service]: enabled });

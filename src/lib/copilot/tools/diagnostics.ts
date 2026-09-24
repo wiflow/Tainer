@@ -24,7 +24,7 @@ registerTool({
   execute: async (args, ctx) => {
     if (ctx.session.user.role !== "admin") {
       throw new Error(
-        "Administrator access required for port scanning — it uses Proxmox SSH credentials under the hood.",
+        "Administrator access required for port scanning. It uses Proxmox SSH credentials under the hood.",
       );
     }
     const siteSlug = String(args.siteSlug ?? "");
@@ -37,7 +37,7 @@ registerTool({
       }
       const ip = detail.ipAddress?.trim() ?? "";
       if (!ip || ip === "Unavailable" || ip === "DHCP" || ip === "No IP") {
-        throw new Error("Deployment has no routable IP address — can't port-scan.");
+        throw new Error("Deployment has no routable IP address, can't port-scan.");
       }
 
       const ports = await scanPorts(ip, detail.node, detail.vmid);

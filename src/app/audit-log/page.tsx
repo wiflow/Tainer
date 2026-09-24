@@ -22,7 +22,7 @@ export default async function AuditLogPage() {
           <div>
             <h1 className="text-[15px] font-medium text-white">Audit log</h1>
             <p className="text-[12px] text-zinc-500">
-              Every administrative action recorded by Tainer — sign-ins, user changes,
+              Every administrative action recorded by Tainer: sign-ins, user changes,
               settings updates, SSO provisioning. Newest first. Up to {Math.min(entries.length, 1000)} of the
               last 5,000 entries shown.
             </p>

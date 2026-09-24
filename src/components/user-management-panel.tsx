@@ -162,7 +162,7 @@ function UserResetPasswordButton({ user }: { user: ManagedUserSummary }) {
             <DialogDescription>
               Set a new password for{" "}
               <span className="text-zinc-200">{user.name || user.email}</span>. The user&apos;s
-              other active sessions will be revoked — they&apos;ll need to sign in again.
+              other active sessions will be revoked. They&apos;ll need to sign in again.
             </DialogDescription>
           </DialogHeader>
           <Form action={formAction} className="space-y-3">
@@ -350,7 +350,7 @@ function UserGroupsCell({
             <DialogDescription>
               Choose which groups{" "}
               <span className="text-zinc-200">{user.name || user.email}</span> belongs to.
-              Group permissions are additive — a user with both `admin` and `operator` groups
+              Group permissions are additive: a user with both `admin` and `operator` groups
               gets every permission either grants.
             </DialogDescription>
           </DialogHeader>

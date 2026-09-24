@@ -77,7 +77,7 @@ registerTool({
 
     if (!SNAPNAME_REGEX.test(snapshotName)) {
       throw new Error(
-        `Snapshot name must match [a-zA-Z][a-zA-Z0-9_-]{0,39} — got "${snapshotName}".`,
+        `Snapshot name must match [a-zA-Z][a-zA-Z0-9_-]{0,39}, got "${snapshotName}".`,
       );
     }
 
@@ -122,7 +122,7 @@ registerTool({
   category: "Snapshots",
   klass: "destructive",
   description:
-    "Roll a deployment back to a snapshot. THIS DISCARDS ALL CHANGES made since the snapshot was taken — rootfs and (for VMs with snapshotted RAM) memory state are overwritten. Container is briefly stopped during the rollback.",
+    "Roll a deployment back to a snapshot. THIS DISCARDS ALL CHANGES made since the snapshot was taken: rootfs and (for VMs with snapshotted RAM) memory state are overwritten. Container is briefly stopped during the rollback.",
   input_schema: siteSlugSchema({
     deploymentId: { type: "string", description: "Deployment id from list_containers." },
     snapshotName: {

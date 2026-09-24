@@ -23,7 +23,7 @@ export async function recordCopilotAudit(input: AuditInput): Promise<void> {
   } as const)[input.outcome];
 
   const argsStr = formatArgs(input.args);
-  const detail = input.detail ? ` — ${input.detail}` : "";
+  const detail = input.detail ? `: ${input.detail}` : "";
   const message = `Tainy ${verb} ${input.klass} tool ${input.toolName}${
     argsStr ? ` (${argsStr})` : ""
   }${detail}`;

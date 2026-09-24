@@ -613,7 +613,7 @@ export function CopilotSidebar({
                 title={
                   includeDeployment
                     ? "The copilot treats this page's deployment as \"this container\". Click to detach."
-                    : "Page context detached — questions won't assume this deployment. Click to re-attach."
+                    : "Page context detached. Questions won't assume this deployment. Click to re-attach."
                 }
               >
                 <Box className="h-3 w-3 flex-shrink-0" />
@@ -944,7 +944,7 @@ function EmptyState({ siteSlug }: { siteSlug: string | null }) {
       </div>
       <div className="text-[13px] font-medium text-white">Tainy</div>
       <div className="text-[11.5px] text-zinc-500 max-w-[300px]">
-        Ask about cluster state, deployments, or templates. I can also run actions — you&apos;ll
+        Ask about cluster state, deployments, or templates. I can also run actions. You&apos;ll
         see an approval card before anything destructive.
       </div>
       {siteSlug && (
@@ -1063,7 +1063,7 @@ function ChatHistoryPanel({
         </div>
       ) : chats.length === 0 ? (
         <div className="px-4 py-3 text-[12px] text-zinc-500">
-          No saved chats yet — conversations save automatically after each reply.
+          No saved chats yet. Conversations save automatically after each reply.
         </div>
       ) : (
         <ul className="py-1">

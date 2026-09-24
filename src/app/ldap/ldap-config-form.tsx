@@ -106,7 +106,7 @@ export function LdapConfigForm({
             <p className={helpClassName}>
               <code>ldaps://</code> required by default. Plain <code>ldap://</code>{" "}
               is refused unless <code>TAINER_LDAP_ALLOW_INSECURE=true</code> is
-              set (development only — bind password sent in clear).
+              set (development only, bind password sent in clear).
             </p>
           </label>
 
@@ -190,7 +190,7 @@ export function LdapConfigForm({
             />
             <p className={helpClassName}>
               Must contain <code>{"{email}"}</code>. The supplied value is
-              RFC-4515 escaped before substitution — safe against LDAP
+              RFC-4515 escaped before substitution, so it is safe against LDAP
               injection.
             </p>
           </label>

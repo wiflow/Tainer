@@ -109,7 +109,7 @@ export async function* runCopilotTurn(
     });
     yield {
       type: "error",
-      message: `Slow down — at most ${MAX_TURNS_PER_MINUTE} messages per minute. Wait a moment and try again.`,
+      message: `Slow down: at most ${MAX_TURNS_PER_MINUTE} messages per minute. Wait a moment and try again.`,
     };
     return;
   }
@@ -126,14 +126,14 @@ export async function* runCopilotTurn(
     });
     yield {
       type: "error",
-      message: `Daily token budget exhausted (${usage.tokenBudget}). Resets at 00:00 UTC — an admin can raise it in Settings → Tainy.`,
+      message: `Daily token budget exhausted (${usage.tokenBudget}). Resets at 00:00 UTC, or an admin can raise it in Settings → Tainy.`,
     };
     return;
   }
   if (usage.toolCallsRemaining <= 0) {
     yield {
       type: "error",
-      message: `Daily tool-call budget exhausted (${usage.toolCallBudget}). Resets at 00:00 UTC — an admin can raise it in Settings → Tainy.`,
+      message: `Daily tool-call budget exhausted (${usage.toolCallBudget}). Resets at 00:00 UTC, or an admin can raise it in Settings → Tainy.`,
     };
     return;
   }

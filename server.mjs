@@ -439,7 +439,7 @@ async function proxmoxPasswordLogin(config) {
             if (!parsed.data?.ticket) {
               reject(
                 new Error(
-                  "Proxmox login failed — check username and password for this site.",
+                  "Proxmox login failed. Check username and password for this site.",
                 ),
               );
               return;

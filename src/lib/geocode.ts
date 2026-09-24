@@ -42,7 +42,7 @@ export async function geocodeAddress(query: string): Promise<GeocodeResult> {
   const longitude = hit ? Number.parseFloat(hit.lon ?? "") : NaN;
 
   if (!hit || !Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-    throw new Error(`No location found for "${normalized}" — try a city and country.`);
+    throw new Error(`No location found for "${normalized}". Try a city and country.`);
   }
 
   return {

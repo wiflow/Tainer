@@ -288,7 +288,7 @@ function ProviderRow({
         <ConfirmDialog
           consequences={[
             "Users created through this provider keep their accounts, but can no longer sign in with it.",
-            "Anyone without a local password will need another way in — check that first.",
+            "Anyone without a local password will need another way in, so check that first.",
           ]}
           description={`Delete the identity provider "${provider.name}"?`}
           onConfirm={() => {
@@ -383,7 +383,7 @@ function ProviderTypeChooser({
             </span>
           </div>
           <p className="text-[11px] text-zinc-500">
-            Microsoft Entra, Google Workspace, Okta, Keycloak, Auth0 — anything
+            Microsoft Entra, Google Workspace, Okta, Keycloak, Auth0 or anything
             speaking OpenID Connect. Adds a &quot;Sign in with X&quot; button to the
             login page.
           </p>
@@ -406,7 +406,7 @@ function ProviderTypeChooser({
           </div>
           <p className="text-[11px] text-zinc-500">
             Corporate AD or OpenLDAP. Authenticates transparently through the
-            standard sign-in form — no separate button. Only one LDAP config
+            standard sign-in form, with no separate button. Only one LDAP config
             is supported per Tainer install.
           </p>
         </button>

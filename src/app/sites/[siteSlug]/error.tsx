@@ -19,7 +19,7 @@ export default function SiteError({
     <ErrorState
       backHref="/sites"
       backLabel="All sites"
-      description="This page could not load data for the site. The Proxmox API may be unreachable, or the stored credentials may no longer be valid — check the site's connection settings."
+      description="This page could not load data for the site. The Proxmox API may be unreachable, or the stored credentials may no longer be valid. Check the site's connection settings."
       digest={error.digest}
       onRetry={reset}
       title="Couldn't load this site"

@@ -91,7 +91,7 @@ export function NetworkIntegrationPanel({
         <header className="border-b border-white/[0.04] px-4 py-3">
           <h3 className="text-[13px] font-medium text-zinc-100">Agent tokens</h3>
           <p className="mt-0.5 text-[11px] text-zinc-500">
-            One token per Proxmox node. Each is shown only once at issuance — copy it
+            One token per Proxmox node. Each is shown only once at issuance. Copy it
             immediately. Tokens are scoped to this site and authenticate pushes to{" "}
             <code className="font-mono text-zinc-400">{ingestUrl}</code>.
           </p>
@@ -280,7 +280,7 @@ function NewTokenPanel({
           </h3>
           <p className="mt-0.5 text-[11px] text-emerald-300/70">
             Copy this snippet and run it as root on the Proxmox node. The token is
-            shown once — closing this panel does not reveal it again.
+            shown once. Closing this panel does not reveal it again.
           </p>
         </div>
         <button
@@ -382,7 +382,7 @@ function buildSetupSnippet({
     ? `# SNMP polling is enabled for this site. The agent polls each LLDP-discovered
 # neighbour's MgmtIP via SNMPv2c every ${pollSeconds}s and posts the IF-MIB
 # inventory to Tainer. The community string is set in /etc/tainer-snmp.env
-# below — keep that file 0600.`
+# below. Keep that file 0600.`
     : `# SNMP polling is NOT YET ENABLED for this site. The agent ships disabled.
 # Once an admin sets the SNMP community in the Tainer integrations panel,
 # edit /etc/tainer-snmp.env on each node (or rerun this snippet) and the
@@ -393,7 +393,7 @@ function buildSetupSnippet({
 #
 # Note: curl runs with -k (skip TLS verification) because Tainer uses a
 # self-signed Caddy cert by default. The agent still authenticates itself
-# with the per-node bearer token below — TLS verification here would only
+# with the per-node bearer token below. TLS verification here would only
 # matter if you've installed a public CA cert on Tainer. If you have,
 # drop the -k from the ExecStart lines.
 #
@@ -543,7 +543,7 @@ function AgentEndpointSection({
         </div>
         <p className="mt-1 text-[11px] text-zinc-500">
           The base URL Proxmox nodes POST LLDP + SNMP data to. By default Tainer
-          uses its public origin (<code className="font-mono">APP_URL</code>) — but
+          uses its public origin (<code className="font-mono">APP_URL</code>), but
           nodes often can&apos;t resolve that (LAN box reached by IP, split DNS).
           Set an override that&apos;s reachable <em>from the nodes</em>. Tainer
           appends <code className="font-mono">/api/internal/…</code> itself.
@@ -682,7 +682,7 @@ function SnmpConfigSection({
               name="community"
               placeholder={
                 config.hasCommunity
-                  ? "•••••••• (set — type to replace)"
+                  ? "•••••••• (set, type to replace)"
                   : "e.g. Tainer-RO"
               }
               type={showCommunity ? "text" : "password"}

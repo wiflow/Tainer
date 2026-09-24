@@ -109,7 +109,7 @@ function SnapshotRow({
 
       <ConfirmDialog
         consequences={[
-          "Only this saved copy of the node configuration is removed — the node itself is untouched.",
+          "Only this saved copy of the node configuration is removed. The node itself is untouched.",
         ]}
         description={`Delete the config snapshot "${snapshot.label}"?`}
         onConfirm={() => {

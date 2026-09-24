@@ -199,7 +199,7 @@ async function runBackup(): Promise<StateBackupResult> {
   if (!config.passphraseEncrypted) {
     return {
       ok: false,
-      message: "No backup passphrase set — configure one in Settings first.",
+      message: "No backup passphrase set. Configure one in Settings first.",
       file: null,
       sizeBytes: null,
     };
@@ -219,7 +219,7 @@ async function runBackup(): Promise<StateBackupResult> {
     return true;
   });
   if (entries.length === 0) {
-    return { ok: false, message: "Data directory is empty — nothing to back up.", file: null, sizeBytes: null };
+    return { ok: false, message: "Data directory is empty. Nothing to back up.", file: null, sizeBytes: null };
   }
 
   const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");

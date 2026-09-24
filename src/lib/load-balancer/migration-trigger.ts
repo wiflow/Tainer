@@ -189,7 +189,7 @@ export function evaluateMigrationDecisions(input: {
               : hasPinTag(guest)
                 ? "pinned via plb_pin tag"
                 : "exempt via plb_ignore tag"
-          }) — move it manually to finish the drain.`,
+          }). Move it manually to finish the drain.`,
         });
         continue;
       }
@@ -241,7 +241,7 @@ export function evaluateMigrationDecisions(input: {
         type: guest.type,
         sourceNode: node,
         targetNode,
-        reason: `Node ${node} is in maintenance mode — draining guests`,
+        reason: `Node ${node} is in maintenance mode, draining guests`,
         cause: "maintenance-drain",
       });
       budget--;
@@ -406,7 +406,7 @@ export function evaluateMigrationDecisions(input: {
           type: guest.type,
           sourceNode: score.node,
           targetNode,
-          reason: `Node ${score.node} forecast to reach score ${forecast.predictedScore.toFixed(1)} (threshold ${threshold.toFixed(1)}) within ${settings.predictiveHorizonMinutes} min — trend +${forecast.slopePerMinute.toFixed(2)}/min, confidence R²=${forecast.r2.toFixed(2)} over ${forecast.sampleCount} samples`,
+          reason: `Node ${score.node} forecast to reach score ${forecast.predictedScore.toFixed(1)} (threshold ${threshold.toFixed(1)}) within ${settings.predictiveHorizonMinutes} min: trend +${forecast.slopePerMinute.toFixed(2)}/min, confidence R²=${forecast.r2.toFixed(2)} over ${forecast.sampleCount} samples`,
           cause: "predicted-overload",
         });
         budget--;

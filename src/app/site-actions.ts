@@ -216,7 +216,7 @@ export async function createSiteAction(
 
     const validation = await validateSiteConnection(tempConfig);
     if (!validation.ok) {
-      return errorState(_previousState, validation.message ?? "Connection failed — check credentials and API URL.");
+      return errorState(_previousState, validation.message ?? "Connection failed. Check credentials and API URL.");
     }
 
     const fingerprints = validation.nodes?.map((n) => n.fingerprint) ?? [];

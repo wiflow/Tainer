@@ -206,7 +206,7 @@ export async function testIdpProviderAction(
     }
     return {
       authorizationEndpoint: result.authorizationEndpoint,
-      message: "Discovery succeeded — provider looks good.",
+      message: "Discovery succeeded. Provider looks good.",
       requestId: randomUUID(),
       status: "success",
     };

@@ -73,7 +73,7 @@ export function normalizeAgentBaseUrl(raw: string | null | undefined): string | 
   }
   if (parsed.pathname !== "/" || parsed.search || parsed.hash) {
     throw new Error(
-      "Agent base URL must be a bare origin (no path) — Tainer appends /api/internal/... itself.",
+      "Agent base URL must be a bare origin (no path). Tainer appends /api/internal/... itself.",
     );
   }
   return parsed.origin;

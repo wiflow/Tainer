@@ -132,7 +132,7 @@ registerTool({
   category: "Backups",
   klass: "destructive",
   description:
-    "Restore a backup archive OVER an existing container/VM, replacing its current rootfs/disks. This is destructive and irreversible — the guest should be stopped first. Use the archive volid from list_backups and the deployment id of the target to overwrite. Requires typing the target's name to confirm.",
+    "Restore a backup archive OVER an existing container/VM, replacing its current rootfs/disks. This is destructive and irreversible. The guest should be stopped first. Use the archive volid from list_backups and the deployment id of the target to overwrite. Requires typing the target's name to confirm.",
   input_schema: siteSlugSchema({
     deploymentId: {
       type: "string",
@@ -149,7 +149,7 @@ registerTool({
     },
     confirmName: {
       type: "string",
-      description: "The target's current name (from get_container) — server rejects a mismatch.",
+      description: "The target's current name (from get_container). The server rejects a mismatch.",
     },
   }),
   describe: (args) =>
@@ -167,7 +167,7 @@ registerTool({
       if (!detail) throw new Error("Target deployment not found.");
       if (detail.name !== confirmName) {
         throw new Error(
-          `confirmName mismatch — expected "${detail.name}", got "${confirmName}". Refusing to restore.`,
+          `confirmName mismatch: expected "${detail.name}", got "${confirmName}". Refusing to restore.`,
         );
       }
       if (detail.rawStatus === "running") {
@@ -180,7 +180,7 @@ registerTool({
       // rootfs is a Proxmox volume spec like "local-lvm:vm-101-disk-0,size=8G".
       const rootfsStorage = detail.rootfs.includes(":") ? detail.rootfs.split(":")[0] : "";
       const storage = requestedStorage || rootfsStorage;
-      if (!storage) throw new Error("Couldn't determine target storage — pass storage explicitly.");
+      if (!storage) throw new Error("Couldn't determine target storage. Pass storage explicitly.");
 
       const upid = await restoreBackup(node, vmid, archiveVolid, storage, { force: true });
 

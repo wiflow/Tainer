@@ -175,7 +175,7 @@ export function DockerLibraryForm({
             </label>
             <InfoTip label="Library path" side="right">
               <code className="text-zinc-200">/app/data/docker-library</code> lives on the
-              already-mounted data volume, so it works with no redeploy — the directory is created
+              already-mounted data volume, so it works with no redeploy. The directory is created
               on the first pull. Leave blank to fall back to the{" "}
               <code className="text-zinc-200">DOCKER_LIBRARY_PATH</code> environment variable.
             </InfoTip>
@@ -255,7 +255,7 @@ export function BackupSettingsForm({
                 Default backup storage
               </label>
               <InfoTip label="Default backup storage" side="right">
-                Must already be configured in Proxmox as a backup-capable target — for example a
+                Must already be configured in Proxmox as a backup-capable target, for example a
                 CIFS/SMB share with the &quot;backup&quot; content type.
               </InfoTip>
             </span>

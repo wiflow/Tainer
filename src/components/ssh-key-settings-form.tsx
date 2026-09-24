@@ -100,7 +100,7 @@ export function SshKeySettingsForm({
                   <span className="flex items-center gap-1.5">
                     <p className="text-[12px] font-medium text-zinc-500">Managed login user</p>
                     <InfoTip label="Managed login user" side="right">
-                      SSH-ready Linux templates must create this user ahead of time — Tainer signs
+                      SSH-ready Linux templates must create this user ahead of time. Tainer signs
                       short-lived certificates for it.
                     </InfoTip>
                   </span>

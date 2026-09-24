@@ -21,7 +21,7 @@ registerTool({
   category: "Navigation",
   klass: "read",
   description:
-    "Navigate the user's browser to a Tainer page. Use when the user says 'take me to', 'open', 'go to', or 'show me' a page or entity. Useful targets: '/sites/<siteSlug>/deployments/<deploymentId>' (container/VM detail — use the id from list_containers), '/sites/<siteSlug>/deployments' (all deployments in a site), '/sites/<siteSlug>/network' (topology + IP pools), '/sites/<siteSlug>/network/devices/<chassisId>' (switch front panel), '/sites/<siteSlug>/templates', '/sites/<siteSlug>/backups', '/settings', '/audit-log' (admin), '/users' (admin). Runs immediately — pair it with a short confirmation like 'Taking you there.'",
+    "Navigate the user's browser to a Tainer page. Use when the user says 'take me to', 'open', 'go to', or 'show me' a page or entity. Useful targets: '/sites/<siteSlug>/deployments/<deploymentId>' (container/VM detail, use the id from list_containers), '/sites/<siteSlug>/deployments' (all deployments in a site), '/sites/<siteSlug>/network' (topology + IP pools), '/sites/<siteSlug>/network/devices/<chassisId>' (switch front panel), '/sites/<siteSlug>/templates', '/sites/<siteSlug>/backups', '/settings', '/audit-log' (admin), '/users' (admin). Runs immediately, so pair it with a short confirmation like 'Taking you there.'",
   input_schema: {
     type: "object",
     additionalProperties: false,

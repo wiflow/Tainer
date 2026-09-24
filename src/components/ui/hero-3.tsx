@@ -51,7 +51,7 @@ export function HeroSection() {
 						"fade-in slide-in-from-bottom-10 animate-in fill-mode-backwards delay-200 duration-500 ease-out"
 					)}
 				>
-					Deploy LXC containers from curated templates, manage lifecycles, <br /> and monitor your cluster — all from one dashboard.
+					Deploy LXC containers from curated templates, manage lifecycles, <br /> and monitor your cluster, all from one dashboard.
 				</p>
 
 				<div className="fade-in slide-in-from-bottom-10 flex w-fit animate-in items-center justify-center gap-3 fill-mode-backwards pt-2 delay-300 duration-500 ease-out">

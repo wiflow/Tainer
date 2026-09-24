@@ -105,7 +105,7 @@ function validateInput(input: LdapConfigInput, isCreate: boolean): void {
     process.env.TAINER_LDAP_ALLOW_INSECURE !== "true"
   ) {
     throw new Error(
-      "LDAP URL must use ldaps:// — plaintext LDAP exposes the bind password to anyone on the network path. Set TAINER_LDAP_ALLOW_INSECURE=true only for closed-network development.",
+      "LDAP URL must use ldaps://. Plaintext LDAP exposes the bind password to anyone on the network path. Set TAINER_LDAP_ALLOW_INSECURE=true only for closed-network development.",
     );
   }
 

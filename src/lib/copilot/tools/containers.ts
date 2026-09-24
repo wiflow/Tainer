@@ -273,7 +273,7 @@ registerTool({
   category: "Containers",
   klass: "write",
   description:
-    "Update environment variables on an existing LXC container. Merges the provided key/value pairs into the container's current env (overrides existing keys, leaves untouched keys alone). Use this for 'change Grafana's port' (GF_SERVER_HTTP_PORT), 'set a feature flag', 'update a DB connection string', etc. Most env-driven services need a restart_deployment afterwards to pick up changes — ask the user first.",
+    "Update environment variables on an existing LXC container. Merges the provided key/value pairs into the container's current env (overrides existing keys, leaves untouched keys alone). Use this for 'change Grafana's port' (GF_SERVER_HTTP_PORT), 'set a feature flag', 'update a DB connection string', etc. Most env-driven services need a restart_deployment afterwards to pick up changes, so ask the user first.",
   input_schema: siteSlugSchema({
     deploymentId: {
       type: "string",
@@ -382,7 +382,7 @@ registerTool({
       if (!detail) throw new Error("Deployment not found.");
       if (detail.name !== confirmName) {
         throw new Error(
-          `confirmName mismatch — expected "${detail.name}", got "${confirmName}". Refusing to delete.`,
+          `confirmName mismatch: expected "${detail.name}", got "${confirmName}". Refusing to delete.`,
         );
       }
 
@@ -429,7 +429,7 @@ async function resolveDestroyTargets(deploymentIds: string[]): Promise<ResolvedT
     if (!deploymentId || seen.has(deploymentId)) continue;
     seen.add(deploymentId);
     const detail = await getDeploymentDetail(deploymentId);
-    if (!detail) throw new Error(`Deployment ${deploymentId} not found — refusing the batch.`);
+    if (!detail) throw new Error(`Deployment ${deploymentId} not found. Refusing the batch.`);
     const { node, vmid, type } = decodeDeploymentId(deploymentId);
     targets.push({
       deploymentId,
@@ -449,7 +449,7 @@ registerTool({
   category: "Containers",
   klass: "destructive",
   description:
-    "PERMANENTLY DELETE several containers/VMs in one action, with a single confirmation. Pass the deployment ids (from list_containers). Running guests are hard-stopped first automatically (in parallel, with a bounded wait) — you do NOT need to stop them yourself. The approval card lists every guest that will be destroyed. There is no undo. Use this for 'delete ignition-02 through ignition-10', 'remove all the temp containers', etc. — do NOT loop destroy_deployment.",
+    "PERMANENTLY DELETE several containers/VMs in one action, with a single confirmation. Pass the deployment ids (from list_containers). Running guests are hard-stopped first automatically (in parallel, with a bounded wait), so you do NOT need to stop them yourself. The approval card lists every guest that will be destroyed. There is no undo. Use this for 'delete ignition-02 through ignition-10', 'remove all the temp containers', etc. Do NOT loop destroy_deployment.",
   input_schema: siteSlugSchema({
     deploymentIds: {
       type: "array",
@@ -490,7 +490,7 @@ registerTool({
     const ids = Array.isArray(args.deploymentIds) ? (args.deploymentIds as unknown[]).map(String) : [];
     if (ids.length === 0) throw new Error("deploymentIds is required.");
     if (ids.length > MAX_BATCH_DESTROY) {
-      throw new Error(`Too many at once — cap is ${MAX_BATCH_DESTROY}.`);
+      throw new Error(`Too many at once. Cap is ${MAX_BATCH_DESTROY}.`);
     }
 
     return runInSiteWithPermission(ctx.session, siteSlug, "delete-deployments", async () => {
@@ -518,7 +518,7 @@ registerTool({
       const failed: Array<{ name: string; vmid: number; error: string }> = [];
       for (const t of targets) {
         if (t.running && !stoppedOk.has(t.vmid)) {
-          failed.push({ name: t.name, vmid: t.vmid, error: "Stop didn't finish in time — skipped." });
+          failed.push({ name: t.name, vmid: t.vmid, error: "Stop didn't finish in time, skipped." });
           continue;
         }
         try {

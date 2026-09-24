@@ -1947,7 +1947,7 @@ export async function signInWithLdap(
   input: LdapSignInInput,
 ): Promise<LdapSignInResult> {
   const email = normalizeEmail(input.email);
-  if (!email) throw new Error("LDAP returned an empty email — refusing to sign in.");
+  if (!email) throw new Error("LDAP returned an empty email. Refusing to sign in.");
   const name = input.name.trim() || email;
 
   let provisioned = false;
@@ -2680,7 +2680,7 @@ export async function disableLocalPassword(): Promise<void> {
     }
     if (!user.ssoProviderId || !user.ssoSubject) {
       throw new Error(
-        "Link an SSO provider before disabling your local password — without one, you would be locked out.",
+        "Link an SSO provider before disabling your local password. Without one, you would be locked out.",
       );
     }
     user.passwordHash = "";

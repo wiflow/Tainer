@@ -21,7 +21,7 @@ registerTool({
   description:
     "List the automated backup policies for a site (name, enabled, interval, storage, retention, which tags they cover). Use for 'what backup schedules are set?', 'is prod being backed up automatically?'.",
   input_schema: siteSlugSchema(),
-  describe: (args) => `List backup policies — ${String(args.siteSlug)}`,
+  describe: (args) => `List backup policies: ${String(args.siteSlug)}`,
   execute: async (args, ctx) => {
     const siteSlug = String(args.siteSlug ?? "");
     return runInSite(ctx.session, siteSlug, async () => {
@@ -45,9 +45,9 @@ registerTool({
   category: "Diagnostics",
   klass: "read",
   description:
-    "List the alert policies for a site (name, enabled, and the rules they evaluate — offline, high CPU/memory, storage pressure, etc.). Use for 'what are we alerting on?', 'is high-CPU alerting turned on?'.",
+    "List the alert policies for a site (name, enabled, and the rules they evaluate: offline, high CPU/memory, storage pressure, etc.). Use for 'what are we alerting on?', 'is high-CPU alerting turned on?'.",
   input_schema: siteSlugSchema(),
-  describe: (args) => `List alert policies — ${String(args.siteSlug)}`,
+  describe: (args) => `List alert policies: ${String(args.siteSlug)}`,
   execute: async (args, ctx) => {
     const siteSlug = String(args.siteSlug ?? "");
     return runInSite(ctx.session, siteSlug, async () => {
@@ -68,11 +68,11 @@ registerTool({
   category: "Cluster",
   klass: "read",
   description:
-    "List saved node configuration snapshots for a site (network, DNS, hosts, storage, firewall, timezone) with when and by whom they were taken. Use for 'what config backups exist for node1?'. Restoring is intentionally UI-only (it can rewrite cluster-wide networking) — point the user to the node-configs restore page for that.",
+    "List saved node configuration snapshots for a site (network, DNS, hosts, storage, firewall, timezone) with when and by whom they were taken. Use for 'what config backups exist for node1?'. Restoring is intentionally UI-only (it can rewrite cluster-wide networking), so point the user to the node-configs restore page for that.",
   input_schema: siteSlugSchema({
     node: { type: "string", description: "Optional node name to filter by." },
   }),
-  describe: (args) => `List config snapshots — ${String(args.siteSlug)}`,
+  describe: (args) => `List config snapshots: ${String(args.siteSlug)}`,
   execute: async (args, ctx) => {
     const siteSlug = String(args.siteSlug ?? "");
     const node = typeof args.node === "string" ? args.node.trim() : "";
@@ -128,7 +128,7 @@ registerTool({
   description:
     "List the ISO images available in the site's ISO library (name, size, modified time). Use for 'what install ISOs do we have?', typically before creating a VM.",
   input_schema: siteSlugSchema(),
-  describe: (args) => `List ISOs — ${String(args.siteSlug)}`,
+  describe: (args) => `List ISOs: ${String(args.siteSlug)}`,
   execute: async (args, ctx) => {
     const siteSlug = String(args.siteSlug ?? "");
     return runInSite(ctx.session, siteSlug, async () => {

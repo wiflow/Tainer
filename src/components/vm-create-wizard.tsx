@@ -141,7 +141,7 @@ export function VmCreateWizard({
                 <option value="">No ISO (PXE / manual)</option>
                 {isoImages.map((iso) => (
                   <option key={iso.volid} value={iso.volid}>
-                    {iso.fileName} ({iso.sizeLabel}) — {iso.storage}
+                    {iso.fileName} ({iso.sizeLabel}) on {iso.storage}
                   </option>
                 ))}
               </select>

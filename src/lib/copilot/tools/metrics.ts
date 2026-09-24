@@ -11,7 +11,7 @@ registerTool({
   category: "Diagnostics",
   klass: "read",
   description:
-    "Get the historical CPU %, memory %, and network throughput trend for a container/VM over a timeframe (hour/day/week/month/year). Returns average and peak plus a compact series. Use for 'is web01 trending hot?', 'show memory over the last day', 'has CPU been spiking this week?'. get_container only shows the current instant — this shows the trend.",
+    "Get the historical CPU %, memory %, and network throughput trend for a container/VM over a timeframe (hour/day/week/month/year). Returns average and peak plus a compact series. Use for 'is web01 trending hot?', 'show memory over the last day', 'has CPU been spiking this week?'. get_container only shows the current instant; this shows the trend.",
   input_schema: siteSlugSchema({
     deploymentId: {
       type: "string",

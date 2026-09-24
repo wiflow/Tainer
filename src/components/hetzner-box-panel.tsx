@@ -217,7 +217,7 @@ export function HetznerBoxPanel({
                 })}
               </div>
               <p className="mt-2 text-[11px] text-zinc-500">
-                Click to toggle. SSH cannot be disabled from here — offload transfers depend on it.
+                Click to toggle. SSH cannot be disabled from here because offload transfers depend on it.
               </p>
             </div>
 
@@ -246,7 +246,7 @@ export function HetznerBoxPanel({
               </div>
               {snapshots.length === 0 ? (
                 <p className="text-[12px] text-zinc-500">
-                  No snapshots yet. Snapshots capture the whole box server-side — cheap insurance
+                  No snapshots yet. Snapshots capture the whole box server-side. They are cheap insurance
                   against accidental deletion of offloaded archives.
                 </p>
               ) : (

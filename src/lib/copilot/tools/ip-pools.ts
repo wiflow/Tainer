@@ -77,7 +77,7 @@ registerTool({
         gateway: pool.gateway,
         dns: pool.defaultDns,
         tagSlug: pool.tagSlug,
-        range: `${pool.firstHost} – ${pool.lastHost}`,
+        range: `${pool.firstHost} - ${pool.lastHost}`,
         usableHostCount: pool.usableHostCount,
         usedCount: pool.usedCount,
         availableCount: pool.availableCount,
@@ -104,7 +104,7 @@ registerTool({
   category: "Network",
   klass: "write",
   description:
-    "Change an LXC container's static IPv4 address to a free address from one of the site's IP pools. Rewrites the container's eth0 (net0) config with the pool's bridge, gateway, and prefix, and sets the pool's DNS servers when configured. The server validates that the address is actually free in that pool — already-used or out-of-range addresses are refused. A running container usually picks the new address up live, but some services cache the old IP until a restart_deployment. LXC only — QEMU VMs are not supported.",
+    "Change an LXC container's static IPv4 address to a free address from one of the site's IP pools. Rewrites the container's eth0 (net0) config with the pool's bridge, gateway, and prefix, and sets the pool's DNS servers when configured. The server validates that the address is actually free in that pool. Already-used or out-of-range addresses are refused. A running container usually picks the new address up live, but some services cache the old IP until a restart_deployment. LXC only. QEMU VMs are not supported.",
   input_schema: siteSlugSchema({
     deploymentId: {
       type: "string",

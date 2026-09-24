@@ -140,7 +140,7 @@ export default async function DeviceDetailPage({
               <p className="mt-0.5 text-[11px] text-zinc-500">
                 {snmpSnapshot
                   ? `Live port inventory from SNMP, last polled ${new Date(snmpSnapshot.collectedAt).toLocaleTimeString()}. Click a port for details.`
-                  : "Front-panel mock based on LLDP-observed ports. Only ports with one of this site's Proxmox nodes attached are visible — enable SNMP polling in the Integrations panel to see the full chassis."}
+                  : "Front-panel mock based on LLDP-observed ports. Only ports with one of this site's Proxmox nodes attached are visible. Enable SNMP polling in the Integrations panel to see the full chassis."}
               </p>
             </div>
             {snmpSnapshot ? (

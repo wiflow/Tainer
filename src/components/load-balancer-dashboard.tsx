@@ -114,8 +114,8 @@ function NodeScoreTable({
           </EmptyMedia>
           <EmptyTitle>No node scores yet</EmptyTitle>
           <EmptyDescription>
-            Turn the load balancer on in Settings below and scores appear within a poll interval —
-            it starts in Observe mode, so nothing moves until you say so.
+            Turn the load balancer on in Settings below and scores appear within a poll interval.
+            It starts in Observe mode, so nothing moves until you say so.
           </EmptyDescription>
         </EmptyHeader>
       </Empty>
@@ -134,7 +134,7 @@ function NodeScoreTable({
             <Th
               align="right"
               className="pr-4"
-              tip="Host memory in use. Weighted highest of the four signals by default — running out of memory is what actually kills workloads."
+              tip="Host memory in use. Weighted highest of the four signals by default, since running out of memory is what actually kills workloads."
             >
               Memory %
             </Th>
@@ -156,7 +156,7 @@ function NodeScoreTable({
             <Th
               align="right"
               className="pr-4"
-              tip="Utilization and latency combined through your weights, plus penalties. Lower is healthier — new deployments are suggested onto the lowest-score nodes."
+              tip="Utilization and latency combined through your weights, plus penalties. Lower is healthier. New deployments are suggested onto the lowest-score nodes."
             >
               Score
             </Th>
@@ -331,14 +331,14 @@ function SettingsForm({
             defaultChecked={settings.enabled}
             name="enabled"
             subtitle="Start the P2C observer and score nodes every poll interval."
-            tip="Turns on scoring only. Nodes get a health score every poll and new deployments are steered towards the healthiest ones — nothing moves on its own until auto-migration is enabled too."
+            tip="Turns on scoring only. Nodes get a health score every poll and new deployments are steered towards the healthiest ones. Nothing moves on its own until auto-migration is enabled too."
             title="Enable Load Balancer"
           />
           <ToggleRow
             defaultChecked={settings.migrationEnabled}
             name="migrationEnabled"
             subtitle="Migrate guests when a node is consistently overloaded."
-            tip="Lets the balancer act on what it sees. A node has to stay over the threshold for several consecutive polls first — a brief spike resets the counter and nothing happens. Requires the load balancer to be enabled."
+            tip="Lets the balancer act on what it sees. A node has to stay over the threshold for several consecutive polls first. A brief spike resets the counter and nothing happens. Requires the load balancer to be enabled."
             title="Enable Auto-Migration"
           />
           <ToggleRow
@@ -382,7 +382,7 @@ function SettingsForm({
         </div>
 
         <div className="space-y-3">
-          <GroupHeading tip="Proxmox cannot live-migrate LXC containers — every automatic move is stop, transfer, start, with real downtime. Containers are therefore excluded from balancing unless you opt in. VMs always live-migrate with no downtime.">
+          <GroupHeading tip="Proxmox cannot live-migrate LXC containers. Every automatic move is stop, transfer, start, with real downtime. Containers are therefore excluded from balancing unless you opt in. VMs always live-migrate with no downtime.">
             Container Migrations
           </GroupHeading>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -431,7 +431,7 @@ function SettingsForm({
             <div>
               <InfoLabel
                 htmlFor="maintenanceNodes"
-                tip="Nodes to drain. Guests are evacuated one at a time (containers restart) and nothing new is placed here — the safe way to empty a node before you take it down."
+                tip="Nodes to drain. Guests are evacuated one at a time (containers restart) and nothing new is placed here. This is the safe way to empty a node before you take it down."
               >
                 Maintenance Nodes (drain)
               </InfoLabel>
@@ -489,7 +489,7 @@ function SettingsForm({
         </div>
 
         <div className="space-y-3">
-          <GroupHeading tip="How much each signal counts towards a node's score. Weights are auto-normalized to sum to 1.0, so only their ratio matters — higher weight, more influence.">
+          <GroupHeading tip="How much each signal counts towards a node's score. Weights are auto-normalized to sum to 1.0, so only their ratio matters: higher weight, more influence.">
             Score Weights
           </GroupHeading>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -527,7 +527,7 @@ function SettingsForm({
               min="0"
               name="weightDisk"
               step="0.1"
-              tip="How much local storage usage counts. Usually the smallest weight — full disks are a capacity problem, not a contention one."
+              tip="How much local storage usage counts. Usually the smallest weight, since full disks are a capacity problem, not a contention one."
             />
           </div>
         </div>
@@ -574,7 +574,7 @@ function SettingsForm({
               max="20"
               min="1"
               name="migrationConsecutivePolls"
-              tip="How many polls in a row a node has to stay over the threshold before it becomes a candidate. This is what filters out spikes — a single good reading resets the counter."
+              tip="How many polls in a row a node has to stay over the threshold before it becomes a candidate. This is what filters out spikes: a single good reading resets the counter."
             />
             <NumberField
               defaultValue={settings.migrationCooldownSeconds}
@@ -604,7 +604,7 @@ function SettingsForm({
         </div>
 
         <div className="space-y-3">
-          <GroupHeading tip="Points added to a node's score when its guests are visibly suffering. Utilization alone misses contention — a node at 60% CPU can still be stalling everything on it.">
+          <GroupHeading tip="Points added to a node's score when its guests are visibly suffering. Utilization alone misses contention. A node at 60% CPU can still be stalling everything on it.">
             Penalties
           </GroupHeading>
           <div className="grid grid-cols-2 gap-3">
@@ -638,7 +638,7 @@ function SettingsForm({
               max="10000"
               min="50"
               name="latencyMaxMs"
-              tip="The response time treated as “as bad as it gets” when normalising latency into the score. Anything slower scores the same — it just caps the scale."
+              tip="The response time treated as “as bad as it gets” when normalising latency into the score. Anything slower scores the same. It just caps the scale."
             />
             <NumberField
               defaultValue={settings.psiPenalty}

@@ -129,7 +129,7 @@ export function StorageBoxCard({
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-[15px]">
             <Cloud className="h-4 w-4" />
-            Off-site backup — Hetzner Storage Box
+            Off-site backup: Hetzner Storage Box
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -177,7 +177,7 @@ export function StorageBoxCard({
                 Encrypt archives before upload (AES-256)
               </span>
               <span className="text-[11px] text-zinc-500">
-                — Hetzner never sees plaintext; failed transfers restart from zero instead of resuming.
+                Hetzner never sees plaintext. Failed transfers restart from zero instead of resuming.
               </span>
             </label>
             <div className="sm:col-span-2">
@@ -201,7 +201,7 @@ export function StorageBoxCard({
       <CardHeader>
         <CardTitle className="flex flex-wrap items-center gap-2 text-[15px]">
           <Cloud className="h-4 w-4" />
-          Off-site backup — {summary.host}
+          Off-site backup: {summary.host}
           {summary.keyInstalled ? (
             <Badge variant="success">
               <KeyRound className="mr-1 h-3 w-3" />
@@ -300,8 +300,8 @@ export function StorageBoxCard({
           {summary.cifsStorageId ? (
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <p className="text-[12px] text-zinc-400">
-                Mounted cluster-wide as <span className="text-zinc-200">{summary.cifsStorageId}</span> —
-                backup policies can target it directly.
+                Mounted cluster-wide as <span className="text-zinc-200">{summary.cifsStorageId}</span>.
+                Backup policies can target it directly.
               </p>
               <form action={unregisterAction}>
                 <input name="siteSlug" type="hidden" value={siteSlug} />
@@ -336,7 +336,7 @@ export function StorageBoxCard({
               </Button>
               <p className="w-full text-[11px] text-zinc-500">
                 Mounts the box on every node so vzdump can write to it directly. Writes then run
-                over the WAN — the offload toggle on each policy is the local-first alternative.
+                over the WAN. The offload toggle on each policy is the local-first alternative.
               </p>
             </form>
           )}

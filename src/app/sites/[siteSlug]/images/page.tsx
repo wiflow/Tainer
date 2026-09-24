@@ -224,7 +224,7 @@ function DockerHubView({
                 Browse namespace
               </label>
               <InfoTip label="Browse namespace" side="top">
-                Browsed when the search query is left blank — for example{" "}
+                Browsed when the search query is left blank, for example{" "}
                 <code className="text-zinc-200">library</code> for Docker&apos;s official images.
               </InfoTip>
             </span>

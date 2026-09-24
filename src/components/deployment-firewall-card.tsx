@@ -130,7 +130,7 @@ export function DeploymentFirewallCard({
       <CardContent className="p-0">
         {rules.length === 0 ? (
           <p className="px-5 py-4 text-[12.5px] text-zinc-500">
-            No guest-level rules — traffic follows the default policies above
+            No guest-level rules. Traffic follows the default policies above
             {options.enable ? "" : " once the firewall is enabled"}.
           </p>
         ) : (

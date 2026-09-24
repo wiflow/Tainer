@@ -71,7 +71,7 @@ registerTool({
   category: "Diagnostics",
   klass: "read",
   description:
-    "Run a health diagnostic scan of a site — surfaces issues like nodes offline, storage nearly full, guests without recent backups, resource pressure, etc. Returns a categorised issue list with severities. Use for 'is prod healthy?', 'what's wrong with this site?', 'anything I should worry about?'.",
+    "Run a health diagnostic scan of a site. Surfaces issues like nodes offline, storage nearly full, guests without recent backups, resource pressure, etc. Returns a categorised issue list with severities. Use for 'is prod healthy?', 'what's wrong with this site?', 'anything I should worry about?'.",
   input_schema: siteSlugSchema(),
   describe: (args) => `Run diagnostics on site ${String(args.siteSlug)}`,
   execute: async (args, ctx) => {

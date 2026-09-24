@@ -9,7 +9,7 @@ registerTool({
   category: "Templates",
   klass: "read",
   description:
-    "List the QEMU/KVM VM templates configured for a site (name, cores, memory, disk, bridge, node). VMs are created from these via the create-VM page — for 'create a VM' point the user there with open_page to /sites/<siteSlug>/deployments/create-vm-from-template, since VM creation needs ISO/cloud-init choices the UI collects. This tool answers 'what VM templates exist?' and surfaces their defaults.",
+    "List the QEMU/KVM VM templates configured for a site (name, cores, memory, disk, bridge, node). VMs are created from these via the create-VM page. For 'create a VM', point the user there with open_page to /sites/<siteSlug>/deployments/create-vm-from-template, since VM creation needs ISO/cloud-init choices the UI collects. This tool answers 'what VM templates exist?' and surfaces their defaults.",
   input_schema: siteSlugSchema(),
   describe: (args) => `List VM templates for site ${String(args.siteSlug)}`,
   execute: async (args, ctx) => {

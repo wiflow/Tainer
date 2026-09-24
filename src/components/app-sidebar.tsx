@@ -612,7 +612,7 @@ export function AppSidebar({
                       href={`https://hub.docker.com/r/tainersh/tainer/tags?name=${encodeURIComponent(latestVersion)}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      title={`Update available: v${latestVersion} — view on Docker Hub`}
+                      title={`Update available: v${latestVersion}. View on Docker Hub`}
                       className="ml-2 inline-flex items-center gap-0.5 rounded-full bg-emerald-500/15 px-2 py-px text-[10px] font-semibold text-emerald-300 hover:bg-emerald-500/25 hover:text-emerald-200 transition-colors"
                     >
                       v{latestVersion}

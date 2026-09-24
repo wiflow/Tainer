@@ -115,7 +115,7 @@ export async function testIpamIntegrationAction(
       };
     }
     return {
-      message: "Connection succeeded — phpIPAM responded.",
+      message: "Connection succeeded. phpIPAM responded.",
       requestId: randomUUID(),
       status: "success",
     };

@@ -154,7 +154,7 @@ registerTool({
     return runInSiteWithPermission(ctx.session, siteSlug, "manage-deployments", async () => {
       const { node, vmid, type } = decodeDeploymentId(deploymentId);
       if (node === targetNode) {
-        throw new Error(`Already on node "${targetNode}" — nothing to migrate.`);
+        throw new Error(`Already on node "${targetNode}". Nothing to migrate.`);
       }
       const upid =
         type === "qemu"

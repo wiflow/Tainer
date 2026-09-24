@@ -197,7 +197,7 @@ export function CopilotSettingsPanel() {
     <div className="space-y-4">
       <SectionPanel
         title="Tainy"
-        description="AI assistant for diagnosing and managing your Proxmox cluster. Runs on a single site-wide DeepInfra API key — every action still runs through each user's own permissions."
+        description="AI assistant for diagnosing and managing your Proxmox cluster. Runs on a single site-wide DeepInfra API key. Every action still runs through each user's own permissions."
         headerRight={
           isAdmin ? (
             <div className="flex items-center gap-2">
@@ -247,7 +247,7 @@ export function CopilotSettingsPanel() {
                 <div className="flex items-center gap-2">
                   <div className="h-2 w-2 rounded-full bg-emerald-400" />
                   <span className="text-[12px] text-zinc-300">
-                    Key on file — ending in <code className="text-zinc-100">…{settings.keyHint}</code>
+                    Key on file, ending in <code className="text-zinc-100">…{settings.keyHint}</code>
                   </span>
                 </div>
                 {isAdmin && (
@@ -291,7 +291,7 @@ export function CopilotSettingsPanel() {
             <span className="flex items-center gap-1.5">
               <label className="text-[12px] font-medium text-zinc-300">Model</label>
               <InfoTip label="Model" side="right">
-                Fast = Gemma 4 26B A4B (MoE — cheap, great for triage). Smart = Gemma 4 31B (best
+                Fast = Gemma 4 26B A4B (MoE, cheap, great for triage). Smart = Gemma 4 31B (best
                 for multi-step reasoning). Kimi = Kimi K3 (Moonshot&apos;s frontier MoE, strongest
                 at agentic tool use). All served by DeepInfra.
               </InfoTip>
@@ -321,7 +321,7 @@ export function CopilotSettingsPanel() {
             </div>
             {baseUrl.trim() && (
               <p className="text-[11px] text-amber-200/80 mt-1.5">
-                A custom endpoint is set — the model presets above are ignored in favour of
+                A custom endpoint is set, so the model presets above are ignored in favour of
                 the custom model id below.
               </p>
             )}
@@ -334,8 +334,8 @@ export function CopilotSettingsPanel() {
                 Custom endpoint (self-hosted models)
               </label>
               <InfoTip label="Custom endpoint" side="right">
-                Point Tainy at any OpenAI-compatible server — vLLM, Ollama, LM Studio, or a
-                corporate gateway — instead of DeepInfra. Use the base URL up to (not including){" "}
+                Point Tainy at any OpenAI-compatible server (vLLM, Ollama, LM Studio, or a
+                corporate gateway) instead of DeepInfra. Use the base URL up to (not including){" "}
                 <code className="text-zinc-200">/chat/completions</code>, e.g.{" "}
                 <code className="text-zinc-200">https://vllm.example.com/v1</code>. https is
                 required; the API key above is optional for endpoints that don&apos;t need one.
@@ -431,7 +431,7 @@ export function CopilotSettingsPanel() {
                   Cost estimation (optional)
                 </label>
                 <InfoTip label="Cost estimation" side="right">
-                  USD per million tokens for your provider/model. Purely informational — turns
+                  USD per million tokens for your provider/model. Purely informational. It turns
                   token counts in the usage displays into a dollar estimate. Leave empty to hide
                   costs.
                 </InfoTip>
@@ -465,7 +465,7 @@ export function CopilotSettingsPanel() {
             <span className="flex items-center gap-1.5">
               <label className="text-[12px] font-medium text-zinc-300">Operator notes</label>
               <InfoTip label="Operator notes" side="right">
-                Site-specific guidance injected into Tainy&apos;s instructions — runbook rules like
+                Site-specific guidance injected into Tainy&apos;s instructions, for example runbook rules like
                 &quot;never restart CT 105 during business hours&quot; or &quot;prefer the servers
                 IP pool for new containers&quot;. Visible to every user via the copilot&apos;s
                 behaviour; max 4,000 characters.
@@ -476,7 +476,7 @@ export function CopilotSettingsPanel() {
                 className={cn(inputClassName, "min-h-[84px] resize-y")}
                 value={operatorNotes}
                 onChange={(e) => setOperatorNotes(e.target.value.slice(0, 4000))}
-                placeholder="e.g. Production containers are tagged 'prod' — always suggest a snapshot before touching them."
+                placeholder="e.g. Production containers are tagged 'prod'. Always suggest a snapshot before touching them."
               />
             ) : operatorNotes.trim() ? (
               <pre className="mt-1.5 whitespace-pre-wrap rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2.5 text-[12px] text-zinc-400 font-sans">
@@ -560,7 +560,7 @@ export function CopilotSettingsPanel() {
                     {group.name}
                     {group.isAdmin && (
                       <span className="ml-1.5 text-[10px] text-violet-300/80">
-                        admin group — exempt
+                        admin group (exempt)
                       </span>
                     )}
                   </span>
@@ -588,7 +588,7 @@ export function CopilotSettingsPanel() {
       {isAdmin && (
         <SectionPanel
           title="Usage by user"
-          description="Token and tool-call spend per user — today and over the rolling 30-day window the usage log keeps."
+          description="Token and tool-call spend per user, today and over the rolling 30-day window the usage log keeps."
         >
           {userUsage.length === 0 ? (
             <div className="flex items-center gap-2 text-[12px] text-zinc-500">

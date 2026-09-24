@@ -61,13 +61,13 @@ export async function validateSiteConnection(
           res.on("data", (chunk) => { raw += chunk; });
           res.on("end", () => {
             if (res.statusCode && res.statusCode >= 400) {
-              reject(new Error(`Login failed (HTTP ${res.statusCode}) — check username and password.`));
+              reject(new Error(`Login failed (HTTP ${res.statusCode}). Check username and password.`));
               return;
             }
             try {
               const parsed = JSON.parse(raw);
               if (!parsed.data?.ticket) {
-                reject(new Error("Login failed — invalid credentials."));
+                reject(new Error("Login failed: invalid credentials."));
                 return;
               }
               resolve(parsed.data.ticket as string);

@@ -24,7 +24,7 @@ registerTool({
   category: "Diagnostics",
   klass: "read",
   description:
-    "List the currently-active alerts for a site (resource thresholds, guest down, storage pressure, etc. — whatever the site's alert policies watch). Use for 'any alerts firing?', 'what's alerting on prod?'. These are the live, unresolved alerts.",
+    "List the currently-active alerts for a site (resource thresholds, guest down, storage pressure, or whatever else the site's alert policies watch). Use for 'any alerts firing?', 'what's alerting on prod?'. These are the live, unresolved alerts.",
   input_schema: siteSlugSchema(),
   describe: (args) => `List active alerts for site ${String(args.siteSlug)}`,
   execute: async (args, ctx) => {

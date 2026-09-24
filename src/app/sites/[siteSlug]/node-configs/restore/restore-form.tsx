@@ -160,13 +160,13 @@ export function RestoreForm({
               <div>
                 <p className="text-[13px] font-medium text-zinc-200 flex items-center gap-1.5">
                   <ShieldAlert className="h-3.5 w-3.5 text-red-400" />
-                  Destructive mode — also remove items not in the snapshot
+                  Destructive mode: also remove items not in the snapshot
                 </p>
                 <p className="mt-0.5 text-[11px] text-zinc-500">
                   Default behaviour is additive (re-add or update what was in the snapshot).
                   Enable destructive mode to also DELETE storages and firewall rules that exist
                   now but were not in the snapshot. This can disconnect storage backends and
-                  break running workloads — leave off unless you know the snapshot is the
+                  break running workloads. Leave off unless you know the snapshot is the
                   authoritative source.
                 </p>
               </div>

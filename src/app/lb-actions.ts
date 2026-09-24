@@ -153,7 +153,7 @@ export async function computeRebalancePlanAction(
         await clearRebalancePlan();
         revalidatePath(`/sites/${siteSlug}/load-balancer`);
         return {
-          message: "The cluster is already balanced — no moves would improve it meaningfully.",
+          message: "The cluster is already balanced. No moves would improve it meaningfully.",
           requestId: randomUUID(),
           status: "success",
         };
@@ -220,7 +220,7 @@ export async function applyRebalancePlanAction(
       });
       if (!updated || updated.status !== "active") {
         return {
-          message: "Plan not found or no longer applicable — compute a fresh one.",
+          message: "Plan not found or no longer applicable. Compute a fresh one.",
           requestId: randomUUID(),
           status: "error",
         };
@@ -239,7 +239,7 @@ export async function applyRebalancePlanAction(
 
       revalidatePath(`/sites/${siteSlug}/load-balancer`);
       return {
-        message: "Plan applied. The balancer executes one move at a time — watch progress below.",
+        message: "Plan applied. The balancer executes one move at a time. Watch progress below.",
         requestId: randomUUID(),
         status: "success",
       };

@@ -154,7 +154,7 @@ export async function restoreConfigSnapshotAction(
         message = "Restore failed for all selected sections.";
       } else {
         status = "error";
-        message = `Restore completed with issues — ${ok.length} ok, ${partial.length} partial, ${failed.length} failed.`;
+        message = `Restore completed with issues: ${ok.length} ok, ${partial.length} partial, ${failed.length} failed.`;
       }
 
       return {
@@ -412,7 +412,7 @@ export async function runConfigSnapshotPolicyNowAction(
         message:
           result.snapshotsTaken > 0
             ? `Snapshot taken (${result.snapshotsTaken} run${result.snapshotsTaken === 1 ? "" : "s"}).`
-            : "No snapshot was taken — schedule may be paused.",
+            : "No snapshot was taken. The schedule may be paused.",
         requestId: randomUUID(),
         status: result.snapshotsTaken > 0 ? "success" : "error",
       };

@@ -247,7 +247,7 @@ export function ConfigSnapshotSchedules({
               <input
                 className={fieldClassName}
                 name="name"
-                placeholder="e.g. Daily — pve-01"
+                placeholder="e.g. Daily pve-01"
                 required
               />
             </label>

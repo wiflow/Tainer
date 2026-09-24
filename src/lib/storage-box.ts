@@ -424,7 +424,7 @@ export async function connectStorageBox(input: {
     host,
     keyInstalled,
     lastTestMessage: usage.totalBytes
-      ? `Connected — ${(usage.usedBytes ?? 0) / 1024 ** 3 < 1 ? "<1" : Math.round((usage.usedBytes ?? 0) / 1024 ** 3)} of ${Math.round(usage.totalBytes / 1024 ** 3)} GiB used`
+      ? `Connected: ${(usage.usedBytes ?? 0) / 1024 ** 3 < 1 ? "<1" : Math.round((usage.usedBytes ?? 0) / 1024 ** 3)} of ${Math.round(usage.totalBytes / 1024 ** 3)} GiB used`
       : "Connected",
     lastTestOk: true,
     lastTestedAt: timestamp,
@@ -523,7 +523,7 @@ export async function testStorageBox(): Promise<{ ok: boolean; message: string; 
     const usage = parseDfOutput(output);
     result = {
       message: usage.totalBytes
-        ? `Reachable — ${formatGiB(usage.usedBytes ?? 0)} of ${formatGiB(usage.totalBytes)} GiB used`
+        ? `Reachable: ${formatGiB(usage.usedBytes ?? 0)} of ${formatGiB(usage.totalBytes)} GiB used`
         : "Reachable",
       ok: true,
       usage,
@@ -703,7 +703,7 @@ export async function scheduleArchiveOffload(input: {
         archive: archiveName,
         durationSeconds: Math.round((Date.now() - startedAt) / 1000),
         kind: "offload",
-        message: `${input.trigger === "reconcile" ? "Backfilled" : "Offloaded"} to ${config.host}:${remoteDir}${encrypted ? " (encrypted)" : ""} — sha256 ${verified ? "verified" : "NOT verified"}`,
+        message: `${input.trigger === "reconcile" ? "Backfilled" : "Offloaded"} to ${config.host}:${remoteDir}${encrypted ? " (encrypted)" : ""}, sha256 ${verified ? "verified" : "NOT verified"}`,
         policyId: input.policyId,
         policyName: input.policyName,
         remotePath: `${remoteDir}/${remoteName}`,
@@ -923,7 +923,7 @@ export async function retrieveArchive(input: {
   if (!target) throw new Error(`Unknown storage "${input.targetStorage}".`);
   if (!target.path) {
     throw new Error(
-      `Storage "${input.targetStorage}" is not file-based — pick a directory storage for retrieval.`,
+      `Storage "${input.targetStorage}" is not file-based. Pick a directory storage for retrieval.`,
     );
   }
 

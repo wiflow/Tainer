@@ -128,7 +128,7 @@ export function CaCertField({ id, name, defaultValue, apiUrl }: Props) {
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <span className="text-[11px] font-medium text-zinc-500">
-          CA certificates (PEM) — for internal/corporate CAs
+          CA certificates (PEM) for internal/corporate CAs
         </span>
         {certCount > 0 && (
           <span className="flex items-center gap-1 text-[10px] text-emerald-400">

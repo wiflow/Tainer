@@ -85,7 +85,7 @@ export function TagDeleteButton({
             ? [
                 <>
                   Removed from <span className="text-zinc-200">{memberCount}</span> deployment
-                  {memberCount === 1 ? "" : "s"} — the deployments themselves are not touched.
+                  {memberCount === 1 ? "" : "s"}. The deployments themselves are not touched.
                 </>,
               ]
             : undefined

@@ -18,7 +18,7 @@ export default function AppError({
   return (
     <ErrorState
       backHref="/"
-      description="This page failed to render. Retrying often clears it — if it doesn't, the reference below appears alongside the full error in the server log."
+      description="This page failed to render. Retrying often clears it. If it doesn't, the reference below appears alongside the full error in the server log."
       digest={error.digest}
       onRetry={reset}
       title="Something went wrong on this page"

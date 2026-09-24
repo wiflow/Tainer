@@ -36,18 +36,18 @@ export type ToolCallView = {
 
 const TOOL_LABELS: Record<string, (args: Record<string, unknown>) => string> = {
   list_sites: () => "List accessible sites",
-  list_nodes: (a) => `List nodes — ${String(a.siteSlug ?? "?")}`,
+  list_nodes: (a) => `List nodes: ${String(a.siteSlug ?? "?")}`,
   get_task_status: (a) => `Check task on ${String(a.node ?? "?")}`,
-  get_cluster_overview: (a) => `Read cluster overview — ${String(a.siteSlug ?? "?")}`,
+  get_cluster_overview: (a) => `Read cluster overview: ${String(a.siteSlug ?? "?")}`,
   list_containers: (a) => {
     const status = a.status && a.status !== "all" ? ` · ${a.status}` : "";
-    return `List containers — ${String(a.siteSlug ?? "?")}${status}`;
+    return `List containers: ${String(a.siteSlug ?? "?")}${status}`;
   },
   get_container: () => `Read deployment details`,
-  list_templates: (a) => `List OS templates — ${String(a.siteSlug ?? "?")}`,
-  list_deployment_templates: (a) => `List deployment templates — ${String(a.siteSlug ?? "?")}`,
-  list_storage_pools: (a) => `Check storage pools — ${String(a.siteSlug ?? "?")}`,
-  list_ip_pools: (a) => `List IP pools — ${String(a.siteSlug ?? "?")}`,
+  list_templates: (a) => `List OS templates: ${String(a.siteSlug ?? "?")}`,
+  list_deployment_templates: (a) => `List deployment templates: ${String(a.siteSlug ?? "?")}`,
+  list_storage_pools: (a) => `Check storage pools: ${String(a.siteSlug ?? "?")}`,
+  list_ip_pools: (a) => `List IP pools: ${String(a.siteSlug ?? "?")}`,
   get_audit_log: () => `Read audit log`,
   start_deployment: () => `Start deployment`,
   stop_deployment: () => `Hard-stop deployment`,
@@ -58,7 +58,7 @@ const TOOL_LABELS: Record<string, (args: Record<string, unknown>) => string> = {
     if (a.cores != null) bits.push(`cores=${a.cores}`);
     if (a.memoryMb != null) bits.push(`mem=${a.memoryMb}MB`);
     if (a.swapMb != null) bits.push(`swap=${a.swapMb}MB`);
-    return `Update resources — ${bits.join(", ") || "no changes"}`;
+    return `Update resources: ${bits.join(", ") || "no changes"}`;
   },
   destroy_deployment: () => `Destroy deployment`,
   destroy_batch_deployments: (a) =>
@@ -78,31 +78,31 @@ const TOOL_LABELS: Record<string, (args: Record<string, unknown>) => string> = {
   delete_snapshot: (a) => `Delete snapshot "${String(a.snapshotName ?? "?")}"`,
   launch_batch_from_deployment_template: (a) =>
     `Launch ${String(a.count ?? "?")}× "${String(a.hostnamePrefix ?? "?")}…" from template`,
-  list_backups: (a) => `List backups — ${String(a.siteSlug ?? "?")}`,
+  list_backups: (a) => `List backups: ${String(a.siteSlug ?? "?")}`,
   create_backup: () => `Back up deployment`,
   restore_backup: () => `Restore backup (overwrite)`,
   migrate_deployment: (a) => `Migrate to node ${String(a.targetNode ?? "?")}`,
   set_deployment_tags: () => `Update tags`,
-  list_tags: (a) => `List tags — ${String(a.siteSlug ?? "?")}`,
-  get_deployment_metrics: (a) => `Metrics trend — ${String(a.timeframe ?? "day")}`,
+  list_tags: (a) => `List tags: ${String(a.siteSlug ?? "?")}`,
+  get_deployment_metrics: (a) => `Metrics trend (${String(a.timeframe ?? "day")})`,
   get_network_path: () => `Trace network path`,
-  get_cve_report: (a) => `Last CVE scan — ${String(a.siteSlug ?? "?")}`,
-  run_cve_scan: (a) => `Run CVE scan — ${String(a.siteSlug ?? "?")}`,
-  run_diagnostics: (a) => `Run diagnostics — ${String(a.siteSlug ?? "?")}`,
-  get_alerts: (a) => `Active alerts — ${String(a.siteSlug ?? "?")}`,
+  get_cve_report: (a) => `Last CVE scan: ${String(a.siteSlug ?? "?")}`,
+  run_cve_scan: (a) => `Run CVE scan: ${String(a.siteSlug ?? "?")}`,
+  run_diagnostics: (a) => `Run diagnostics: ${String(a.siteSlug ?? "?")}`,
+  get_alerts: (a) => `Active alerts: ${String(a.siteSlug ?? "?")}`,
   get_heartbeat_status: () => `Heartbeat status`,
-  list_firewall_rules: (a) => `List firewall rules — ${String(a.siteSlug ?? "?")}`,
+  list_firewall_rules: (a) => `List firewall rules: ${String(a.siteSlug ?? "?")}`,
   add_firewall_rule: (a) => `Add firewall rule (${String(a.type ?? "?")} ${String(a.action ?? "?")})`,
   delete_firewall_rule: (a) => `Delete firewall rule #${String(a.pos ?? "?")}`,
-  list_vm_templates: (a) => `List VM templates — ${String(a.siteSlug ?? "?")}`,
-  list_backup_policies: (a) => `Backup policies — ${String(a.siteSlug ?? "?")}`,
-  list_alert_policies: (a) => `Alert policies — ${String(a.siteSlug ?? "?")}`,
-  list_config_snapshots: (a) => `Config snapshots — ${String(a.siteSlug ?? "?")}`,
+  list_vm_templates: (a) => `List VM templates: ${String(a.siteSlug ?? "?")}`,
+  list_backup_policies: (a) => `Backup policies: ${String(a.siteSlug ?? "?")}`,
+  list_alert_policies: (a) => `Alert policies: ${String(a.siteSlug ?? "?")}`,
+  list_config_snapshots: (a) => `Config snapshots: ${String(a.siteSlug ?? "?")}`,
   take_config_snapshot: (a) => `Snapshot node ${String(a.node ?? "?")} config`,
-  list_isos: (a) => `List ISOs — ${String(a.siteSlug ?? "?")}`,
+  list_isos: (a) => `List ISOs: ${String(a.siteSlug ?? "?")}`,
   list_users: () => `List users`,
   list_groups: () => `List permission groups`,
-  search_docker_images: (a) => `Search Docker Hub — "${String(a.query ?? "?")}"`,
+  search_docker_images: (a) => `Search Docker Hub: "${String(a.query ?? "?")}"`,
   pull_docker_image: (a) =>
     `Pull ${String(a.namespace ?? "library")}/${String(a.repository ?? "?")}:${String(a.tag ?? "latest")} → ${String(a.storage ?? "?")}`,
   create_container_from_image: (a) =>

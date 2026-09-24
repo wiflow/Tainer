@@ -1444,7 +1444,7 @@ function CredentialsCard({
         </span>
         <div className="flex-1 min-w-0">
           <div className="text-[12px] font-medium text-amber-200">
-            Root password — shown once
+            Root password (shown once)
           </div>
           <div className="text-[10.5px] text-amber-200/70 mt-0.5">{creds.warning}</div>
           <div className="mt-2 flex items-center gap-1.5">
@@ -1611,7 +1611,7 @@ function MetricsRow({
 
 function MetricsCard({ data }: { data: MetricsResult }) {
   if (data.issue && data.points === 0) {
-    return <EmptyResult message={`No metrics available — ${data.issue}`} />;
+    return <EmptyResult message={`No metrics available: ${data.issue}`} />;
   }
   return (
     <motion.div
@@ -1723,7 +1723,7 @@ const SEVERITY_TONE: Record<string, string> = {
 
 function DiagnosticsCard({ data }: { data: DiagnosticsResult }) {
   if (data.issueCount === 0) {
-    return <EmptyResult message="No issues found — site looks healthy." />;
+    return <EmptyResult message="No issues found. Site looks healthy." />;
   }
   return (
     <div className="space-y-1">
@@ -1882,7 +1882,7 @@ function NetworkPathCard({ data, siteSlug }: { data: NetworkPathResult; siteSlug
                     {u.vlan != null && <span className="text-zinc-600">VLAN {u.vlan}</span>}
                   </>
                 ) : (
-                  <span className="text-zinc-600">— no LLDP neighbour observed</span>
+                  <span className="text-zinc-600">(no LLDP neighbour observed)</span>
                 )}
               </div>
             );
@@ -2123,7 +2123,7 @@ function BatchDestroyCard({ result }: { result: BatchDestroyResult }) {
           </div>
           {result.failed.map((f) => (
             <div key={f.vmid} className="text-[10.5px] text-amber-200/80">
-              <span className="font-medium">{f.name}</span> (CT/VM {f.vmid}) — {f.error}
+              <span className="font-medium">{f.name}</span> (CT/VM {f.vmid}): {f.error}
             </div>
           ))}
         </div>
@@ -2197,14 +2197,14 @@ function BatchCreateCard({
           </div>
           {result.failed.map((f) => (
             <div key={f.hostname} className="text-[10.5px] text-rose-200/80">
-              <span className="font-medium">{f.hostname}</span> — {f.error}
+              <span className="font-medium">{f.hostname}</span>: {f.error}
             </div>
           ))}
         </div>
       )}
 
       <div className="rounded-md border border-amber-500/25 bg-amber-500/[0.05] px-2.5 py-1.5 text-[10.5px] text-amber-200/80">
-        Each root password is shown once — reveal and store them now.
+        Each root password is shown once. Reveal and store them now.
       </div>
     </div>
   );
@@ -2329,7 +2329,7 @@ export function SnapshotListView({
         </Link>
       )}
       {data.snapshots.length === 0 ? (
-        <EmptyResult message="No snapshots yet — take one with create_snapshot." />
+        <EmptyResult message="No snapshots yet. Take one with create_snapshot." />
       ) : (
         <div className="space-y-1">
           {data.snapshots.map((s) => (

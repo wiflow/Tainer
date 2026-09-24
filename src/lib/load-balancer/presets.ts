@@ -12,7 +12,7 @@ export const LB_PRESET_STOPS: LbPresetStop[] = [
     key: "observe",
     label: "Observe",
     description:
-      "Watch and recommend only. The balancer scores nodes and records the moves it would make, but never migrates anything — the trust-building mode.",
+      "Watch and recommend only. The balancer scores nodes and records the moves it would make, but never migrates anything. This is the trust-building mode.",
     overrides: {
       migrationDryRun: true,
       migrationEnabled: true,

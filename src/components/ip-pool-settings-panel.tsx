@@ -402,7 +402,7 @@ function IpPoolDeleteButton({
       <ConfirmSubmitButton
         className="h-8"
         consequences={[
-          "Addresses already assigned to running guests keep working — they are not reclaimed.",
+          "Addresses already assigned to running guests keep working. They are not reclaimed.",
           "New deployments can no longer draw an address from this range.",
         ]}
         description={`Delete the IP pool "${poolName}"?`}

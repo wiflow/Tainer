@@ -16,7 +16,7 @@ const STEPS: { title: string; body: string }[] = [
   {
     title: "Move the smallest thing that helps",
     body:
-      "The balancer sheds just enough load — never a 64 GB VM when a 4 GB one would do — and only to a node with genuine headroom that beats the source by your minimum improvement.",
+      "The balancer sheds just enough load (never a 64 GB VM when a 4 GB one would do), and only to a node with genuine headroom that beats the source by your minimum improvement.",
   },
   {
     title: "Protect containers",
@@ -42,7 +42,7 @@ export function LoadBalancerExplainer() {
         <ChevronRight className="h-3.5 w-3.5 text-zinc-500 transition-transform duration-200 group-open:rotate-90" />
         How the load balancer works
         <span className="text-[12px] font-normal text-zinc-500">
-          — the short version
+          (the short version)
         </span>
       </summary>
       <div className="grid gap-x-6 gap-y-4 border-t border-white/5 px-5 py-4 sm:grid-cols-2">

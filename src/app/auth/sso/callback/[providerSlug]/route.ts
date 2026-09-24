@@ -88,7 +88,7 @@ export async function GET(
     if (error instanceof ResponseBodyError) {
       const parts = [error.error];
       if (error.error_description) parts.push(error.error_description);
-      detail = parts.filter(Boolean).join(" — ") || "OIDC token endpoint returned an error.";
+      detail = parts.filter(Boolean).join(": ") || "OIDC token endpoint returned an error.";
       logBody = {
         error: error.error,
         error_description: error.error_description,
@@ -98,7 +98,7 @@ export async function GET(
     } else if (error instanceof AuthorizationResponseError) {
       const parts = [error.error];
       if (error.error_description) parts.push(error.error_description);
-      detail = parts.filter(Boolean).join(" — ") || "OIDC authorization response was invalid.";
+      detail = parts.filter(Boolean).join(": ") || "OIDC authorization response was invalid.";
       logBody = {
         error: error.error,
         error_description: error.error_description,

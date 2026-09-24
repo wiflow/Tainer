@@ -137,7 +137,7 @@ export async function takeConfigSnapshot(
     createdAt: new Date().toISOString(),
     createdBy,
     id: randomUUID(),
-    label: label.trim() || `${nodeName} — ${new Date().toLocaleDateString()}`,
+    label: label.trim() || `${nodeName} (${new Date().toLocaleDateString()})`,
     nodeName,
     policyId: options.policyId ?? null,
     trigger: options.trigger ?? "manual",
@@ -270,7 +270,7 @@ export async function runConfigSnapshotTick(): Promise<ConfigSnapshotTickResult>
     policies,
     policyLabel: (p) => `Policy "${p.name}"`,
     runOne: async (policy) => {
-      const label = `${policy.name} — ${new Date().toLocaleString()}`;
+      const label = `${policy.name} (${new Date().toLocaleString()})`;
       await takeConfigSnapshot(policy.nodeName, `schedule:${policy.name}`, label, {
         policyId: policy.id,
         policyRetention: policy.retentionCount,

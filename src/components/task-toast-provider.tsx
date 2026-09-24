@@ -220,11 +220,11 @@ function ToastCard({
                     ? `${toast.progress}%`
                     : toast.status === "success"
                       ? isClickable
-                        ? "Completed — click to open"
+                        ? "Completed. Click to open"
                         : "Completed"
                       : toast.status === "warning"
                         ? isClickable
-                          ? "Completed with warnings — click to open"
+                          ? "Completed with warnings. Click to open"
                           : "Completed with warnings"
                       : "Failed"}
                 </p>

@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
     if (chain.length === 0) {
       return NextResponse.json({
         ok: false,
-        error: `No intermediate/root certs found via AIA. The server cert is issued by "${leaf.issuer}" — you need to manually upload that CA certificate.`,
+        error: `No intermediate/root certs found via AIA. The server cert is issued by "${leaf.issuer}", so you need to manually upload that CA certificate.`,
         chain: [{
           subject: leaf.subject,
           issuer: leaf.issuer,
