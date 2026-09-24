@@ -221,8 +221,9 @@ export async function loginAction(
     const twoFactorCode = String(formData.get("twoFactorCode") ?? "").trim();
 
     if (twoFactorCode) {
+      let completed: Awaited<ReturnType<typeof completeTwoFactorLogin>>;
       try {
-        await completeTwoFactorLogin(twoFactorCode);
+        completed = await completeTwoFactorLogin(twoFactorCode);
       } catch (error) {
         const challengeUser = await getLoginChallengeUser().catch(() => null);
         if (challengeUser) {
@@ -235,15 +236,23 @@ export async function loginAction(
         }
         throw error;
       }
-      const session = await getCurrentSession();
-      if (session) {
-        recordAdminAudit({
-          action: "login-success",
-          actorEmail: session.user.email,
-          actorName: session.user.name,
-          message: "Local password + 2FA sign-in",
-        }).catch(() => {});
-      }
+      const { ssoProviderName, user } = completed;
+      recordAdminAudit(
+        ssoProviderName
+          ? {
+              action: "sso-login",
+              actorEmail: user.email,
+              actorName: user.name,
+              targetEmail: user.email,
+              message: `Signed in via ${ssoProviderName} with 2FA`,
+            }
+          : {
+              action: "login-success",
+              actorEmail: user.email,
+              actorName: user.name,
+              message: "Local password + 2FA sign-in",
+            },
+      ).catch(() => {});
     } else {
       const email = String(formData.get("email") ?? "").trim();
       const password = String(formData.get("password") ?? "");

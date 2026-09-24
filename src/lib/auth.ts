@@ -188,6 +188,7 @@ export type TwoFactorSetup = {
 type LoginChallenge = {
   expiresAt: string;
   nonce: string;
+  ssoProviderName?: string;
   userId: string;
 };
 
@@ -1730,7 +1731,7 @@ export async function completeTwoFactorLogin(code: string) {
     await clearLoginChallengeCookie();
     await createSession(user.id);
 
-    return sanitizeUser(user);
+    return { ssoProviderName: challenge.ssoProviderName ?? null, user: await sanitizeUser(user) };
   });
 }
 
@@ -1887,6 +1888,7 @@ export async function createSession(userId: string) {
 
 export type SsoSignInInput = {
   providerId: string;
+  providerName: string;
   /** Stable identifier from the IdP (`sub` claim). */
   subject: string;
   email: string;
@@ -2035,6 +2037,7 @@ export async function signInWithSso(
     await setLoginChallengeCookie({
       expiresAt: addMinutes(new Date(), LOGIN_CHALLENGE_TTL_MINUTES).toISOString(),
       nonce: randomBytes(16).toString("base64url"),
+      ssoProviderName: input.providerName,
       userId: user.id,
     });
     return { provisioned, requiresTwoFactor: true, user };

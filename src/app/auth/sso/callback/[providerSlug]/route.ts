@@ -148,6 +148,7 @@ export async function GET(
   try {
     result = await signInWithSso({
       providerId: provider.id,
+      providerName: provider.name,
       subject: claims.sub,
       email: claims.email,
       emailVerified: claims.emailVerified,
@@ -162,13 +163,6 @@ export async function GET(
   }
 
   if (result.requiresTwoFactor) {
-    recordAdminAudit({
-      action: "sso-login",
-      actorEmail: result.user.email,
-      actorName: result.user.name,
-      targetEmail: result.user.email,
-      message: `Signed in via ${provider.name}, awaiting 2FA challenge`,
-    }).catch(() => {});
     const response = NextResponse.redirect(publicUrl(request, "/login?two_factor=1"));
     response.cookies.delete(OIDC_FLOW_COOKIE);
     return response;
