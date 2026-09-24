@@ -27,6 +27,8 @@ import {
   disableLocalPassword,
   disableTwoFactor,
   getCurrentSession,
+  getLoginChallengeUser,
+  isAcceptableLoginEmail,
   requirePermission,
   requireSession,
   resetPasswordWithToken,
@@ -37,7 +39,7 @@ import {
   updateUserPermissions,
   type Permission,
 } from "@/lib/auth";
-import { recordAdminAudit } from "@/lib/admin-audit-log";
+import { recordAdminAudit, recordThrottledAdminAudit } from "@/lib/admin-audit-log";
 import { getClientIpForRateLimit } from "@/lib/proxy-trust";
 
 function errorState<T extends BasicActionState>(state: T, message: string): T {
@@ -212,12 +214,27 @@ export async function loginAction(
   // Capture the email up-front so the catch-block audit entry can attribute
   // a failed attempt even when `beginLogin` throws before we know the user.
   let attemptedEmail = "";
+  let clientIp: string | undefined;
 
   try {
+    clientIp = await getClientIpForRateLimit();
     const twoFactorCode = String(formData.get("twoFactorCode") ?? "").trim();
 
     if (twoFactorCode) {
-      await completeTwoFactorLogin(twoFactorCode);
+      try {
+        await completeTwoFactorLogin(twoFactorCode);
+      } catch (error) {
+        const challengeUser = await getLoginChallengeUser().catch(() => null);
+        if (challengeUser) {
+          recordAdminAudit({
+            action: "two-factor-failure",
+            actorEmail: challengeUser.email,
+            actorName: challengeUser.name,
+            message: `2FA sign-in failed${clientIp ? ` from ${clientIp}` : ""}: ${error instanceof Error ? error.message : "unknown error"}`,
+          }).catch(() => {});
+        }
+        throw error;
+      }
       const session = await getCurrentSession();
       if (session) {
         recordAdminAudit({
@@ -229,21 +246,24 @@ export async function loginAction(
       }
     } else {
       const email = String(formData.get("email") ?? "").trim();
-      attemptedEmail = email;
       const password = String(formData.get("password") ?? "");
 
       if (!email || !password) {
         return errorState(_previousState, "Enter both your email and password.");
       }
 
-      const result = await beginLogin(email, password, await getClientIpForRateLimit());
+      if (isAcceptableLoginEmail(email)) {
+        attemptedEmail = email.toLowerCase();
+      }
+
+      const result = await beginLogin(email, password, clientIp);
 
       if (result.requiresTwoFactor) {
         recordAdminAudit({
-          action: "login-success",
+          action: "login-password-verified",
           actorEmail: email,
           actorName: email,
-          message: "Local password sign-in — awaiting 2FA challenge",
+          message: "Password verified, waiting for 2FA code",
         }).catch(() => {});
         return {
           message: "Enter your authenticator code or one of your recovery codes to finish signing in.",
@@ -263,11 +283,11 @@ export async function loginAction(
   } catch (error) {
     const reason = error instanceof Error ? error.message : "Failed to sign in.";
     if (attemptedEmail) {
-      recordAdminAudit({
+      recordThrottledAdminAudit(`login-failure:${attemptedEmail}:${clientIp ?? ""}`, {
         action: "login-failure",
         actorEmail: attemptedEmail,
         actorName: attemptedEmail,
-        message: `Local password sign-in failed: ${reason}`,
+        message: `Local password sign-in failed${clientIp ? ` from ${clientIp}` : ""}: ${reason}`,
       }).catch(() => {});
     }
     return {
@@ -398,6 +418,16 @@ export async function changePasswordAction(
       currentPassword,
       nextPassword,
     });
+
+    const session = await getCurrentSession();
+    if (session) {
+      recordAdminAudit({
+        action: "password-changed",
+        actorEmail: session.user.email,
+        actorName: session.user.name,
+        message: "Changed own password and signed out other sessions",
+      }).catch(() => {});
+    }
 
     return {
       message: "Password updated. Other sessions have been signed out.",

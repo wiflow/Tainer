@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
-import { verifyGuestShellStepUp } from "@/lib/auth";
+import { recordAdminAudit } from "@/lib/admin-audit-log";
+import { getCurrentSession, verifyGuestShellStepUp, type AuthSession } from "@/lib/auth";
 
 function validateOrigin(request: Request) {
   const origin = request.headers.get("origin");
@@ -23,8 +24,11 @@ function validateOrigin(request: Request) {
 }
 
 export async function POST(request: Request) {
+  let session: AuthSession | null = null;
+
   try {
     validateOrigin(request);
+    session = await getCurrentSession();
     const payload = (await request.json()) as { code?: string };
     const code = String(payload.code ?? "").trim();
 
@@ -33,11 +37,25 @@ export async function POST(request: Request) {
     }
 
     const result = await verifyGuestShellStepUp(code);
+    if (session) {
+      recordAdminAudit({
+        action: "guest-shell-step-up",
+        actorEmail: session.user.email,
+        actorName: session.user.name,
+        message: "Verified 2FA for in-app SSH",
+      }).catch(() => {});
+    }
     return NextResponse.json({ success: true, ...result });
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to verify 2FA challenge." },
-      { status: 400 },
-    );
+    const message = error instanceof Error ? error.message : "Failed to verify 2FA challenge.";
+    if (session) {
+      recordAdminAudit({
+        action: "guest-shell-step-up-failure",
+        actorEmail: session.user.email,
+        actorName: session.user.name,
+        message: `2FA check for in-app SSH failed: ${message}`,
+      }).catch(() => {});
+    }
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 }

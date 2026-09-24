@@ -789,6 +789,19 @@ async function readLoginChallengeCookie() {
   }
 }
 
+export async function getLoginChallengeUser() {
+  const challenge = await readLoginChallengeCookie();
+
+  if (!challenge) {
+    return null;
+  }
+
+  const store = await readAuthStore();
+  const user = store.users.find((entry) => entry.id === challenge.userId);
+
+  return user ? { email: user.email, name: user.name } : null;
+}
+
 async function readSessionIdFromCookies() {
   const cookieStore = await cookies();
   const cookie = cookieStore.get(SESSION_COOKIE_NAME)?.value;
@@ -1174,7 +1187,7 @@ export async function createInitialAdministrator(input: {
     throw new Error("Enter a valid email address.");
   }
 
-  return mutateAuthStore(async (store) => {
+  await mutateAuthStore(async (store) => {
     if (store.users.length > 0) {
       throw new Error("Initial setup has already been completed.");
     }
@@ -1198,6 +1211,15 @@ export async function createInitialAdministrator(input: {
       updatedAt: timestamp,
     });
   });
+
+  const { recordAdminAudit } = await import("@/lib/admin-audit-log");
+  recordAdminAudit({
+    action: "admin-bootstrapped",
+    actorEmail: email,
+    actorName: name,
+    message: "Created the first administrator during setup",
+    targetEmail: email,
+  }).catch(() => {});
 }
 
 const MAX_RATE_LIMIT_KEYS = 5_000;

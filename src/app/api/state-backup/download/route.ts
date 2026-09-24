@@ -4,6 +4,7 @@ import { Readable } from "node:stream";
 
 import { NextResponse, type NextRequest } from "next/server";
 
+import { recordAdminAudit } from "@/lib/admin-audit-log";
 import { getCurrentSession } from "@/lib/auth";
 import {
   getStateBackupConfig,
@@ -41,6 +42,13 @@ export async function GET(request: NextRequest) {
   } catch {
     return NextResponse.json({ error: "Backup not found." }, { status: 404 });
   }
+
+  recordAdminAudit({
+    action: "state-backup-downloaded",
+    actorEmail: session.user.email,
+    actorName: session.user.name,
+    message: `Downloaded state backup ${name}`,
+  }).catch(() => {});
 
   const stream = Readable.toWeb(createReadStream(filePath)) as ReadableStream;
   return new Response(stream, {
