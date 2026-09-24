@@ -5,7 +5,7 @@ import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 
 import type { BasicActionState } from "@/lib/action-states";
-import { requirePermission, requireSession } from "@/lib/auth";
+import { requireSession, requireSitePermission } from "@/lib/auth";
 import { triggerManualBackupRun } from "@/lib/backup-engine";
 import {
   createBackupPolicy,
@@ -79,10 +79,10 @@ export async function createBackupPolicyAction(
 ): Promise<BasicActionState> {
   try {
     const session = await requireSession();
-    requirePermission(session, "manage-backups");
     const siteSlug = String(formData.get("siteSlug") ?? "");
     if (!siteSlug) return { message: "Missing site context.", requestId: randomUUID(), status: "error" };
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
+    requireSitePermission(session, siteConfig.siteId, "manage-backups");
     return await withSiteConfig(siteConfig, async () => {
     const input = parsePolicyInput(formData);
     await createBackupPolicy(input);
@@ -109,10 +109,10 @@ export async function updateBackupPolicyAction(
 ): Promise<BasicActionState> {
   try {
     const session = await requireSession();
-    requirePermission(session, "manage-backups");
     const siteSlug = String(formData.get("siteSlug") ?? "");
     if (!siteSlug) return { message: "Missing site context.", requestId: randomUUID(), status: "error" };
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
+    requireSitePermission(session, siteConfig.siteId, "manage-backups");
     return await withSiteConfig(siteConfig, async () => {
     const policyId = String(formData.get("policyId") ?? "");
     if (!policyId) throw new Error("Policy ID is required.");
@@ -144,10 +144,10 @@ export async function deleteBackupPolicyAction(
 ): Promise<BasicActionState> {
   try {
     const session = await requireSession();
-    requirePermission(session, "manage-backups");
     const siteSlug = String(formData.get("siteSlug") ?? "");
     if (!siteSlug) return { message: "Missing site context.", requestId: randomUUID(), status: "error" };
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
+    requireSitePermission(session, siteConfig.siteId, "manage-backups");
     return await withSiteConfig(siteConfig, async () => {
     const policyId = String(formData.get("policyId") ?? "");
     if (!policyId) throw new Error("Policy ID is required.");
@@ -178,10 +178,10 @@ export async function duplicateBackupPolicyAction(
 ): Promise<BasicActionState> {
   try {
     const session = await requireSession();
-    requirePermission(session, "manage-backups");
     const siteSlug = String(formData.get("siteSlug") ?? "");
     if (!siteSlug) return { message: "Missing site context.", requestId: randomUUID(), status: "error" };
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
+    requireSitePermission(session, siteConfig.siteId, "manage-backups");
     return await withSiteConfig(siteConfig, async () => {
     const policyId = String(formData.get("policyId") ?? "");
     if (!policyId) throw new Error("Policy ID is required.");
@@ -212,10 +212,10 @@ export async function toggleBackupPolicyAction(
 ): Promise<BasicActionState> {
   try {
     const session = await requireSession();
-    requirePermission(session, "manage-backups");
     const siteSlug = String(formData.get("siteSlug") ?? "");
     if (!siteSlug) return { message: "Missing site context.", requestId: randomUUID(), status: "error" };
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
+    requireSitePermission(session, siteConfig.siteId, "manage-backups");
     return await withSiteConfig(siteConfig, async () => {
     const policyId = String(formData.get("policyId") ?? "");
     const enabled = formData.get("enabled") === "true";
@@ -246,10 +246,10 @@ export async function runBackupPolicyNowAction(
 ): Promise<BasicActionState> {
   try {
     const session = await requireSession();
-    requirePermission(session, "manage-backups");
     const siteSlug = String(formData.get("siteSlug") ?? "");
     if (!siteSlug) return { message: "Missing site context.", requestId: randomUUID(), status: "error" };
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
+    requireSitePermission(session, siteConfig.siteId, "manage-backups");
     return await withSiteConfig(siteConfig, async () => {
     const policyId = String(formData.get("policyId") ?? "");
     if (!policyId) throw new Error("Policy ID is required.");

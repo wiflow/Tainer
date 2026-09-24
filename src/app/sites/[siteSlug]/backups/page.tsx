@@ -20,7 +20,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { MetricCard } from "@/components/ui/metric-card";
 import { SectionPanel } from "@/components/ui/section-panel";
 import { getAppSettings, resolveDefaultRootfsStorage } from "@/lib/app-settings";
-import { getCurrentSession } from "@/lib/auth";
+import { getCurrentSession, hasSitePermission } from "@/lib/auth";
 import { listBackupPolicies } from "@/lib/backup-policies";
 import { listBackupRuns } from "@/lib/backup-run-log";
 import { listContainerTags } from "@/lib/container-groups";
@@ -59,7 +59,7 @@ export default async function BackupsPage({
 }) {
   const { siteSlug } = await params;
   await requireSitePageAccess(siteSlug);
-  await ensureSiteConfig(siteSlug);
+  const siteConfig = await ensureSiteConfig(siteSlug);
 
   const session = await getCurrentSession();
 
@@ -90,6 +90,7 @@ export default async function BackupsPage({
 
   const defaults = getProxmoxDefaults();
   const isAdmin = session.user.role === "admin";
+  const canManageBackups = hasSitePermission(session, siteConfig.siteId, "manage-backups");
   const restoreTargetStorage = resolveDefaultRootfsStorage(
     rootfsResult.targets,
     settings.defaultRootfsStorage || defaults.defaultRootfsStorage,
@@ -121,7 +122,7 @@ export default async function BackupsPage({
           </CardContent>
         </Card>
 
-        {isAdmin && storageBoxSummary.configured && (
+        {canManageBackups && storageBoxSummary.configured && (
           <StorageBoxCard
             dirStorages={dirStorages}
             nodes={[]}
@@ -194,7 +195,7 @@ export default async function BackupsPage({
         title="API access notes"
       />
 
-      {isAdmin && storageBoxSummary.configured && (
+      {canManageBackups && storageBoxSummary.configured && (
         <StorageBoxCard
           dirStorages={dirStorages}
           nodes={[...new Set(overview.backupStoragePools.map((p) => p.node))]}
@@ -204,7 +205,7 @@ export default async function BackupsPage({
         />
       )}
 
-      {isAdmin && (
+      {canManageBackups && (
         <BackupPoliciesList
           availableTags={availableTags}
           healthyPools={healthyPools}
@@ -230,7 +231,7 @@ export default async function BackupsPage({
           archives={overview.recentArchives}
           defaultNode={defaults.defaultNode}
           defaultStorage={restoreTargetStorage}
-          isAdmin={isAdmin}
+          isAdmin={canManageBackups}
           offsiteArchives={offsiteArchives}
         />
       </SectionPanel>
