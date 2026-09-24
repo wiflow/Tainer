@@ -54,6 +54,21 @@ export function getPublicOrigin(headers: Headers, requestUrl?: string): string {
   );
 }
 
+const RETURN_TO_BASE = "http://tainer.invalid";
+
+/** Reduce a caller-supplied return path to a same-origin relative path, or `fallback`. */
+export function sanitizeReturnTo(raw: string | null | undefined, fallback = "/"): string {
+  if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return fallback;
+  if (/[\\\u0000-\u001f\u007f]/.test(raw)) return fallback;
+  try {
+    const url = new URL(raw, RETURN_TO_BASE);
+    if (url.origin !== RETURN_TO_BASE || url.pathname.startsWith("//")) return fallback;
+    return url.pathname + url.search + url.hash;
+  } catch {
+    return fallback;
+  }
+}
+
 export const OIDC_FLOW_COOKIE = "tainer_oidc_flow";
 const OIDC_FLOW_COOKIE_NAMESPACE = "oidc-flow:v1";
 const OIDC_FLOW_TTL_MS = 5 * 60 * 1000; // 5 minutes — enough to complete the IdP redirect dance

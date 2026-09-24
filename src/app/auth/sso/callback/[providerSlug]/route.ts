@@ -15,6 +15,7 @@ import {
   completeOidcAuthorization,
   getPublicOrigin,
   oidcFlowCookieHelpers,
+  sanitizeReturnTo,
 } from "@/lib/oidc";
 
 export const dynamic = "force-dynamic";
@@ -163,7 +164,9 @@ export async function GET(
 
   // Send the user back where they came from. Cookie has been set by
   // signInWithSso → createSession.
-  const target = publicUrl(request, flowState.returnTo || "/");
+  const home = publicUrl(request, "/");
+  let target = publicUrl(request, sanitizeReturnTo(flowState.returnTo));
+  if (target.origin !== home.origin) target = home;
   const response = NextResponse.redirect(target);
   response.cookies.delete(OIDC_FLOW_COOKIE);
   return response;

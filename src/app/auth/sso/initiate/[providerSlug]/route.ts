@@ -5,6 +5,7 @@ import {
   OIDC_FLOW_COOKIE,
   getPublicOrigin,
   oidcFlowCookieHelpers,
+  sanitizeReturnTo,
   startOidcAuthorization,
 } from "@/lib/oidc";
 
@@ -16,14 +17,6 @@ function buildRedirectUri(request: NextRequest, providerSlug: string): string {
   // strict-compares these). APP_URL > x-forwarded-* > Host header.
   const origin = getPublicOrigin(request.headers, request.url);
   return `${origin}/auth/sso/callback/${providerSlug}`;
-}
-
-function sanitizeReturnTo(raw: string | null, fallback = "/"): string {
-  if (!raw) return fallback;
-  // Block protocol-relative URLs and absolute URLs to prevent open-redirect.
-  // Only same-origin paths are allowed back through this entrypoint.
-  if (!raw.startsWith("/") || raw.startsWith("//")) return fallback;
-  return raw;
 }
 
 export async function GET(
