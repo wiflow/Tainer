@@ -5,7 +5,7 @@ import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 
 import type { BasicActionState } from "@/lib/action-states";
-import { requirePermission, requireSession } from "@/lib/auth";
+import { requireAdminSession } from "@/lib/auth";
 import { recordAdminAudit } from "@/lib/admin-audit-log";
 import { clearAllHeartbeatAlerts, runHeartbeatCheck } from "@/lib/heartbeat-engine";
 import { saveHeartbeatSettings } from "@/lib/heartbeat-settings";
@@ -25,8 +25,7 @@ export async function saveHeartbeatSettingsAction(
   formData: FormData,
 ): Promise<BasicActionState> {
   try {
-    const session = await requireSession();
-    requirePermission(session, "manage-settings");
+    const session = await requireAdminSession();
 
     const enabled = formData.get("enabled") === "true";
     const checkIntervalSeconds = Number(formData.get("checkIntervalSeconds") ?? 60);
@@ -77,8 +76,7 @@ export async function runHeartbeatCheckNowAction(
   _formData: FormData,
 ): Promise<BasicActionState> {
   try {
-    const session = await requireSession();
-    requirePermission(session, "manage-settings");
+    await requireAdminSession();
 
     const result = await runHeartbeatCheck({ force: true });
 
@@ -95,8 +93,7 @@ export async function clearHeartbeatAlertsAction(
   _formData: FormData,
 ): Promise<BasicActionState> {
   try {
-    const session = await requireSession();
-    requirePermission(session, "manage-settings");
+    await requireAdminSession();
 
     await clearAllHeartbeatAlerts();
     revalidatePath("/heartbeat");
@@ -112,8 +109,7 @@ export async function sendTestHeartbeatWebhookAction(
   formData: FormData,
 ): Promise<BasicActionState> {
   try {
-    const session = await requireSession();
-    requirePermission(session, "manage-settings");
+    await requireAdminSession();
 
     const webhookUrl = String(formData.get("webhookUrl") ?? "").trim();
     const webhookKind = String(formData.get("webhookKind") ?? "auto") as AlertWebhookKind;

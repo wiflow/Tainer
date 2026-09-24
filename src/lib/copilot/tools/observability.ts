@@ -1,6 +1,5 @@
 import "server-only";
 
-import { requirePermission } from "@/lib/auth";
 import { getActiveHeartbeatAlerts } from "@/lib/heartbeat-engine";
 import { getActiveAlertRuntimeEntries } from "@/lib/alert-runtime-state";
 import type { AlertRuntimeEntry } from "@/lib/alert-runtime-state";
@@ -42,7 +41,7 @@ registerTool({
   category: "Diagnostics",
   klass: "read",
   description:
-    "List active cluster-connectivity (heartbeat) alerts: sites or endpoints Tainer currently can't reach. Global, not per-site. Use for 'is everything reachable?', 'any sites down?'. An empty result means all monitored endpoints are responding. Requires manage-settings.",
+    "List active cluster-connectivity (heartbeat) alerts: sites or endpoints Tainer currently can't reach. Global, not per-site. Use for 'is everything reachable?', 'any sites down?'. An empty result means all monitored endpoints are responding. Admin role required.",
   input_schema: {
     type: "object",
     additionalProperties: false,
@@ -50,7 +49,9 @@ registerTool({
   },
   describe: () => "Check cluster heartbeat status",
   execute: async (_args, ctx) => {
-    requirePermission(ctx.session, "manage-settings");
+    if (ctx.session.user.role !== "admin") {
+      throw new Error("Administrator access required for get_heartbeat_status.");
+    }
     const alerts = await getActiveHeartbeatAlerts();
     return {
       allHealthy: alerts.length === 0,

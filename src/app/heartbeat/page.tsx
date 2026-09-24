@@ -4,7 +4,7 @@ import { Activity, HeartPulse, ServerCrash } from "lucide-react";
 import { HeartbeatSettingsPanel } from "@/components/heartbeat-settings-panel";
 import { HeartbeatStatusCard } from "@/components/heartbeat-status-card";
 import { MetricCard } from "@/components/ui/metric-card";
-import { getCurrentSession, hasPermission } from "@/lib/auth";
+import { getCurrentSession } from "@/lib/auth";
 import { getActiveHeartbeatAlerts } from "@/lib/heartbeat-engine";
 import { getHeartbeatSettings } from "@/lib/heartbeat-settings";
 import { getSchedulerStatus } from "@/lib/alert-scheduler";
@@ -19,7 +19,7 @@ export default async function HeartbeatPage() {
     redirect("/login");
   }
 
-  if (!hasPermission(session, "manage-settings")) {
+  if (session.user.role !== "admin") {
     redirect("/");
   }
 

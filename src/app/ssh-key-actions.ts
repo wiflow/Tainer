@@ -5,7 +5,7 @@ import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 
 import type { BasicActionState } from "@/lib/action-states";
-import { requirePermission, requireSession } from "@/lib/auth";
+import { requireAdminSession } from "@/lib/auth";
 import { withSiteConfig } from "@/lib/proxmox";
 import { resolveSiteConfigBySlug } from "@/lib/site-resolver";
 import { deleteSshAccessAuthority, generateSshAccessAuthority } from "@/lib/ssh-keys";
@@ -17,8 +17,7 @@ export async function generateSshKeyAction(
   void previousState;
 
   try {
-    const session = await requireSession();
-    requirePermission(session, "manage-settings");
+    await requireAdminSession();
 
     const siteSlug = String(formData.get("siteSlug") ?? "");
     if (!siteSlug) return { message: "Missing site context.", requestId: randomUUID(), status: "error" };
@@ -52,8 +51,7 @@ export async function deleteSshKeyAction(
   void previousState;
 
   try {
-    const session = await requireSession();
-    requirePermission(session, "manage-settings");
+    await requireAdminSession();
 
     const siteSlug = String(formData.get("siteSlug") ?? "");
     if (!siteSlug) return { message: "Missing site context.", requestId: randomUUID(), status: "error" };
