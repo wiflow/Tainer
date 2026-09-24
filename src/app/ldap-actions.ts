@@ -41,13 +41,20 @@ export async function saveLdapConfigAction(
   try {
     const session = await requireAdminSession();
     const input = parseInput(formData);
+    const previous = await getLdapConfig();
     const config = await saveLdapConfig(input);
 
+    const changes = [
+      previous && previous.url !== config.url ? `url ${previous.url} -> ${config.url}` : `url=${config.url}`,
+      previous && previous.bindDN !== config.bindDN ? `bindDN ${previous.bindDN} -> ${config.bindDN}` : null,
+      `autoProvision=${config.autoProvision}`,
+      `enabled=${config.enabled}`,
+    ].filter(Boolean);
     await recordAdminAudit({
       action: "ldap-config-updated",
       actorEmail: session.user.email,
       actorName: session.user.name,
-      message: `LDAP config updated: url=${config.url}, autoProvision=${config.autoProvision}, enabled=${config.enabled}`,
+      message: `LDAP config updated: ${changes.join(", ")}`,
     });
 
     revalidatePath("/identity-providers");

@@ -265,12 +265,17 @@ export async function updateIdpProvider(
       throw new Error(`A provider with slug "${slug}" already exists.`);
     }
     const existing = store.providers[index];
+    const issuer = input.issuer.trim().replace(/\/+$/, "");
+    const clientId = input.clientId.trim();
+    if (!newSecret && (issuer !== existing.issuer || clientId !== existing.clientId)) {
+      throw new Error("Re-enter the client secret when changing the issuer URL or client ID.");
+    }
     const updated: IdpProvider = {
       ...existing,
       slug,
       name: input.name.trim(),
-      issuer: input.issuer.trim().replace(/\/+$/, ""),
-      clientId: input.clientId.trim(),
+      issuer,
+      clientId,
       encryptedClientSecret: newSecret ?? existing.encryptedClientSecret,
       allowedEmailDomains: input.allowedEmailDomains.trim(),
       autoProvision: input.autoProvision,

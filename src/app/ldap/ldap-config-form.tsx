@@ -183,7 +183,8 @@ export function LdapConfigForm({
             )}
             <p className={helpClassName}>
               Encrypted with AES-256-GCM at rest in <code>ldap-config.json</code>.
-              Never returned to this form.
+              Never returned to this form. Re-enter it when changing the server
+              URL or bind DN.
             </p>
           </label>
         </div>

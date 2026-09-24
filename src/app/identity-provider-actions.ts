@@ -81,6 +81,7 @@ export async function updateIdpProviderAction(
       };
     }
     const input = parseInput(formData);
+    const previous = await getIdpProviderById(id);
     const provider = await updateIdpProvider(id, input);
     if (!provider) {
       return {
@@ -94,11 +95,20 @@ export async function updateIdpProviderAction(
     // sign-in fetches it fresh.
     invalidateOidcDiscoveryCache(id);
 
+    const changes = [
+      `slug=${provider.slug}`,
+      previous && previous.issuer !== provider.issuer
+        ? `issuer ${previous.issuer} -> ${provider.issuer}`
+        : null,
+      previous && previous.clientId !== provider.clientId
+        ? `clientId ${previous.clientId} -> ${provider.clientId}`
+        : null,
+    ].filter(Boolean);
     recordAdminAudit({
       action: "sso-provider-updated",
       actorEmail: session.user.email,
       actorName: session.user.name,
-      message: `Updated OIDC provider "${provider.name}" (slug=${provider.slug})`,
+      message: `Updated OIDC provider "${provider.name}" (${changes.join(", ")})`,
     }).catch(() => {});
 
     revalidatePath("/identity-providers");

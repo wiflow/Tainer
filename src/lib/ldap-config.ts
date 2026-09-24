@@ -183,6 +183,13 @@ function validateInput(input: LdapConfigInput, isCreate: boolean): void {
 export async function saveLdapConfig(input: LdapConfigInput): Promise<LdapConfig> {
   const existing = await getLdapConfig();
   validateInput(input, !existing);
+  if (
+    existing &&
+    !input.bindPassword &&
+    (input.url.trim() !== existing.url || input.bindDN.trim() !== existing.bindDN)
+  ) {
+    throw new Error("Re-enter the bind password when changing the server URL or bind DN.");
+  }
 
   const newEncryptedPassword = input.bindPassword
     ? await encryptText(input.bindPassword)

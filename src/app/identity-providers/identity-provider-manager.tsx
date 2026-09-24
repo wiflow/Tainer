@@ -131,6 +131,11 @@ function ProviderForm({
             required={!isEdit}
             type="password"
           />
+          {isEdit ? (
+            <span className="mt-1 block text-[11px] text-zinc-600">
+              Required when changing the issuer URL or client ID.
+            </span>
+          ) : null}
         </label>
       </div>
 
