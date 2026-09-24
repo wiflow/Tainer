@@ -26,7 +26,7 @@ import { listContainerTags } from "@/lib/container-groups";
 import { getGeneratedDeploymentSshKeyInfo } from "@/lib/deployment-ssh-keys";
 import { getDeploymentTemplate } from "@/lib/deployment-templates";
 import { getAppSettings } from "@/lib/app-settings";
-import { getCurrentSession, hasFreshGuestShellStepUp, hasSitePermission } from "@/lib/auth";
+import { getCurrentSession, hasFreshGuestShellStepUp, hasSitePermission, type Permission } from "@/lib/auth";
 import { extractSshHost } from "@/lib/guest-access";
 import { getDeploymentActivities } from "@/lib/deployment-activity-log";
 import { getDeploymentBackupInfo, getDeploymentDetail, getDeploymentNetSpecs, getGuestFirewallOptions, getLatestDeploymentActivity, getNodes, getTemplateFileInfo, listGuestFirewallRules, listSnapshots, withSiteConfig } from "@/lib/proxmox";
@@ -160,7 +160,8 @@ export default async function DeploymentDetailPage({
     parseStorageFromVolumeRef(deployment.rootfs) || settings.defaultRootfsStorage;
 
   const updateAvailable = templateUpdated || imageUpdated;
-  const canRunDestructiveActions = session?.user.role === "admin";
+  const canSite = (permission: Permission) =>
+    Boolean(session && hasSitePermission(session, siteConfig.siteId, permission));
 
   const usage = deployment.resourceUsage;
   const sshHost = extractSshHost(deployment.networkInfo?.ipAddress ?? deployment.ipAddress);
@@ -200,7 +201,7 @@ export default async function DeploymentDetailPage({
             <DeploymentEditButton deployment={deployment} />
             <div className="h-6 w-px bg-white/5" aria-hidden />
             <DeploymentQuickActions
-              allowDelete={canRunDestructiveActions}
+              allowDelete={canSite("delete-deployments")}
               currentNode={deployment.node}
               deploymentId={deployment.id}
               nodeMetrics={nodeMetrics}
@@ -217,7 +218,7 @@ export default async function DeploymentDetailPage({
 
       {updateAvailable && tainerMeta && (
         <DeploymentUpdateBanner
-          canRecreate={canRunDestructiveActions}
+          canRecreate={canSite("manage-deployments")}
           deploymentId={deployment.id}
           templateId={sourceTemplate?.id ?? ""}
           templateName={sourceTemplate?.name ?? tainerMeta.templateName}
@@ -387,7 +388,7 @@ export default async function DeploymentDetailPage({
         defaultBackupStorage={settings.defaultBackupStorage}
         deploymentId={deployment.id}
         deploymentType={deployment.type}
-        isAdmin={canRunDestructiveActions}
+        isAdmin={canSite("manage-backups")}
         restoreTargetNode={deployment.node}
         restoreTargetStorage={restoreTargetStorage}
         vmid={deployment.vmid}
@@ -395,7 +396,7 @@ export default async function DeploymentDetailPage({
 
       <DeploymentSnapshotCard
         deploymentId={deployment.id}
-        isAdmin={canRunDestructiveActions}
+        isAdmin={canSite("manage-snapshots")}
         siteSlug={siteSlug}
         snapshots={snapshots}
       />
@@ -412,11 +413,7 @@ export default async function DeploymentDetailPage({
           deploymentId={deployment.id}
           options={firewallOptions}
           rules={firewallRules}
-          canManage={Boolean(
-            session &&
-              (canRunDestructiveActions ||
-                hasSitePermission(session, siteConfig.siteId, "manage-security")),
-          )}
+          canManage={canSite("manage-security")}
         />
       ) : null}
 

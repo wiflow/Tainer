@@ -6,7 +6,7 @@ import { isIP } from "node:net";
 import { revalidatePath, revalidateTag } from "next/cache";
 
 import type { ProxmoxActionState } from "@/lib/action-states";
-import { requirePermission, requireSession, requireSitePermission } from "@/lib/auth";
+import { requireSession, requireSitePermission } from "@/lib/auth";
 import {
   buildProvisionedDeploymentSshKey,
   saveGeneratedDeploymentSshKey,
@@ -948,7 +948,6 @@ export async function deleteDeploymentAction(
 ): Promise<ProxmoxActionState> {
   try {
     const session = await requireSession();
-    requirePermission(session, "manage-deployments");
     checkOperationRateLimit(session.user.id);
 
     const siteSlug = String(formData.get("siteSlug") ?? "");
@@ -956,6 +955,7 @@ export async function deleteDeploymentAction(
       return { message: "Missing site context.", requestId: randomUUID(), status: "error", task: null };
     }
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
+    requireSitePermission(session, siteConfig.siteId, "delete-deployments");
     return await withSiteConfig(siteConfig, async () => {
 
     const deploymentId = String(formData.get("deploymentId") ?? "").trim();
@@ -1018,13 +1018,13 @@ export async function migrateDeploymentAction(
 ): Promise<ProxmoxActionState> {
   try {
     const session = await requireSession();
-    requirePermission(session, "manage-deployments");
 
     const siteSlug = String(formData.get("siteSlug") ?? "");
     if (!siteSlug) {
       return { message: "Missing site context.", requestId: randomUUID(), status: "error", task: null };
     }
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
+    requireSitePermission(session, siteConfig.siteId, "manage-deployments");
     return await withSiteConfig(siteConfig, async () => {
 
     const deploymentId = String(formData.get("deploymentId") ?? "").trim();
@@ -1107,13 +1107,13 @@ export async function recreateFromTemplateAction(
 ): Promise<ProxmoxActionState> {
   try {
     const session = await requireSession();
-    requirePermission(session, "manage-deployments");
 
     const siteSlug = String(formData.get("siteSlug") ?? "");
     if (!siteSlug) {
       return { message: "Missing site context.", requestId: randomUUID(), status: "error", task: null };
     }
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
+    requireSitePermission(session, siteConfig.siteId, "manage-deployments");
     return await withSiteConfig(siteConfig, async () => {
 
     const deploymentId = String(formData.get("deploymentId") ?? "").trim();

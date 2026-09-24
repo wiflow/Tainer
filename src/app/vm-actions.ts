@@ -5,7 +5,7 @@ import { randomUUID } from "node:crypto";
 import { revalidatePath, revalidateTag } from "next/cache";
 
 import type { ProxmoxActionState } from "@/lib/action-states";
-import { requirePermission, requireSession, requireSitePermission } from "@/lib/auth";
+import { requireSession, requireSitePermission } from "@/lib/auth";
 import { createRateLimiterOrThrow } from "@/lib/rate-limit";
 
 const enforceRateLimit = createRateLimiterOrThrow("vm-actions", 10, 5 * 60_000);
@@ -395,13 +395,13 @@ export async function deleteVmAction(
 ): Promise<ProxmoxActionState> {
   try {
     const session = await requireSession();
-    requirePermission(session, "manage-deployments");
 
     const siteSlug = String(formData.get("siteSlug") ?? "");
     if (!siteSlug) {
       return { message: "Missing site context.", requestId: randomUUID(), status: "error", task: null };
     }
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
+    requireSitePermission(session, siteConfig.siteId, "delete-deployments");
     return await withSiteConfig(siteConfig, async () => {
 
     const deploymentId = String(formData.get("deploymentId") ?? "").trim();
@@ -464,13 +464,13 @@ export async function migrateVmAction(
 ): Promise<ProxmoxActionState> {
   try {
     const session = await requireSession();
-    requirePermission(session, "manage-deployments");
 
     const siteSlug = String(formData.get("siteSlug") ?? "");
     if (!siteSlug) {
       return { message: "Missing site context.", requestId: randomUUID(), status: "error", task: null };
     }
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
+    requireSitePermission(session, siteConfig.siteId, "manage-deployments");
     return await withSiteConfig(siteConfig, async () => {
 
     const deploymentId = String(formData.get("deploymentId") ?? "").trim();
