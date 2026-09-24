@@ -120,6 +120,10 @@ export async function GET(request: NextRequest) {
     return withSiteConfig(config, handler);
   }
 
+  if (session.user.role !== "admin") {
+    return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+  }
+
   return handler();
 }
 
@@ -205,6 +209,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: "Forbidden" }, { status: 403 });
     }
     return withSiteConfig(config, handler);
+  }
+
+  if (session.user.role !== "admin") {
+    return NextResponse.json({ message: "Forbidden" }, { status: 403 });
   }
 
   return handler();

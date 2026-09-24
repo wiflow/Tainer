@@ -428,6 +428,7 @@ export async function bulkTagLifecycleAction(
 
         return {
           node: deployment.node,
+          siteSlug,
           submittedMessage: `${meta.submitted} for ${label} ${deployment.vmid}.`,
           successMessage: `${meta.success} ${label} ${deployment.vmid}.`,
           title: `${meta.present} ${label} ${deployment.vmid}`,
