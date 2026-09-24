@@ -226,7 +226,7 @@ export async function loginAction(
       } catch (error) {
         const challengeUser = await getLoginChallengeUser().catch(() => null);
         if (challengeUser) {
-          recordAdminAudit({
+          recordThrottledAdminAudit(`two-factor-failure:${challengeUser.email}:${clientIp ?? ""}`, {
             action: "two-factor-failure",
             actorEmail: challengeUser.email,
             actorName: challengeUser.name,
@@ -259,10 +259,10 @@ export async function loginAction(
       const result = await beginLogin(email, password, clientIp);
 
       if (result.requiresTwoFactor) {
-        recordAdminAudit({
+        recordThrottledAdminAudit(`login-password-verified:${attemptedEmail}:${clientIp ?? ""}`, {
           action: "login-password-verified",
-          actorEmail: email,
-          actorName: email,
+          actorEmail: attemptedEmail,
+          actorName: attemptedEmail,
           message: "Password verified, waiting for 2FA code",
         }).catch(() => {});
         return {

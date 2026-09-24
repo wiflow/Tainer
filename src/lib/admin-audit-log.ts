@@ -89,7 +89,9 @@ const UNAUTHENTICATED_ACTIONS = new Set<AdminAuditAction>([
   "ldap-login-failure",
   "lldp-ingest-rejected",
   "login-failure",
+  "login-password-verified",
   "password-reset-requested",
+  "two-factor-failure",
 ]);
 const MAX_UNAUTHENTICATED_ENTRIES = 1000;
 
