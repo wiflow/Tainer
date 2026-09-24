@@ -2412,7 +2412,7 @@ async function requireReauthentication(
     !storedSession ||
     Date.now() - new Date(storedSession.createdAt).getTime() > REAUTHENTICATION_MAX_AGE_MS
   ) {
-    throw new Error("Sign in again, then set up 2FA within 10 minutes.");
+    throw new Error("Sign in again, then try this within 10 minutes.");
   }
 }
 
@@ -2523,9 +2523,7 @@ export async function disableTwoFactor(input: { currentPassword: string }) {
       throw new Error("User account could not be found.");
     }
 
-    if (!(await verifyPassword(input.currentPassword, user.passwordHash))) {
-      throw new Error("Current password is incorrect.");
-    }
+    await requireReauthentication(store, user, session.id, input.currentPassword);
 
     const timestamp = nowIso();
     user.pendingTwoFactorSecret = null;

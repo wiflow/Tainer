@@ -517,13 +517,15 @@ export function AccountSettingsPanel({
               </>
             ) : (
               <Form action={disableTwoFactorActionForm} className="space-y-4">
-                <label className="block">
-                  <span className="flex items-center gap-2 text-[13px] font-medium text-zinc-300">
-                    <ShieldOff className="h-4 w-4 text-zinc-500" />
-                    Current password to disable 2FA
-                  </span>
-                  <input className={inputClassName} name="currentPassword" type="password" />
-                </label>
+                {account.hasLocalPassword !== false ? (
+                  <label className="block">
+                    <span className="flex items-center gap-2 text-[13px] font-medium text-zinc-300">
+                      <ShieldOff className="h-4 w-4 text-zinc-500" />
+                      Current password to disable 2FA
+                    </span>
+                    <input className={inputClassName} name="currentPassword" type="password" />
+                  </label>
+                ) : null}
 
                 <Button disabled={disableTwoFactorPending} type="submit" variant="danger">
                   {disableTwoFactorPending ? "Disabling..." : "Disable 2FA"}
