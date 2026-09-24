@@ -336,9 +336,9 @@ export function AppSidebar({
           </div>
         )}
 
-        <div className="mx-2 mb-4 flex flex-col gap-1.5">
+        <div className="mx-2 mb-4 flex items-center gap-1.5">
           <button
-            className="flex items-center gap-2 rounded-md border border-white/5 bg-white/[0.02] px-3 py-2 text-left transition-colors hover:border-white/10 hover:bg-white/[0.05]"
+            className="flex min-w-0 flex-1 items-center gap-2 rounded-md border border-white/5 bg-white/[0.02] px-3 py-2 text-left transition-colors hover:border-white/10 hover:bg-white/[0.05]"
             onClick={() =>
               document.dispatchEvent(
                 new KeyboardEvent("keydown", { bubbles: true, key: "k", metaKey: true }),
@@ -347,26 +347,24 @@ export function AppSidebar({
             type="button"
           >
             <Search className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
-            <span className="text-[12px] text-zinc-500">Search…</span>
+            <span className="truncate text-[12px] text-zinc-500">Search…</span>
             <kbd className="ml-auto rounded border border-white/10 bg-white/5 px-1.5 py-0.5 font-sans text-[10px] text-zinc-500">
               ⌘K
             </kbd>
           </button>
 
           <button
-            className="flex items-center gap-2 rounded-md border border-white/5 bg-white/[0.02] px-3 py-2 text-left transition-colors hover:border-white/10 hover:bg-white/[0.05]"
+            aria-label="Ask Tainy"
+            className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-md border border-white/5 bg-white/[0.02] text-zinc-500 transition-colors hover:border-white/10 hover:bg-white/[0.05] hover:text-zinc-300"
             onClick={() =>
               document.dispatchEvent(
                 new KeyboardEvent("keydown", { bubbles: true, key: "j", metaKey: true }),
               )
             }
+            title="Ask Tainy (⌘J)"
             type="button"
           >
-            <Sparkles className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
-            <span className="text-[12px] text-zinc-500">Ask Tainy…</span>
-            <kbd className="ml-auto rounded border border-white/10 bg-white/5 px-1.5 py-0.5 font-sans text-[10px] text-zinc-500">
-              ⌘J
-            </kbd>
+            <Sparkles className="h-3.5 w-3.5" />
           </button>
         </div>
 
