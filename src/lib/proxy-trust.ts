@@ -2,6 +2,10 @@ import "server-only";
 
 import { headers } from "next/headers";
 
+export function trustProxyHeaders(): boolean {
+  return process.env.TAINER_TRUST_PROXY_HEADERS === "true";
+}
+
 /**
  * Resolve the client IP for rate-limiting purposes.
  *
@@ -15,10 +19,6 @@ import { headers } from "next/headers";
  * `x-tainer-peer-ip` on every request (overwriting any client-supplied copy).
  * Behind an untrusted proxy that is the proxy's address.
  */
-export function trustProxyHeaders(): boolean {
-  return process.env.TAINER_TRUST_PROXY_HEADERS === "true";
-}
-
 export async function getClientIpForRateLimit(): Promise<string | undefined> {
   const headerStore = await headers();
   if (trustProxyHeaders()) {
