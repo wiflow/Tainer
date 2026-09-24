@@ -113,8 +113,8 @@ export function DeploymentFirewallCard({
             </CardTitle>
             <CardDescription>
               Guest-level rules (policy in: {options.policyIn}, out: {options.policyOut}).
-              Rules only apply on interfaces with their firewall flag on — toggle it per
-              NIC under Network → Switching.
+              Rules only apply on interfaces with their firewall flag on. Set it per NIC
+              in Proxmox (firewall=1 on the netN line).
             </CardDescription>
           </div>
           {canManage ? (
