@@ -4,7 +4,8 @@
  * username/password auth.
  *
  * Usage:
- *   node scripts/migrate-sites-to-password.mjs
+ *   PROXMOX_URL=https://pve.example.com:8006 PROXMOX_USERNAME=user@pam \
+ *   PROXMOX_PASSWORD=... node scripts/migrate-sites-to-password.mjs
  *
  * Reads auth-secret.txt from the data directory, encrypts the new password,
  * and rewrites sites.json with `username` + `passwordEncrypted` fields
@@ -20,10 +21,9 @@ const DATA_DIR = path.join(process.cwd(), "data");
 const SITES_FILE = path.join(DATA_DIR, "sites.json");
 const SECRET_FILE = path.join(DATA_DIR, "auth-secret.txt");
 
-// New Proxmox credentials (from .env.local / user input)
-const NEW_API_URL = "https://192.0.2.10:8006";
-const NEW_USERNAME = "tainer@pam";
-const NEW_PASSWORD = "REDACTED";
+const NEW_API_URL = process.env.PROXMOX_URL?.trim();
+const NEW_USERNAME = process.env.PROXMOX_USERNAME?.trim();
+const NEW_PASSWORD = process.env.PROXMOX_PASSWORD;
 
 // ── Crypto helpers (mirror src/lib/crypto.ts) ───────────────────────────
 async function getSecret() {
@@ -44,6 +44,9 @@ function encrypt(secret, value) {
 
 // ── Main ────────────────────────────────────────────────────────────────
 async function main() {
+  if (!NEW_API_URL || !NEW_USERNAME || !NEW_PASSWORD) {
+    throw new Error("Set PROXMOX_URL, PROXMOX_USERNAME and PROXMOX_PASSWORD.");
+  }
   const secret = await getSecret();
   const raw = await readFile(SITES_FILE, "utf8");
   const store = JSON.parse(raw);
