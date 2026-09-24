@@ -3,11 +3,8 @@
 import { useActionState, useState } from "react";
 import { KeyRound, Plus, Trash2 } from "lucide-react";
 
-import {
-  createApiTokenAction,
-  initialApiTokenActionState,
-  revokeApiTokenAction,
-} from "@/app/api-token-actions";
+import { initialApiTokenActionState } from "@/app/api-token-action-states";
+import { createApiTokenAction, revokeApiTokenAction } from "@/app/api-token-actions";
 import { CopyableText } from "@/components/copyable-text";
 import { useActionFlashFeedback } from "@/components/task-toast-provider";
 import { Button } from "@/components/ui/button";
