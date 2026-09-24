@@ -1847,8 +1847,9 @@ export async function signInWithSso(
     if (!existing && input.emailVerified !== true) {
       throw new Error(
         `${input.providerName} did not confirm that ${email} is verified, so it cannot be ` +
-          "used to find or create a Tainer account. Ask an administrator to add you and " +
-          "link your identity provider account.",
+          "used to find or create a Tainer account. Ask an administrator to configure " +
+          `${input.providerName} to send email_verified, or to turn on ` +
+          `"Trust email without email_verified claim" for it.`,
       );
     }
 
