@@ -13,7 +13,7 @@
 [![CodeQL](https://github.com/wiflow/Tainer/actions/workflows/codeql.yml/badge.svg)](https://github.com/wiflow/Tainer/actions/workflows/codeql.yml)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/wiflow/Tainer/badge)](https://scorecard.dev/viewer/?uri=github.com/wiflow/Tainer)
 [![CodeFactor](https://www.codefactor.io/repository/github/wiflow/tainer/badge)](https://www.codefactor.io/repository/github/wiflow/tainer)
-![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/wiflow/Tainer?utm_source=oss&utm_medium=github&utm_campaign=wiflow%2FTainer&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
+[![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/wiflow/Tainer?labelColor=171717&color=FF570A&label=CodeRabbit+Reviews)](https://coderabbit.ai/?utm_source=oss&utm_medium=github&utm_campaign=wiflow%2FTainer)
 
 [![License](https://img.shields.io/github/license/wiflow/Tainer)](LICENSE)
 [![Proxmox VE](https://img.shields.io/badge/Proxmox%20VE-8%20%7C%209-E57000?logo=proxmox&logoColor=white)](https://www.proxmox.com/en/proxmox-virtual-environment)
