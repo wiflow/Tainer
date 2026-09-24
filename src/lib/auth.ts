@@ -606,6 +606,24 @@ function verifyTotp(secret: string, token: string) {
   return false;
 }
 
+async function verifyStoredTotp(user: StoredUser, token: string) {
+  if (!user.twoFactorSecret) {
+    return false;
+  }
+
+  let secret: string;
+  try {
+    secret = await decryptText(user.twoFactorSecret);
+  } catch {
+    console.error(
+      `[auth] The 2FA secret of user ${user.id} cannot be decrypted with the current AUTH_SECRET; only recovery codes are accepted until 2FA is reset.`,
+    );
+    return false;
+  }
+
+  return verifyTotp(secret, token);
+}
+
 function buildOtpAuthUrl(user: Pick<StoredUser, "email">, secret: string) {
   const issuer = encodeURIComponent("Tainer");
   const label = encodeURIComponent(`Tainer:${user.email}`);
@@ -1597,10 +1615,9 @@ export async function completeTwoFactorLogin(code: string) {
       throw new Error("Two-factor authentication is not available for this account.");
     }
 
-    const secret = await decryptText(user.twoFactorSecret);
     const normalizedRecoveryCode = normalizeRecoveryCode(code);
     const normalizedTotpCode = normalizeTotpCode(code);
-    const isTotp = verifyTotp(secret, normalizedTotpCode);
+    const isTotp = await verifyStoredTotp(user, normalizedTotpCode);
 
     if (!isTotp) {
       const recoveryHash = hashOpaqueValue(normalizedRecoveryCode);
@@ -1725,10 +1742,9 @@ export async function completeMobileTwoFactorLogin(challengeToken: string, code:
       throw new Error("Two-factor authentication is not available for this account.");
     }
 
-    const secret = await decryptText(user.twoFactorSecret);
     const normalizedRecoveryCode = normalizeRecoveryCode(code);
     const normalizedTotpCode = normalizeTotpCode(code);
-    const isTotp = verifyTotp(secret, normalizedTotpCode);
+    const isTotp = await verifyStoredTotp(user, normalizedTotpCode);
 
     if (!isTotp) {
       const recoveryHash = hashOpaqueValue(normalizedRecoveryCode);
@@ -2706,10 +2722,9 @@ export async function verifyGuestShellStepUp(code: string) {
 
   await checkTotpRateLimit(user.id);
 
-  const secret = await decryptText(user.twoFactorSecret);
   const normalizedRecoveryCode = normalizeRecoveryCode(code);
   const normalizedTotpCode = normalizeTotpCode(code);
-  const isTotp = verifyTotp(secret, normalizedTotpCode);
+  const isTotp = await verifyStoredTotp(user, normalizedTotpCode);
 
   if (!isTotp) {
     const recoveryHash = hashOpaqueValue(normalizedRecoveryCode);
