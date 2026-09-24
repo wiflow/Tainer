@@ -12,6 +12,7 @@ export type AdminAuditAction =
   | "user-role-changed"
   | "password-changed"
   | "password-reset-requested"
+  | "password-reset-completed"
   | "two-factor-enabled"
   | "two-factor-disabled"
   | "settings-updated"
@@ -32,6 +33,11 @@ export type AdminAuditAction =
   | "user-groups-updated"
   | "login-success"
   | "login-failure"
+  | "login-password-verified"
+  | "two-factor-failure"
+  | "admin-bootstrapped"
+  | "guest-shell-step-up"
+  | "guest-shell-step-up-failure"
   | "sso-login"
   | "sso-user-provisioned"
   | "sso-provider-created"
@@ -59,6 +65,7 @@ export type AdminAuditAction =
   | "copilot-budget-exceeded"
   | "copilot-settings-updated"
   | "state-backup-created"
+  | "state-backup-downloaded"
   | "state-backup-settings-updated"
   | "api-token-created"
   | "api-token-revoked";
@@ -75,6 +82,21 @@ export type AdminAuditEntry = {
 
 const MAX_ENTRIES = 5000;
 const DATA_FILE = "admin-audit-log.json";
+
+// Events that callers can trigger without a session are capped separately so
+// they can never push authenticated admin events out of the log.
+const UNAUTHENTICATED_ACTIONS = new Set<AdminAuditAction>([
+  "ldap-login-failure",
+  "lldp-ingest-rejected",
+  "login-failure",
+  "password-reset-requested",
+]);
+const MAX_UNAUTHENTICATED_ENTRIES = 1000;
+
+const THROTTLE_WINDOW_MS = 15 * 60_000;
+const THROTTLE_MAX_PER_KEY = 5;
+const THROTTLE_MAX_PER_WINDOW = 200;
+const THROTTLE_MAX_KEYS = 2000;
 
 type AdminAuditLogStore = {
   entries: AdminAuditEntry[];
@@ -115,12 +137,70 @@ export async function recordAdminAudit(
     };
 
     store.entries.unshift(entry);
+    if (UNAUTHENTICATED_ACTIONS.has(entry.action)) {
+      let unauthenticated = 0;
+      store.entries = store.entries.filter(
+        (existing) =>
+          !UNAUTHENTICATED_ACTIONS.has(existing.action) ||
+          ++unauthenticated <= MAX_UNAUTHENTICATED_ENTRIES,
+      );
+    }
     if (store.entries.length > MAX_ENTRIES) {
       store.entries = store.entries.slice(0, MAX_ENTRIES);
     }
 
     return entry;
   });
+}
+
+const throttle = {
+  counts: new Map<string, number>(),
+  recorded: 0,
+  suppressed: new Map<AdminAuditAction, number>(),
+  windowStart: 0,
+};
+
+/**
+ * Records at most a few entries per key and a fixed number overall per
+ * window. Use for events an unauthenticated caller can repeat at will; the
+ * number of dropped entries is logged once the next window starts.
+ */
+export async function recordThrottledAdminAudit(
+  key: string,
+  input: Omit<AdminAuditEntry, "id" | "recordedAt">,
+) {
+  const now = Date.now();
+
+  if (now - throttle.windowStart >= THROTTLE_WINDOW_MS) {
+    const suppressed = [...throttle.suppressed];
+    throttle.counts.clear();
+    throttle.recorded = 0;
+    throttle.suppressed.clear();
+    throttle.windowStart = now;
+
+    for (const [action, count] of suppressed) {
+      await recordAdminAudit({
+        action,
+        actorEmail: "system",
+        actorName: "Audit log",
+        message: `${count} similar event${count === 1 ? " was" : "s were"} not recorded individually in the previous ${THROTTLE_WINDOW_MS / 60_000} minutes.`,
+      });
+    }
+  }
+
+  const count = throttle.counts.get(key) ?? 0;
+  if (
+    count >= THROTTLE_MAX_PER_KEY ||
+    throttle.recorded >= THROTTLE_MAX_PER_WINDOW ||
+    (count === 0 && throttle.counts.size >= THROTTLE_MAX_KEYS)
+  ) {
+    throttle.suppressed.set(input.action, (throttle.suppressed.get(input.action) ?? 0) + 1);
+    return null;
+  }
+
+  throttle.counts.set(key, count + 1);
+  throttle.recorded += 1;
+  return recordAdminAudit(input);
 }
 
 export async function getAdminAuditLog(

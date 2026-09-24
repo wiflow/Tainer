@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { recordAdminAudit } from "@/lib/admin-audit-log";
+import { recordThrottledAdminAudit } from "@/lib/admin-audit-log";
 import {
   lookupLldpTokenByPlaintext,
   markLldpTokenUsed,
@@ -84,7 +84,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
   if (token.revokedAt) {
-    recordAdminAudit({
+    recordThrottledAdminAudit(`lldp-ingest-rejected:${token.id}`, {
       action: "lldp-ingest-rejected",
       actorEmail: "system",
       actorName: "SNMP ingest",

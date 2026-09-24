@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { recordAdminAudit } from "@/lib/admin-audit-log";
+import { recordThrottledAdminAudit } from "@/lib/admin-audit-log";
 import {
   lookupLldpTokenByPlaintext,
   markLldpTokenUsed,
@@ -61,7 +61,7 @@ export async function POST(request: Request) {
     // Log only this case — a revoked token in active use is the kind of
     // signal an admin actually wants to see. Unknown-token attempts are
     // noisy (scanner traffic) and not audited.
-    recordAdminAudit({
+    recordThrottledAdminAudit(`lldp-ingest-rejected:${token.id}`, {
       action: "lldp-ingest-rejected",
       actorEmail: "system",
       actorName: "LLDP ingest",
