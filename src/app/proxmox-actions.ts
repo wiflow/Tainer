@@ -28,11 +28,9 @@ import {
   deleteContainer,
   encodeDeploymentId,
   envTextToString,
-  getActiveSiteConfig,
   getContainerEnvText,
   getDeploymentIndex,
   getDeploymentDetail,
-  getPveTicket,
   getTemplateFileInfo,
   importTemplateFromUrl,
   migrateContainer,
@@ -43,7 +41,6 @@ import {
   withSiteConfig,
 } from "@/lib/proxmox";
 import { resolveSiteConfigBySlug } from "@/lib/site-resolver";
-import { buildProxmoxUrl } from "@/lib/utils";
 
 const NODE_REGEX = /^[a-zA-Z0-9]([a-zA-Z0-9._-]{0,61}[a-zA-Z0-9])?$/;
 const STORAGE_REGEX = /^[a-zA-Z0-9._-]{1,63}$/;
@@ -454,49 +451,17 @@ export async function createLxcAction(
         // Runs after start so the container has networking.
         if (shouldStart) {
           try {
-            const { runSshCommand } = await import("@/lib/ssh-command");
-            const siteConfig = getActiveSiteConfig();
-            const pveUser = siteConfig.username?.trim() || "root@pam";
-            const osUser = pveUser.split("@")[0] || "root";
-            const { default: https } = await import("node:https");
+            const { runNodeRootCommand } = await import("@/lib/proxmox-host");
 
-            // Resolve node IP
-            const nodeIpUrl = buildProxmoxUrl(`/api2/json/nodes/${node}/network`, siteConfig.apiUrl);
-            const pveAuth = await getPveTicket(siteConfig);
-            const nodeIp = await new Promise<string | null>((resolve) => {
-              const req = https.request(nodeIpUrl, {
-                headers: { Cookie: `PVEAuthCookie=${pveAuth.ticket}` },
-                method: "GET",
-                rejectUnauthorized: !siteConfig.tlsInsecure,
-              }, (res) => {
-                let raw = "";
-                res.setEncoding("utf8");
-                res.on("data", (chunk) => { raw += chunk; });
-                res.on("end", () => {
-                  try {
-                    const parsed = JSON.parse(raw) as { data?: Array<{ address?: string; type?: string }> };
-                    const ip = parsed.data?.find((e) => e.address && (e.type === "bridge" || e.type === "eth"))?.address;
-                    resolve(ip ?? null);
-                  } catch { resolve(null); }
-                });
-              });
-              req.on("error", () => resolve(null));
-              req.end();
-            });
+            // Wait a few seconds for networking to come up inside the container
+            await new Promise((r) => setTimeout(r, 5000));
 
-            if (nodeIp) {
-              // Wait a few seconds for networking to come up inside the container
-              await new Promise((r) => setTimeout(r, 5000));
-
-              await runSshCommand({
-                destination: `${osUser}@${nodeIp}`,
-                hostKeyOptions: ["-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null"],
-                password: siteConfig.password,
-                remoteCommand: `pct exec ${Number(vmid)} -- sh -c "if command -v apt-get >/dev/null 2>&1; then DEBIAN_FRONTEND=noninteractive apt-get update -qq && apt-get install -y -qq debsecan 2>/dev/null; fi"`,
-                timeoutMs: 60_000,
-              });
-              console.log(`[post-create] Installed debsecan in CT ${vmid}`);
-            }
+            await runNodeRootCommand(
+              node,
+              `pct exec ${Number(vmid)} -- sh -c "if command -v apt-get >/dev/null 2>&1; then DEBIAN_FRONTEND=noninteractive apt-get update -qq && apt-get install -y -qq debsecan 2>/dev/null; fi"`,
+              { timeoutMs: 60_000 },
+            );
+            console.log(`[post-create] Installed debsecan in CT ${vmid}`);
           } catch (error) {
             // Best-effort — don't fail the deployment
             console.error(`[post-create] debsecan install in CT ${vmid} failed:`, error instanceof Error ? error.message : error);

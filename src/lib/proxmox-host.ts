@@ -12,7 +12,7 @@ import { buildProxmoxUrl } from "@/lib/utils";
 const NODE_NAME_REGEX = /^[a-zA-Z0-9]([a-zA-Z0-9._-]{0,61}[a-zA-Z0-9])?$/;
 const IPV4_REGEX = /^(\d{1,3}\.){3}\d{1,3}$/;
 const LXC_CONFIG_LINE_REGEX = /^lxc\.[A-Za-z0-9_.-]+\s*:\s*.+$/;
-const SSH_USERNAME_REGEX = /^[A-Za-z0-9._-]+$/;
+const SSH_USERNAME_REGEX = /^[A-Za-z0-9_][A-Za-z0-9._-]*$/;
 
 function validateNodeName(value: string) {
   const normalized = value.trim();

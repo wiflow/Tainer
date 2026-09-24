@@ -28,7 +28,7 @@ function getProxmoxConsoleUser() {
   if (!hasSiteConfig()) return "root";
   const config = getActiveSiteConfig();
   const osUser = (config.username?.trim() || "root@pam").split("@")[0] || "root";
-  return /^[A-Za-z0-9._-]+$/.test(osUser) ? osUser : "root";
+  return /^[A-Za-z0-9_][A-Za-z0-9._-]*$/.test(osUser) ? osUser : "root";
 }
 
 function normalizeScanTargetIp(value: string): string | null {

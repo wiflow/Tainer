@@ -79,6 +79,10 @@ export async function runSshCommand({
   remoteCommand,
   timeoutMs = 15_000,
 }: RunSshCommandInput) {
+  if (!destination || destination.startsWith("-")) {
+    throw new Error("Invalid SSH destination.");
+  }
+
   const sshPath = await resolveFirstExistingPath(["/usr/bin/ssh", "/bin/ssh"]) ?? "ssh";
   const sshpassPath = await resolveFirstExistingPath(["/usr/bin/sshpass", "/bin/sshpass"]);
 
@@ -122,6 +126,7 @@ export async function runSshCommand({
     "ConnectTimeout=5",
     "-o",
     "LogLevel=ERROR",
+    "--",
     destination,
     raw ? remoteCommand : `sh -lc ${shellSingleQuote(remoteCommand)}`,
   ];
