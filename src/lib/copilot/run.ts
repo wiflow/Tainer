@@ -65,7 +65,8 @@ function klassAllowedByPolicy(klass: ToolClass, policy: GroupToolPolicy): boolea
 // descriptions etc.) are fenced so the system prompt can declare everything
 // inside as data-not-instructions.
 function fenceExternalContent(json: string): string {
-  return `<<EXTERNAL_UNTRUSTED_DATA>>\n${json}\n<<END_EXTERNAL_UNTRUSTED_DATA>>`;
+  const escaped = json.replace(/</g, "\\u003c");
+  return `<<EXTERNAL_UNTRUSTED_DATA>>\n${escaped}\n<<END_EXTERNAL_UNTRUSTED_DATA>>`;
 }
 
 /** Did any prior tool call in the conversation return external content? */
