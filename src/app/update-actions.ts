@@ -5,7 +5,7 @@ import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 
 import type { ProxmoxActionState } from "@/lib/action-states";
-import { requirePermission, requireSession } from "@/lib/auth";
+import { requireSession, requireSitePermission } from "@/lib/auth";
 import { refreshNodeAptIndex, validateUpid, withSiteConfig } from "@/lib/proxmox";
 import { resolveSiteConfigBySlug } from "@/lib/site-resolver";
 
@@ -15,7 +15,6 @@ export async function refreshAptIndexAction(
 ): Promise<ProxmoxActionState> {
   try {
     const session = await requireSession();
-    requirePermission(session, "manage-settings");
 
     const siteSlug = String(formData.get("siteSlug") ?? "");
     if (!siteSlug) {
@@ -28,6 +27,7 @@ export async function refreshAptIndexAction(
     }
 
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
+    requireSitePermission(session, siteConfig.siteId, "manage-settings");
     return await withSiteConfig(siteConfig, async () => {
       const upid = await refreshNodeAptIndex(node);
       const validUpid = validateUpid(upid);

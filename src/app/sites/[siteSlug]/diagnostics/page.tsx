@@ -1,5 +1,5 @@
 import { DiagnosticsPanel } from "@/components/diagnostics-panel";
-import { requirePermission, requireSession } from "@/lib/auth";
+import { requireSession, requireSitePermission } from "@/lib/auth";
 import { runDiagnosticScan } from "@/lib/diagnostics";
 import { requireSitePageAccess } from "@/lib/page-guard";
 import { ensureSiteConfig } from "@/lib/site-context";
@@ -13,9 +13,9 @@ export default async function DiagnosticsPage({
 }) {
   const { siteSlug } = await params;
   await requireSitePageAccess(siteSlug);
-  await ensureSiteConfig(siteSlug);
+  const siteConfig = await ensureSiteConfig(siteSlug);
   const session = await requireSession();
-  requirePermission(session, "manage-settings");
+  requireSitePermission(session, siteConfig.siteId, "manage-settings");
 
   const report = await runDiagnosticScan(siteSlug);
 
