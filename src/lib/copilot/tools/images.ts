@@ -130,21 +130,20 @@ registerTool({
       const fileName = buildOciTemplateFileName(namespace, repository, tag);
       const volid = `${storage}:vztmpl/${fileName}`;
 
-      // Cache the image's default env so create_container_from_image (and
-      // the UI) can preload it. Best-effort.
-      if (envVars.length > 0) {
-        const aliases = [
-          ...new Set(
-            buildOciTemplateFileNameAliases(namespace, repository, tag).flatMap(
-              (name) => [name, `${storage}:vztmpl/${name}`],
-            ),
-          ),
-        ];
-        await saveImageEnv(reference, envVars.join("\n"), { aliases }).catch(() => {});
-      }
-
       try {
         const upid = await pullOciRegistryTemplate(node, storage, reference);
+        // Cache the image's default env so create_container_from_image (and
+        // the UI) can preload it. Best-effort.
+        if (envVars.length > 0) {
+          const aliases = [
+            ...new Set(
+              buildOciTemplateFileNameAliases(namespace, repository, tag).flatMap(
+                (name) => [name, `${storage}:vztmpl/${name}`],
+              ),
+            ),
+          ];
+          await saveImageEnv(reference, envVars.join("\n"), { aliases }).catch(() => {});
+        }
         return {
           ok: true,
           verb: "pull-image",
