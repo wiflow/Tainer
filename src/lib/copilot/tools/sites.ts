@@ -1,6 +1,6 @@
 import "server-only";
 
-import { requirePermission } from "@/lib/auth";
+import { requirePermission, requireSiteAccess } from "@/lib/auth";
 import { registerTool } from "@/lib/copilot/registry";
 import { listAccessibleSites } from "@/lib/copilot/tools/helpers";
 import { geocodeAddress } from "@/lib/geocode";
@@ -37,7 +37,7 @@ registerTool({
   category: "Cluster",
   klass: "write",
   description:
-    "Set a site's location on the overview map from a street address or place name (e.g. 'Ballerup, Denmark'). The address is geocoded server-side; coordinates are never entered by hand. Also sets the site's country flag when the address resolves one. Pass an empty address to clear the location.",
+    "Set a site's location on the overview map from a street address or place name (e.g. 'Ballerup, Denmark'). The address is geocoded server-side; coordinates are never entered by hand. Also sets the site's country flag when the address resolves one. Pass an empty address to clear the location. Requires manage-sites.",
   input_schema: {
     type: "object",
     additionalProperties: false,
@@ -55,13 +55,14 @@ registerTool({
   },
   describe: (args) => `Set location of ${String(args.siteSlug)} to "${String(args.address)}"`,
   execute: async (args, ctx) => {
-    requirePermission(ctx.session, "manage-settings");
+    requirePermission(ctx.session, "manage-sites");
 
     const siteSlug = String(args.siteSlug ?? "");
     const address = String(args.address ?? "").trim();
 
     const site = await getSiteBySlug(siteSlug);
     if (!site) throw new Error(`Unknown site "${siteSlug}".`);
+    requireSiteAccess(ctx.session, site.id);
 
     if (!address) {
       await updateSite(site.id, { address: null, latitude: null, longitude: null });
