@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getCurrentSession } from "@/lib/auth";
-import { verifyApprovalToken } from "@/lib/copilot/approval";
+import { consumeApprovalToken } from "@/lib/copilot/approval";
 import { recordCopilotAudit } from "@/lib/copilot/audit";
 import { executeApprovedTool } from "@/lib/copilot/run";
 import { ensureSiteConfig } from "@/lib/site-context";
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
 
   let payload;
   try {
-    payload = await verifyApprovalToken(body.token, session.user.id);
+    payload = await consumeApprovalToken(body.token, session.user.id);
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Invalid token" },

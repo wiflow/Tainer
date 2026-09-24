@@ -590,6 +590,26 @@ export async function executeApprovedTool(
     return { result: { error: `Unknown tool: ${toolName}` }, isError: true };
   }
 
+  const settings = await getCopilotSettings();
+  if (!settings.enabled) {
+    return { result: { error: "Tainy is disabled for this site." }, isError: true };
+  }
+  const usage = await getCopilotUsage(session.user.id);
+  if (usage.toolCallsRemaining <= 0) {
+    await recordCopilotAudit({
+      session,
+      toolName,
+      klass: tool.klass,
+      args,
+      outcome: "budget-exceeded",
+      detail: `Daily tool-call budget exhausted (${usage.toolCallBudget})`,
+    });
+    return {
+      result: { error: `Daily tool-call budget exhausted (${usage.toolCallBudget}).` },
+      isError: true,
+    };
+  }
+
   // Re-check the group policy at execution time — the approval token has a
   // 5-minute window in which an admin may have tightened the policy.
   const policy = await getGroupToolPolicyForUser(session.user);

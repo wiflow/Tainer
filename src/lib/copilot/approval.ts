@@ -1,9 +1,13 @@
 import "server-only";
 
+import { createHash } from "node:crypto";
+
 import { decryptText, encryptText } from "@/lib/crypto";
 import type { ApprovalPayload } from "@/lib/copilot/types";
 
 const APPROVAL_TTL_MS = 5 * 60 * 1000;
+
+const consumedTokens = new Map<string, number>();
 
 /**
  * Mint a signed, encrypted approval token. The payload is AES-256-GCM
@@ -61,6 +65,24 @@ export async function verifyApprovalToken(
   }
 
   return decoded;
+}
+
+/** Verify a token and mark it used, so each approval runs at most once. */
+export async function consumeApprovalToken(
+  token: string,
+  expectedUserId: string,
+): Promise<ApprovalPayload> {
+  const payload = await verifyApprovalToken(token, expectedUserId);
+  const now = Date.now();
+  for (const [key, expiresAt] of consumedTokens) {
+    if (expiresAt <= now) consumedTokens.delete(key);
+  }
+  const digest = createHash("sha256").update(token).digest("hex");
+  if (consumedTokens.has(digest)) {
+    throw new Error("This approval was already used. Ask the assistant again.");
+  }
+  consumedTokens.set(digest, payload.expiresAt);
+  return payload;
 }
 
 function isApprovalPayload(value: unknown): value is ApprovalPayload {
