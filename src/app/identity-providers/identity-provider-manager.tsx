@@ -178,7 +178,9 @@ function ProviderForm({
               Trust email without email_verified claim
             </span>
             <span className="block text-[11px] text-zinc-500">
-              Needed for Microsoft Entra ID. Also accepts preferred_username or upn as the email.
+              Without it, a missing claim still lets linked users sign in but blocks matching
+              by email and auto-provisioning. Needed for Microsoft Entra ID. Also accepts
+              preferred_username or upn as the email.
             </span>
           </span>
         </label>
