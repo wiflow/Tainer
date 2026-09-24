@@ -57,6 +57,7 @@ function emptyStore(): UserGroupStore {
 
 async function readStore(): Promise<UserGroupStore> {
   return readDataJsonFileCached(STORE_FILE, {
+    failClosed: true,
     fallback: emptyStore,
     normalize: (parsed) => {
       const store = parsed as Partial<UserGroupStore>;

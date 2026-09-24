@@ -53,6 +53,7 @@ export function createStoreMutator<TStore>(
 }
 
 type JsonFileCacheOptions<TValue> = {
+  failClosed?: boolean;
   fallback: () => TValue;
   normalize: (parsed: unknown) => TValue;
   ttlMs?: number;
@@ -68,7 +69,7 @@ function primeJsonFileCache(filePath: string, value: unknown, ttlMs = DEFAULT_JS
 
 export async function readJsonFileCached<TValue>(
   filePath: string,
-  { fallback, normalize, ttlMs = DEFAULT_JSON_CACHE_TTL_MS }: JsonFileCacheOptions<TValue>,
+  { failClosed = false, fallback, normalize, ttlMs = DEFAULT_JSON_CACHE_TTL_MS }: JsonFileCacheOptions<TValue>,
 ): Promise<TValue> {
   const cached = jsonFileCache.get(filePath);
   if (cached && cached.expiresAt > Date.now()) {
@@ -80,15 +81,28 @@ export async function readJsonFileCached<TValue>(
     return (inflight as Promise<TValue>).then((value) => cloneJsonValue(value));
   }
 
+  let cacheable = true;
   const request = readFile(filePath, "utf8")
     .then((raw) => normalize(JSON.parse(raw)))
-    .catch(() => fallback());
+    .catch((error: unknown) => {
+      if ((error as NodeJS.ErrnoException | null)?.code === "ENOENT") {
+        return fallback();
+      }
+      if (failClosed) {
+        throw error;
+      }
+      console.error(`[store] Failed to read ${filePath}, using defaults:`, error);
+      cacheable = false;
+      return fallback();
+    });
 
   jsonFileInflight.set(filePath, request);
 
   try {
     const value = await request;
-    primeJsonFileCache(filePath, value, ttlMs);
+    if (cacheable) {
+      primeJsonFileCache(filePath, value, ttlMs);
+    }
     return cloneJsonValue(value);
   } finally {
     jsonFileInflight.delete(filePath);

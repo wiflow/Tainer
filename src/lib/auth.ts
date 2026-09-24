@@ -350,6 +350,7 @@ function readCookieValue(value: string, secret: Buffer, namespace: string) {
 
 async function readAuthStore(): Promise<AuthStore> {
   return readDataJsonFileCached("auth-store.json", {
+    failClosed: true,
     fallback: defaultAuthStore,
     normalize: (parsed) => {
       const store = parsed as Partial<AuthStore>;
