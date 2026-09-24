@@ -25,8 +25,9 @@ function getSystemRootCerts(): X509Certificate[] {
   return systemRootCerts;
 }
 
-const cache = new Map<string, { pems: string[]; fetchedAt: number }>();
+const cache = new Map<string, { pems: string[]; fetchedAt: number; ttl: number }>();
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+const TIMEOUT_CACHE_TTL_MS = 2 * 60 * 1000;
 const CHAIN_TIMEOUT_MS = 15_000;
 const MAX_REDIRECTS = 3;
 const MAX_CERT_BYTES = 64 * 1024;
@@ -48,7 +49,7 @@ export async function getExtraCaCerts(
   const key = `${hostname}:${port}:${rootsKey}`;
 
   const cached = cache.get(key);
-  if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
+  if (cached && Date.now() - cached.fetchedAt < cached.ttl) {
     return cached.pems;
   }
 
@@ -59,20 +60,27 @@ export async function getExtraCaCerts(
     ...getSystemRootCerts(),
     ...(extraRootsPem ? parsePemCerts(extraRootsPem) : []),
   ];
-  const promise = withTimeout(fetchChain(hostname, Number(port), trusted), CHAIN_TIMEOUT_MS, []);
-  inflight.set(key, promise);
+  const promise = (async () => {
+    const intermediates = await withTimeout(fetchChain(hostname, Number(port), trusted), CHAIN_TIMEOUT_MS);
 
-  try {
-    const intermediates = await promise;
+    if (!intermediates) {
+      cache.set(key, { pems: [], fetchedAt: Date.now(), ttl: TIMEOUT_CACHE_TTL_MS });
+      return [];
+    }
 
     if (intermediates.length === 0) {
-      cache.set(key, { pems: [], fetchedAt: Date.now() });
+      cache.set(key, { pems: [], fetchedAt: Date.now(), ttl: CACHE_TTL_MS });
       return [];
     }
 
     const fullBundle = [...getSystemRoots(), ...intermediates];
-    cache.set(key, { pems: fullBundle, fetchedAt: Date.now() });
+    cache.set(key, { pems: fullBundle, fetchedAt: Date.now(), ttl: CACHE_TTL_MS });
     return fullBundle;
+  })();
+  inflight.set(key, promise);
+
+  try {
+    return await promise;
   } catch {
     return [];
   } finally {
@@ -80,10 +88,10 @@ export async function getExtraCaCerts(
   }
 }
 
-function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
   let timer: NodeJS.Timeout | undefined;
-  const timeout = new Promise<T>((resolve) => {
-    timer = setTimeout(() => resolve(fallback), ms);
+  const timeout = new Promise<null>((resolve) => {
+    timer = setTimeout(() => resolve(null), ms);
   });
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }

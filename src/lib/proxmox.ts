@@ -945,6 +945,7 @@ const TASK_PROGRESS_HINTS: Record<string, number> = {
 const tlsOptionsCache = new Map<string, { result: { rejectUnauthorized: boolean; ca?: string[] }; expiresAt: number; connectionKey: string }>();
 const tlsOptionsInflight = new Map<string, Promise<{ rejectUnauthorized: boolean; ca?: string[] }>>();
 const TLS_OPTIONS_CACHE_TTL_MS = 30 * 60_000; // 30 minutes
+const TLS_OPTIONS_EMPTY_CACHE_TTL_MS = 2 * 60_000;
 
 // Keep-alive HTTPS / HTTP agents per site. Without these, every Proxmox call
 // opens a fresh TCP + TLS connection (~50-150ms of handshake on a LAN). The
@@ -1038,7 +1039,7 @@ async function buildTlsOptions(
     const result = await promise;
     tlsOptionsCache.set(config.siteId, {
       result,
-      expiresAt: Date.now() + TLS_OPTIONS_CACHE_TTL_MS,
+      expiresAt: Date.now() + (result.ca ? TLS_OPTIONS_CACHE_TTL_MS : TLS_OPTIONS_EMPTY_CACHE_TTL_MS),
       connectionKey,
     });
     return result;
