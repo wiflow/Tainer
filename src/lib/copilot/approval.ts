@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createHash } from "node:crypto";
+import { randomUUID } from "node:crypto";
 
 import { decryptText, encryptText } from "@/lib/crypto";
 import type { ApprovalPayload } from "@/lib/copilot/types";
@@ -22,13 +22,14 @@ const consumedTokens = new Map<string, number>();
  * whatever is inside the encrypted token.
  */
 export async function mintApprovalToken(
-  input: Omit<ApprovalPayload, "v" | "expiresAt">,
+  input: Omit<ApprovalPayload, "v" | "expiresAt" | "nonce">,
 ): Promise<{ token: string; expiresAt: number }> {
   const expiresAt = Date.now() + APPROVAL_TTL_MS;
   const payload: ApprovalPayload = {
     v: 1,
     expiresAt,
     ...input,
+    nonce: randomUUID(),
   };
   const token = await encryptText(JSON.stringify(payload));
   return { token, expiresAt };
@@ -77,11 +78,11 @@ export async function consumeApprovalToken(
   for (const [key, expiresAt] of consumedTokens) {
     if (expiresAt <= now) consumedTokens.delete(key);
   }
-  const digest = createHash("sha256").update(token).digest("hex");
-  if (consumedTokens.has(digest)) {
+  const key = `${payload.userId}:${payload.nonce}`;
+  if (consumedTokens.has(key)) {
     throw new Error("This approval was already used. Ask the assistant again.");
   }
-  consumedTokens.set(digest, payload.expiresAt);
+  consumedTokens.set(key, payload.expiresAt);
   return payload;
 }
 
@@ -94,6 +95,8 @@ function isApprovalPayload(value: unknown): value is ApprovalPayload {
     typeof v.toolName === "string" &&
     typeof v.userId === "string" &&
     typeof v.expiresAt === "number" &&
+    typeof v.nonce === "string" &&
+    v.nonce.length > 0 &&
     (v.siteSlug === null || typeof v.siteSlug === "string") &&
     !!v.args &&
     typeof v.args === "object"

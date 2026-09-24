@@ -120,6 +120,7 @@ export type ApprovalPayload = {
   siteSlug: string | null;
   /** Unix ms. */
   expiresAt: number;
+  nonce: string;
 };
 
 export type CopilotStreamEvent =
