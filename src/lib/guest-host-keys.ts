@@ -6,7 +6,7 @@ import { readFile } from "node:fs/promises";
 import { promisify } from "node:util";
 
 import { resolveSiteDataFilePathFromContext } from "@/lib/site-data";
-import { writeJsonFileAtomically } from "@/lib/store-utils";
+import { createStoreMutator, writeJsonFileAtomically } from "@/lib/store-utils";
 
 const execFile = promisify(execFileCallback);
 
@@ -71,6 +71,8 @@ async function writeStore(store: GuestHostKeyStore) {
   const filePath = await resolveSiteDataFilePathFromContext(GUEST_HOST_KEYS_FILE);
   await writeJsonFileAtomically(filePath, store);
 }
+
+const mutateStore = createStoreMutator("guest-host-keys", readStore, writeStore);
 
 function computeFingerprint(publicKeyOpenSSH: string) {
   const parts = publicKeyOpenSSH.trim().split(/\s+/);
@@ -141,7 +143,6 @@ export async function enrollGuestHostKey(input: {
 
   const publicKey = `${keyType} ${keyData}`;
   const pinnedAt = new Date().toISOString();
-  const store = await readStore();
   const targetKey = normalizeTargetKey(node, type, vmid);
   const nextRecord: GuestHostKeyRecord = {
     host,
@@ -153,11 +154,12 @@ export async function enrollGuestHostKey(input: {
     vmid,
   };
 
-  store.entries = store.entries.filter(
-    (entry) => normalizeTargetKey(entry.node, entry.type, entry.vmid) !== targetKey,
-  );
-  store.entries.push(nextRecord);
-  await writeStore(store);
+  await mutateStore((store) => {
+    store.entries = store.entries.filter(
+      (entry) => normalizeTargetKey(entry.node, entry.type, entry.vmid) !== targetKey,
+    );
+    store.entries.push(nextRecord);
+  });
 
   return recordToInfo(nextRecord);
 }

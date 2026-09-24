@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 
 import { resolveSiteDataFilePathFromContext } from "@/lib/site-data";
-import { writeJsonFileAtomically } from "@/lib/store-utils";
+import { createStoreMutator, writeJsonFileAtomically } from "@/lib/store-utils";
 
 export type DeploymentActivityAction =
   | "start"
@@ -60,23 +60,25 @@ async function writeStore(store: DeploymentActivityLogStore) {
   await writeJsonFileAtomically(filePath, store);
 }
 
+const mutateStore = createStoreMutator("deployment-activity-log", readStore, writeStore);
+
 export async function recordDeploymentActivity(
   input: Omit<DeploymentActivityEntry, "id" | "recordedAt">,
 ) {
-  const store = await readStore();
-  const entry: DeploymentActivityEntry = {
-    ...input,
-    id: randomUUID(),
-    recordedAt: new Date().toISOString(),
-  };
+  return mutateStore((store) => {
+    const entry: DeploymentActivityEntry = {
+      ...input,
+      id: randomUUID(),
+      recordedAt: new Date().toISOString(),
+    };
 
-  store.entries.unshift(entry);
-  if (store.entries.length > MAX_ENTRIES) {
-    store.entries = store.entries.slice(0, MAX_ENTRIES);
-  }
+    store.entries.unshift(entry);
+    if (store.entries.length > MAX_ENTRIES) {
+      store.entries = store.entries.slice(0, MAX_ENTRIES);
+    }
 
-  await writeStore(store);
-  return entry;
+    return entry;
+  });
 }
 
 export async function getDeploymentActivities(
@@ -90,9 +92,9 @@ export async function getDeploymentActivities(
 }
 
 export async function clearDeploymentActivities(deploymentId: string) {
-  const store = await readStore();
-  store.entries = store.entries.filter(
-    (entry) => entry.deploymentId !== deploymentId,
-  );
-  await writeStore(store);
+  await mutateStore((store) => {
+    store.entries = store.entries.filter(
+      (entry) => entry.deploymentId !== deploymentId,
+    );
+  });
 }
