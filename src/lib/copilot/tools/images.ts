@@ -22,6 +22,11 @@ import {
   updateContainerConfig,
   waitForTask,
 } from "@/lib/proxmox";
+import {
+  PROXMOX_BRIDGE_REGEX,
+  PROXMOX_STORAGE_REGEX,
+  PROXMOX_VOLID_REGEX,
+} from "@/lib/proxmox-validation";
 import { buildDescription, type TainerMeta } from "@/lib/tainer-meta";
 import { recordDeploymentActivity } from "@/lib/deployment-activity-log";
 import { registerTool } from "@/lib/copilot/registry";
@@ -227,6 +232,9 @@ registerTool({
     if (!HOSTNAME_REGEX.test(hostname)) {
       throw new Error(`Hostname must match [a-z0-9-], 1-63 chars (got "${hostname}").`);
     }
+    if (!PROXMOX_VOLID_REGEX.test(templateVolid)) throw new Error("Invalid templateVolid.");
+    if (!PROXMOX_STORAGE_REGEX.test(rootfsStorage)) throw new Error("Invalid rootfsStorage.");
+    if (!PROXMOX_BRIDGE_REGEX.test(bridge)) throw new Error("Invalid bridge.");
 
     return runInSiteWithPermission(ctx.session, siteSlug, "create-deployments", async () => {
       await assertUniqueHostname(hostname);
@@ -438,6 +446,9 @@ registerTool({
     const memoryMb = Number.isInteger(Number(args.memoryMb)) ? Number(args.memoryMb) : 2048;
     const bridge = String(args.bridge ?? "vmbr0").trim() || "vmbr0";
     const osType = ALLOWED_OS_TYPES.includes(String(args.osType)) ? String(args.osType) : "l26";
+    if (!PROXMOX_VOLID_REGEX.test(isoVolid)) throw new Error("Invalid isoVolid.");
+    if (!PROXMOX_STORAGE_REGEX.test(diskStorage)) throw new Error("Invalid diskStorage.");
+    if (!PROXMOX_BRIDGE_REGEX.test(bridge)) throw new Error("Invalid bridge.");
 
     return runInSiteWithPermission(ctx.session, siteSlug, "create-deployments", async () => {
       const vmidStr = await getNextId();
