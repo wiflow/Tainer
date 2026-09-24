@@ -13,7 +13,7 @@ RUN npm run build \
 
 RUN ./node_modules/.bin/esbuild server.mjs --bundle --platform=node --target=node24 \
     --minify --format=esm --outfile=server.min.mjs \
-    --external:next --external:ws --banner:js="import{createRequire}from'module';const require=createRequire(import.meta.url);"
+    --external:next --external:@next/env --external:ws --banner:js="import{createRequire}from'module';const require=createRequire(import.meta.url);"
 
 FROM node:24-alpine AS runtime
 WORKDIR /app

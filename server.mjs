@@ -10,6 +10,7 @@ function pickRequestModule(url) {
   return url.protocol === "http:" ? http : https;
 }
 
+import nextEnv from "@next/env";
 import next from "next";
 import { WebSocketServer, WebSocket } from "ws";
 
@@ -27,6 +28,8 @@ if (!dev && !process.env.AUTH_SECRET?.trim()) {
   );
   process.exit(1);
 }
+
+nextEnv.loadEnvConfig(process.cwd(), dev);
 
 try {
   await migrateLegacyAuthSecret({
