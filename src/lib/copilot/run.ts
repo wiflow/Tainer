@@ -571,10 +571,12 @@ function toOpenAiMessages(messages: ChatMessage[]): OpenAiMessage[] {
   // re-encoded as JSON strings); tool-result messages become one role:"tool"
   // message per result, keyed by tool_call_id.
   const out: OpenAiMessage[] = [];
+  const toolNames = new Map<string, string>();
   for (const msg of messages) {
     if (msg.role === "user") {
       out.push({ role: "user", content: msg.content });
     } else if (msg.role === "assistant") {
+      for (const tc of msg.toolCalls ?? []) toolNames.set(tc.id, tc.name);
       const toolCalls: OpenAiToolCall[] = (msg.toolCalls ?? []).map((tc) => ({
         id: tc.id,
         type: "function" as const,
@@ -587,10 +589,12 @@ function toOpenAiMessages(messages: ChatMessage[]): OpenAiMessage[] {
       });
     } else if (msg.role === "tool") {
       for (const r of msg.results) {
+        const json = JSON.stringify(redactCredentials(r.content) ?? null);
+        const external = getTool(toolNames.get(r.toolCallId) ?? "")?.returnsExternalContent;
         out.push({
           role: "tool",
           tool_call_id: r.toolCallId,
-          content: JSON.stringify(redactCredentials(r.content) ?? null),
+          content: external ? fenceExternalContent(json) : json,
         });
       }
     }

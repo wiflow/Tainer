@@ -157,6 +157,7 @@ registerTool({
   name: "list_users",
   category: "Access",
   klass: "read",
+  returnsExternalContent: true,
   description:
     "List Tainer users (name, email, role, 2FA status, group membership, last-seen). Read-only. Requires manage-users. Use for 'who has access?', 'which users don't have 2FA?', 'when did X last sign in?'.",
   input_schema: { type: "object", additionalProperties: false, properties: {} },

@@ -505,8 +505,8 @@ function ApprovalCard({
             <div className="mt-1.5 flex items-start gap-1.5 rounded-md border border-amber-500/25 bg-amber-500/[0.06] px-2 py-1.5 text-[10.5px] text-amber-200/90">
               <ShieldAlert className="h-3 w-3 mt-px flex-shrink-0" />
               <span>
-                External content (e.g. Docker Hub descriptions) was read earlier in this
-                conversation. Double-check this action matches what you actually asked for.
+                Content written by others (e.g. Docker Hub or container descriptions) was read
+                earlier in this conversation. Double-check this action matches what you actually asked for.
               </span>
             </div>
           )}

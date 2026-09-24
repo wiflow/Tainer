@@ -106,6 +106,7 @@ registerTool({
   name: "get_container",
   category: "Containers",
   klass: "read",
+  returnsExternalContent: true,
   description:
     "Get detailed info for a single container/VM: full resource usage, configured cores/memory/swap, env-var count, network config, and any issues.",
   input_schema: siteSlugSchema({

@@ -7,6 +7,7 @@ registerTool({
   name: "get_audit_log",
   category: "Diagnostics",
   klass: "admin",
+  returnsExternalContent: true,
   description:
     "Read recent admin audit log entries (login attempts, settings changes, copilot activity, etc.). Admin role required. Use this to investigate 'who did X?' or 'when was the last failed login?' questions.",
   input_schema: {
