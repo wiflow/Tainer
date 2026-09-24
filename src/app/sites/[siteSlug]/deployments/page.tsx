@@ -1,6 +1,7 @@
 import { Activity, Layers3, Server, ShieldAlert } from "lucide-react";
 import { unstable_cache } from "next/cache";
 
+import { hasSitePermission } from "@/lib/auth";
 import { requireSitePageAccess } from "@/lib/page-guard";
 import { ensureSiteConfig } from "@/lib/site-context";
 import { resolveSiteConfigBySlug } from "@/lib/site-resolver";
@@ -36,7 +37,7 @@ export default async function DeploymentsPage({
   params: Promise<{ siteSlug: string }>;
 }) {
   const { siteSlug } = await params;
-  await requireSitePageAccess(siteSlug);
+  const { session, site } = await requireSitePageAccess(siteSlug);
   await ensureSiteConfig(siteSlug);
 
   const [{ deployments, issues }, templates, tags] = await getDeploymentsPageData(siteSlug);
@@ -106,7 +107,7 @@ export default async function DeploymentsPage({
 
       <BulkOperationsPanel deployments={deployments} tags={tags} />
 
-      <DeploymentsBoard deployments={deployments} updateMap={updateMap} tags={tags} />
+      <DeploymentsBoard canDelete={hasSitePermission(session, site.id, "delete-deployments")} deployments={deployments} updateMap={updateMap} tags={tags} />
     </div>
   );
 }

@@ -20,6 +20,7 @@ type ExtendedAction = ContainerLifecycleAction | "delete";
 
 type DeploymentQuickActionsProps = {
   allowDelete?: boolean;
+  allowMigrate?: boolean;
   className?: string;
   currentNode?: string;
   deploymentId: string;
@@ -149,6 +150,7 @@ function MigratePopover({
 
 export function DeploymentQuickActions({
   allowDelete = true,
+  allowMigrate = true,
   className,
   currentNode,
   deploymentId,
@@ -303,7 +305,7 @@ export function DeploymentQuickActions({
         );
       })}
 
-      {nodes && nodes.length > 1 && currentNode && nodeMetrics && (
+      {allowMigrate && nodes && nodes.length > 1 && currentNode && nodeMetrics && (
         <MigratePopover
           currentNode={currentNode}
           deploymentId={deploymentId}

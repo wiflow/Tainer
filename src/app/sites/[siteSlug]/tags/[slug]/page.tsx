@@ -3,6 +3,7 @@ import { ArrowLeft, Box, Play, Square } from "lucide-react";
 import { notFound } from "next/navigation";
 import { unstable_cache } from "next/cache";
 
+import { hasSitePermission } from "@/lib/auth";
 import { requireSitePageAccess } from "@/lib/page-guard";
 import { ensureSiteConfig } from "@/lib/site-context";
 import { resolveSiteConfigBySlug } from "@/lib/site-resolver";
@@ -43,7 +44,7 @@ type TagDetailPageProps = {
 
 export default async function TagDetailPage({ params }: TagDetailPageProps) {
   const { siteSlug, slug } = await params;
-  await requireSitePageAccess(siteSlug);
+  const { session, site } = await requireSitePageAccess(siteSlug);
   await ensureSiteConfig(siteSlug);
 
   const [tag, allTags, { deployments }] = await getTagDetailData(siteSlug, slug);
@@ -151,7 +152,7 @@ export default async function TagDetailPage({ params }: TagDetailPageProps) {
           <h2 className="mb-4 text-sm font-semibold text-zinc-100">
             Tag members
           </h2>
-          <DeploymentsBoard deployments={members} tags={allTags} />
+          <DeploymentsBoard canDelete={hasSitePermission(session, site.id, "delete-deployments")} deployments={members} tags={allTags} />
         </div>
       )}
     </div>

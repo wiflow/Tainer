@@ -53,7 +53,7 @@ function RowStatusPill({
   );
 }
 
-export function DeploymentsBoard({ deployments, updateMap = {}, tags = [] }: { deployments: LiveDeployment[]; updateMap?: Record<string, boolean>; tags?: ManagedTagDefinition[] }) {
+export function DeploymentsBoard({ canDelete = false, deployments, updateMap = {}, tags = [] }: { canDelete?: boolean; deployments: LiveDeployment[]; updateMap?: Record<string, boolean>; tags?: ManagedTagDefinition[] }) {
   const siteBase = useSiteBasePath();
   const [search, setSearch] = useState("");
   const [tagFilter, setTagFilter] = useState("");
@@ -245,6 +245,7 @@ export function DeploymentsBoard({ deployments, updateMap = {}, tags = [] }: { d
                     <td className="px-4 py-3 text-right">
                       <div className="flex justify-end">
                         <DeploymentQuickActions
+                          allowDelete={canDelete}
                           deploymentId={deployment.id}
                           rawStatus={deployment.rawStatus}
                           siteSlug={siteBase.replace(/^\/sites\//, "")}

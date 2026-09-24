@@ -887,7 +887,7 @@ export async function importUpstreamTemplateAction(
       return { message: "Missing site context.", requestId: randomUUID(), status: "error", task: null };
     }
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
-    requireSitePermission(session, siteConfig.siteId, "manage-deployments");
+    requireSitePermission(session, siteConfig.siteId, "manage-templates");
     return await withSiteConfig(siteConfig, async () => {
 
     const node = String(formData.get("node") ?? "").trim();
@@ -1114,6 +1114,7 @@ export async function recreateFromTemplateAction(
     }
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
     requireSitePermission(session, siteConfig.siteId, "manage-deployments");
+    requireSitePermission(session, siteConfig.siteId, "delete-deployments");
     return await withSiteConfig(siteConfig, async () => {
 
     const deploymentId = String(formData.get("deploymentId") ?? "").trim();

@@ -202,6 +202,7 @@ export default async function DeploymentDetailPage({
             <div className="h-6 w-px bg-white/5" aria-hidden />
             <DeploymentQuickActions
               allowDelete={canSite("delete-deployments")}
+              allowMigrate={canSite("manage-deployments")}
               currentNode={deployment.node}
               deploymentId={deployment.id}
               nodeMetrics={nodeMetrics}
@@ -218,7 +219,7 @@ export default async function DeploymentDetailPage({
 
       {updateAvailable && tainerMeta && (
         <DeploymentUpdateBanner
-          canRecreate={canSite("manage-deployments")}
+          canRecreate={canSite("manage-deployments") && canSite("delete-deployments")}
           deploymentId={deployment.id}
           templateId={sourceTemplate?.id ?? ""}
           templateName={sourceTemplate?.name ?? tainerMeta.templateName}
