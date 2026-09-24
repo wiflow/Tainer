@@ -132,9 +132,14 @@ export function CopilotSettingsPanel() {
         });
         const json = (await res.json()) as { settings?: CopilotSettings; error?: string };
         if (!res.ok) throw new Error(json.error || `Request failed (${res.status})`);
+        const keyCleared =
+          settings?.hasKey && json.settings && !json.settings.hasKey && extra.apiKey !== null;
         if (json.settings) setSettings(json.settings);
         setApiKey("");
-        setFeedback({ kind: "success", text: "Saved." });
+        setFeedback({
+          kind: "success",
+          text: keyCleared ? "Saved. The endpoint changed, so enter the API key again." : "Saved.",
+        });
       } catch (err) {
         setFeedback({
           kind: "error",
@@ -145,6 +150,7 @@ export function CopilotSettingsPanel() {
       }
     },
     [
+      settings?.hasKey,
       model,
       tokenBudget,
       toolBudget,

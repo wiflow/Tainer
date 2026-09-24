@@ -228,7 +228,12 @@ export async function saveCopilotSettings(
     }
     if (input.model) settings.model = input.model;
     if (input.baseUrl !== undefined) {
-      settings.baseUrl = input.baseUrl?.trim() || null;
+      const nextBaseUrl = input.baseUrl?.trim() || null;
+      if (nextBaseUrl !== settings.baseUrl && input.apiKey === undefined) {
+        settings.encryptedKey = null;
+        settings.keyHint = null;
+      }
+      settings.baseUrl = nextBaseUrl;
     }
     if (input.customModelId !== undefined) {
       settings.customModelId =
