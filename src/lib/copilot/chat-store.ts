@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 
 import { resolveDataFilePath } from "@/lib/app-data";
+import { redactCredentials } from "@/lib/copilot/redact";
 import { createStoreMutator, writeJsonFileAtomically } from "@/lib/store-utils";
 
 const DATA_FILE = "copilot-chats.json";
@@ -86,6 +87,7 @@ function sanitizeTurns(turns: unknown[]): StoredChatTurn[] {
         if (!tc || typeof tc !== "object") return tc;
         const rest = { ...(tc as Record<string, unknown>) };
         delete rest.token;
+        if ("result" in rest) rest.result = redactCredentials(rest.result);
         return rest.status === "awaiting-approval" ? { ...rest, status: "denied" } : rest;
       }),
     };

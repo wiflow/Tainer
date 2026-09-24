@@ -42,6 +42,7 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 
+import { REDACTED_SECRET } from "@/lib/copilot/redact";
 import { cn } from "@/lib/utils";
 
 // -- Shared types (kept structural to match tool-result JSON) ---------------
@@ -1445,6 +1446,13 @@ function CredentialsCard({
 }) {
   const [revealed, setRevealed] = useState(false);
   const [copied, setCopied] = useState(false);
+  if (creds.value === REDACTED_SECRET) {
+    return (
+      <div className="rounded-lg border border-white/[0.08] bg-white/[0.02] px-3 py-2 text-[10.5px] text-zinc-500">
+        Root password was shown once and is not stored.
+      </div>
+    );
+  }
   return (
     <motion.div
       initial={{ opacity: 0, y: 4 }}
@@ -2281,31 +2289,35 @@ function BatchCreatedRow({
           </Link>
         )}
       </div>
-      <div className="mt-1 flex items-center gap-1.5">
-        <code className="flex-1 min-w-0 truncate rounded border border-white/[0.08] bg-black/40 px-2 py-1 text-[11px] font-mono text-zinc-200">
-          {revealed ? item.password : "•".repeat(18)}
-        </code>
-        <button
-          type="button"
-          onClick={() => setRevealed((v) => !v)}
-          className="rounded border border-white/[0.08] bg-white/[0.03] p-1 text-zinc-300 hover:bg-white/[0.08] transition-colors"
-          title={revealed ? "Hide" : "Reveal"}
-        >
-          {revealed ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            navigator.clipboard.writeText(item.password);
-            setCopied(true);
-            setTimeout(() => setCopied(false), 1500);
-          }}
-          className="rounded border border-white/[0.08] bg-white/[0.03] p-1 text-zinc-300 hover:bg-white/[0.08] transition-colors"
-          title="Copy password"
-        >
-          {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-        </button>
-      </div>
+      {item.password === REDACTED_SECRET ? (
+        <div className="mt-1 text-[10.5px] text-zinc-500">Password was shown once and is not stored.</div>
+      ) : (
+        <div className="mt-1 flex items-center gap-1.5">
+          <code className="flex-1 min-w-0 truncate rounded border border-white/[0.08] bg-black/40 px-2 py-1 text-[11px] font-mono text-zinc-200">
+            {revealed ? item.password : "•".repeat(18)}
+          </code>
+          <button
+            type="button"
+            onClick={() => setRevealed((v) => !v)}
+            className="rounded border border-white/[0.08] bg-white/[0.03] p-1 text-zinc-300 hover:bg-white/[0.08] transition-colors"
+            title={revealed ? "Hide" : "Reveal"}
+          >
+            {revealed ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              navigator.clipboard.writeText(item.password);
+              setCopied(true);
+              setTimeout(() => setCopied(false), 1500);
+            }}
+            className="rounded border border-white/[0.08] bg-white/[0.03] p-1 text-zinc-300 hover:bg-white/[0.08] transition-colors"
+            title="Copy password"
+          >
+            {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

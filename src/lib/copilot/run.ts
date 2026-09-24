@@ -9,6 +9,7 @@ import {
 } from "@/lib/copilot/deepinfra";
 import { recordCopilotAudit } from "@/lib/copilot/audit";
 import { mintApprovalToken } from "@/lib/copilot/approval";
+import { redactCredentials } from "@/lib/copilot/redact";
 import { buildSystemPrompt, type SidebarContext } from "@/lib/copilot/system-prompt";
 import {
   getCopilotApiKey,
@@ -558,7 +559,7 @@ function toOpenAiMessages(messages: ChatMessage[]): OpenAiMessage[] {
         out.push({
           role: "tool",
           tool_call_id: r.toolCallId,
-          content: JSON.stringify(r.content ?? null),
+          content: JSON.stringify(redactCredentials(r.content) ?? null),
         });
       }
     }

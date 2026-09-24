@@ -32,6 +32,7 @@ import type {
   CopilotStreamEvent,
 } from "@/lib/copilot/types";
 import type { ChatSummary } from "@/lib/copilot/chat-store";
+import { redactCredentials } from "@/lib/copilot/redact";
 
 import { CopilotMarkdown } from "./copilot-markdown";
 import { PlanView, type ToolCallView } from "./copilot-plan";
@@ -230,7 +231,7 @@ export function CopilotSidebar({
             }
             return {
               toolCallId: tc.id,
-              content: tc.result ?? null,
+              content: redactCredentials(tc.result) ?? null,
               isError: tc.status === "error",
             };
           });
