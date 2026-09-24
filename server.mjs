@@ -1003,6 +1003,8 @@ server.on("upgrade", async (req, socket, head) => {
   try {
     url = new URL(req.url, `http://${req.headers.host}`);
   } catch {
+    socket.write("HTTP/1.1 400 Bad Request\r\n\r\n");
+    socket.destroy();
     return;
   }
 
@@ -1010,6 +1012,9 @@ server.on("upgrade", async (req, socket, head) => {
   const isWebConsoleWs = url.pathname === "/api/proxmox/console-ws";
 
   if (!isMobileConsoleWs && !isWebConsoleWs && url.pathname !== "/api/proxmox/ssh-terminal-ws") {
+    if (dev && url.pathname.startsWith("/_next/")) return;
+    socket.write("HTTP/1.1 404 Not Found\r\n\r\n");
+    socket.destroy();
     return;
   }
 
