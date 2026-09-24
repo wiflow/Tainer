@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { getCurrentSession } from "@/lib/auth";
+import { getCurrentSession, hasSiteAccess } from "@/lib/auth";
 import { listDeploymentTemplates } from "@/lib/deployment-templates";
 import { getDeploymentIndex, getNodes, withSiteConfig } from "@/lib/proxmox";
 import { resolveSiteConfigBySlug } from "@/lib/site-resolver";
@@ -22,6 +22,9 @@ export async function GET(request: Request) {
 
   try {
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
+    if (!hasSiteAccess(session, siteConfig.siteId)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
     const data = await withSiteConfig(siteConfig, async () => {
       const [deploymentIndex, nodesResult, templates] = await Promise.all([
         getDeploymentIndex(),
