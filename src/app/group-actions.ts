@@ -5,7 +5,7 @@ import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 
 import type { BasicActionState, BulkActionState, ProxmoxActionState } from "@/lib/action-states";
-import { requireAdminSession, requireSession } from "@/lib/auth";
+import { requireAdminSession, requireSession, requireSitePermission } from "@/lib/auth";
 import { createRateLimiterOrThrow } from "@/lib/rate-limit";
 
 const enforceRateLimit = createRateLimiterOrThrow("group-actions", 20, 5 * 60_000);
@@ -46,6 +46,7 @@ export async function createTagAction(
     const siteSlug = String(formData.get("siteSlug") ?? "");
     if (!siteSlug) return { message: "Missing site context.", requestId: randomUUID(), status: "error" };
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
+    requireSitePermission(session, siteConfig.siteId, "manage-deployments");
     return await withSiteConfig(siteConfig, async () => {
 
     const name = String(formData.get("name") ?? "").trim();
@@ -115,11 +116,13 @@ export async function updateTagAction(
   formData: FormData,
 ): Promise<BasicActionState> {
   try {
-    await requireSession();
+    const session = await requireSession();
+    enforceRateLimit(session.user.id);
 
     const siteSlug = String(formData.get("siteSlug") ?? "");
     if (!siteSlug) return { message: "Missing site context.", requestId: randomUUID(), status: "error" };
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
+    requireSitePermission(session, siteConfig.siteId, "manage-deployments");
     return await withSiteConfig(siteConfig, async () => {
 
     const tagId = String(formData.get("groupId") ?? "").trim();
@@ -265,13 +268,14 @@ export async function assignContainerToTagAction(
   formData: FormData,
 ): Promise<ProxmoxActionState> {
   try {
-    await requireSession();
+    const session = await requireSession();
 
     const siteSlug = String(formData.get("siteSlug") ?? "");
     if (!siteSlug) {
       return { message: "Missing site context.", requestId: randomUUID(), status: "error", task: null };
     }
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
+    requireSitePermission(session, siteConfig.siteId, "manage-deployments");
     return await withSiteConfig(siteConfig, async () => {
 
     const deploymentId = String(formData.get("deploymentId") ?? "").trim();
@@ -348,13 +352,15 @@ export async function bulkTagLifecycleAction(
   formData: FormData,
 ): Promise<BulkActionState> {
   try {
-    await requireSession();
+    const session = await requireSession();
+    enforceRateLimit(session.user.id);
 
     const siteSlug = String(formData.get("siteSlug") ?? "");
     if (!siteSlug) {
       return { message: "Missing site context.", requestId: randomUUID(), status: "error", tasks: [] };
     }
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
+    requireSitePermission(session, siteConfig.siteId, "manage-deployments");
     return await withSiteConfig(siteConfig, async () => {
 
     const tagSlug = String(formData.get("groupSlug") ?? "").trim();
