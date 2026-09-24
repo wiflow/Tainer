@@ -14,6 +14,16 @@ import next from "next";
 import { WebSocketServer, WebSocket } from "ws";
 
 const dev = process.env.NODE_ENV !== "production";
+
+if (!dev && !process.env.AUTH_SECRET?.trim()) {
+  console.error(
+    "AUTH_SECRET is required in production. Generate one with " +
+      "`openssl rand -base64 32` and set it as an environment variable; " +
+      "do not rely on the on-disk fallback.",
+  );
+  process.exit(1);
+}
+
 const hostname = "0.0.0.0";
 const port = parseInt(process.env.PORT || "3000", 10);
 
