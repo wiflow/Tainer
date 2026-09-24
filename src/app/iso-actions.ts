@@ -5,7 +5,7 @@ import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 
 import type { ProxmoxActionState } from "@/lib/action-states";
-import { requirePermission, requireSession } from "@/lib/auth";
+import { requireSession, requireSitePermission } from "@/lib/auth";
 import { assertSafeDownloadUrl } from "@/lib/import-url";
 import { importTemplateFromUrl, withSiteConfig } from "@/lib/proxmox";
 import { resolveSiteConfigBySlug } from "@/lib/site-resolver";
@@ -16,13 +16,13 @@ export async function downloadIsoFromUrlAction(
 ): Promise<ProxmoxActionState> {
   try {
     const session = await requireSession();
-    requirePermission(session, "manage-settings");
 
     const siteSlug = String(formData.get("siteSlug") ?? "");
     if (!siteSlug) {
       return { message: "Missing site context.", requestId: randomUUID(), status: "error", task: null };
     }
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
+    requireSitePermission(session, siteConfig.siteId, "manage-settings");
     return await withSiteConfig(siteConfig, async () => {
 
     const node = String(formData.get("node") ?? "").trim();

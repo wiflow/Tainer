@@ -935,13 +935,13 @@ export async function importUpstreamTemplateAction(
 ): Promise<ProxmoxActionState> {
   try {
     const session = await requireSession();
-    requirePermission(session, "manage-deployments");
 
     const siteSlug = String(formData.get("siteSlug") ?? "");
     if (!siteSlug) {
       return { message: "Missing site context.", requestId: randomUUID(), status: "error", task: null };
     }
     const siteConfig = await resolveSiteConfigBySlug(siteSlug);
+    requireSitePermission(session, siteConfig.siteId, "manage-deployments");
     return await withSiteConfig(siteConfig, async () => {
 
     const node = String(formData.get("node") ?? "").trim();
