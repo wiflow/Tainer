@@ -376,7 +376,20 @@ export function AccountSettingsPanel({
 
             {!account.hasTwoFactor ? (
               <>
-                <Form action={startTwoFactorAction}>
+                <Form action={startTwoFactorAction} className="space-y-4">
+                  {account.hasLocalPassword !== false ? (
+                    <label className="block">
+                      <span className="text-[13px] font-medium text-zinc-300">
+                        Current password
+                      </span>
+                      <input
+                        autoComplete="current-password"
+                        className={inputClassName}
+                        name="currentPassword"
+                        type="password"
+                      />
+                    </label>
+                  ) : null}
                   <Button
                     disabled={startTwoFactorPending}
                     type="submit"

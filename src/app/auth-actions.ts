@@ -418,8 +418,8 @@ export async function startTwoFactorSetupAction(
 ): Promise<TwoFactorSetupActionState> {
   try {
     void previousState;
-    void formData;
-    const setup = await beginTwoFactorEnrollment();
+    const currentPassword = String(formData.get("currentPassword") ?? "");
+    const setup = await beginTwoFactorEnrollment({ currentPassword });
 
     return {
       manualEntryKey: setup.manualEntryKey,
@@ -475,7 +475,7 @@ export async function confirmTwoFactorSetupAction(
 
     return {
       manualEntryKey: "",
-      message: "Two-factor authentication is now enabled. Save the recovery codes below.",
+      message: "Two-factor authentication is now enabled and other sessions were signed out. Save the recovery codes below.",
       qrCodeDataUrl: "",
       recoveryCodes,
       requestId: randomUUID(),

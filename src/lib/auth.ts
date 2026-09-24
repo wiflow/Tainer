@@ -2286,7 +2286,31 @@ export async function adminSetUserPassword(targetUserId: string, nextPassword: s
   });
 }
 
-export async function beginTwoFactorEnrollment() {
+const REAUTHENTICATION_MAX_AGE_MS = 10 * 60_000;
+
+async function requireReauthentication(
+  store: AuthStore,
+  user: StoredUser,
+  sessionId: string,
+  currentPassword: string,
+) {
+  if (user.passwordHash) {
+    if (!(await verifyPassword(currentPassword, user.passwordHash))) {
+      throw new Error("Current password is incorrect.");
+    }
+    return;
+  }
+
+  const storedSession = store.sessions.find((entry) => entry.id === sessionId);
+  if (
+    !storedSession ||
+    Date.now() - new Date(storedSession.createdAt).getTime() > REAUTHENTICATION_MAX_AGE_MS
+  ) {
+    throw new Error("Sign in again, then set up 2FA within 10 minutes.");
+  }
+}
+
+export async function beginTwoFactorEnrollment(input: { currentPassword: string }) {
   const session = await requireSession();
   const store = await readAuthStore();
   const user = store.users.find((entry) => entry.id === session.user.id);
@@ -2294,6 +2318,12 @@ export async function beginTwoFactorEnrollment() {
   if (!user) {
     throw new Error("User account could not be found.");
   }
+
+  if (user.twoFactorSecret) {
+    throw new Error("Two-factor authentication is already enabled. Disable it before setting up a new authenticator.");
+  }
+
+  await requireReauthentication(store, user, session.id, input.currentPassword);
 
   const secret = generateRandomBase32Secret();
   const encryptedSecret = await encryptText(secret);
@@ -2337,6 +2367,10 @@ export async function confirmTwoFactorEnrollment(code: string) {
       throw new Error("Start two-factor setup before confirming it.");
     }
 
+    if (user.twoFactorSecret) {
+      throw new Error("Two-factor authentication is already enabled.");
+    }
+
     if (user.pendingTwoFactorExpiresAt && new Date(user.pendingTwoFactorExpiresAt).getTime() <= Date.now()) {
       user.pendingTwoFactorSecret = null;
       user.pendingTwoFactorExpiresAt = null;
@@ -2360,7 +2394,15 @@ export async function confirmTwoFactorEnrollment(code: string) {
     user.twoFactorSecret = await encryptText(secret);
     user.twoFactorUpdatedAt = timestamp;
     user.updatedAt = timestamp;
+
+    for (const entry of store.sessions) {
+      if (entry.userId === user.id && entry.id !== session.id && !entry.revokedAt) {
+        entry.revokedAt = timestamp;
+      }
+    }
   });
+
+  await clearGuestShellStepUpCookie();
 
   return recoveryCodes;
 }
