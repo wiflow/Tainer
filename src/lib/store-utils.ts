@@ -117,9 +117,9 @@ export async function readDataJsonFileCached<TValue>(
 }
 
 export async function writeJsonFileAtomically(filePath: string, value: unknown) {
-  await mkdir(dirname(filePath), { recursive: true });
+  await mkdir(dirname(filePath), { mode: 0o700, recursive: true });
   const tempPath = `${filePath}.${randomUUID()}.tmp`;
-  await writeFile(tempPath, `${JSON.stringify(value, null, 2)}\n`, "utf8");
+  await writeFile(tempPath, `${JSON.stringify(value, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
   await chmod(tempPath, 0o600);
   await rename(tempPath, filePath);
   primeJsonFileCache(filePath, value);

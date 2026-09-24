@@ -21,7 +21,7 @@ export async function resolveSiteDataDir(siteId: string): Promise<string> {
 
   const resolution = (async () => {
     const dirPath = path.join(getDataDirectoryPath(), "sites", siteId);
-    await mkdir(dirPath, { recursive: true });
+    await mkdir(dirPath, { mode: 0o700, recursive: true });
     return dirPath;
   })().catch((error) => {
     resolvedSiteDirCache.delete(siteId);

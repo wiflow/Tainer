@@ -45,7 +45,7 @@ export async function resolveDataFilePath(fileName: string) {
     const targetPath = path.join(directoryPath, fileName);
     const legacyPath = path.join(LEGACY_DATA_DIRECTORY, fileName);
 
-    await mkdir(directoryPath, { recursive: true });
+    await mkdir(directoryPath, { mode: 0o700, recursive: true });
 
     if (
       targetPath !== legacyPath &&
