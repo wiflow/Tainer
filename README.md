@@ -13,11 +13,13 @@ Built for teams — includes user accounts, 2FA, role-based permissions, and aud
 ### Docker run
 
 ```bash
+export AUTH_SECRET="$(openssl rand -base64 32)"   # save it and reuse it when upgrading
 docker run -d \
   --name tainer \
   --restart unless-stopped \
   -p 3000:3000 \
   -v tainer-data:/app/data \
+  -e AUTH_SECRET \
   tainersh/tainer:latest
 ```
 
@@ -36,6 +38,7 @@ services:
     restart: unless-stopped
     environment:
       APP_URL: http://localhost:3000   # set to your public URL
+      AUTH_SECRET: ${AUTH_SECRET:?set AUTH_SECRET}
 
 volumes:
   tainer-data:
@@ -44,6 +47,7 @@ volumes:
 Save as `docker-compose.yml` and run:
 
 ```bash
+echo "AUTH_SECRET=$(openssl rand -base64 32)" > .env   # once; keep this file
 docker compose up -d
 ```
 
@@ -60,7 +64,7 @@ All variables are optional unless noted.
 | `APP_URL` | Public base URL (required for password reset links) | `https://tainer.example.com` |
 | `PORT` | HTTP port the server listens on | `3000` |
 | `TAINER_DATA_DIR` | Override the data directory path | `/data/tainer` |
-| `AUTH_SECRET` | Override the auto-generated 32-byte auth key | — |
+| `AUTH_SECRET` | **Required.** Key for sessions and encrypted settings. Keep it stable across restarts | `openssl rand -base64 32` |
 
 ### SMTP (password reset emails)
 

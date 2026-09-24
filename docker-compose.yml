@@ -6,8 +6,9 @@ services:
     volumes:
       - tainer-data:/app/data
     restart: unless-stopped
+    environment:
+      AUTH_SECRET: ${AUTH_SECRET:?set AUTH_SECRET}
     # Optional settings — only needed for password reset emails or custom port
-    # environment:
     #   PORT: "3000"
     #   APP_URL: https://tainer.example.com
     #   SMTP_HOST: smtp.example.com
