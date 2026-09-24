@@ -9,11 +9,34 @@ import { createStoreMutator, writeJsonFileAtomically } from "@/lib/store-utils";
 
 const DATA_FILE = "copilot-chats.json";
 
-// Bounds keep the file small enough for atomic rewrites: 20 chats × 100
-// turns of card-sized JSON is comfortably under a megabyte per user.
+// Bounds keep the file small enough for atomic rewrites.
 const MAX_CHATS_PER_USER = 20;
 const MAX_TURNS_PER_CHAT = 100;
 const MAX_TITLE_LENGTH = 60;
+const MAX_TEXT_LENGTH = 32 * 1024;
+const MAX_RESULT_BYTES = 64 * 1024;
+const MAX_CHAT_BYTES = 256 * 1024;
+
+const TOOL_CALL_FIELDS = [
+  "id",
+  "name",
+  "category",
+  "klass",
+  "args",
+  "status",
+  "result",
+  "durationMs",
+  "describe",
+  "confirmString",
+  "plan",
+  "afterExternalContent",
+];
+
+export class ChatTooLargeError extends Error {
+  constructor() {
+    super("Chat is too large to save.");
+  }
+}
 
 /**
  * Turns are stored in the client's render shape (user/assistant/error turns
@@ -40,8 +63,9 @@ async function readStore(): Promise<ChatStore> {
     const raw = await readFile(await resolveDataFilePath(DATA_FILE), "utf8");
     const parsed = JSON.parse(raw) as Partial<ChatStore>;
     return { chats: Array.isArray(parsed.chats) ? parsed.chats : [] };
-  } catch {
-    return { chats: [] };
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return { chats: [] };
+    throw error;
   }
 }
 
@@ -69,29 +93,68 @@ function toSummary(chat: StoredChat): ChatSummary {
   };
 }
 
+function byteLength(value: unknown): number {
+  return Buffer.byteLength(JSON.stringify(value) ?? "");
+}
+
+function clampText(value: unknown): string {
+  return typeof value === "string" ? value.slice(0, MAX_TEXT_LENGTH) : "";
+}
+
 /**
- * Strip everything that must not survive persistence: approval tokens are
- * one-shot secrets (5-minute TTL), and a restored "awaiting-approval" call
- * would render an approve button that can never succeed — mark it denied.
+ * Keep only the fields the sidebar renders. Approval tokens are one-shot
+ * secrets and generated passwords are shown once, so neither is stored; a
+ * restored "awaiting-approval" call could never succeed, so it is marked denied.
  */
-function sanitizeTurns(turns: unknown[]): StoredChatTurn[] {
-  return turns.slice(-MAX_TURNS_PER_CHAT).map((turn) => {
-    if (!turn || typeof turn !== "object") return {} as StoredChatTurn;
-    const t = turn as Record<string, unknown>;
-    if (t.role !== "assistant" || !Array.isArray(t.toolCalls)) {
-      return t as StoredChatTurn;
+function sanitizeToolCall(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object") return null;
+  const source = value as Record<string, unknown>;
+  const tc: Record<string, unknown> = {};
+  for (const field of TOOL_CALL_FIELDS) {
+    if (field in source) tc[field] = source[field];
+  }
+  if ("result" in tc) {
+    tc.result = redactCredentials(tc.result);
+    if (byteLength(tc.result) > MAX_RESULT_BYTES) {
+      tc.result = { error: "Result too large to save." };
     }
-    return {
-      ...t,
-      toolCalls: t.toolCalls.map((tc) => {
-        if (!tc || typeof tc !== "object") return tc;
-        const rest = { ...(tc as Record<string, unknown>) };
-        delete rest.token;
-        if ("result" in rest) rest.result = redactCredentials(rest.result);
-        return rest.status === "awaiting-approval" ? { ...rest, status: "denied" } : rest;
-      }),
-    };
-  });
+  }
+  if (tc.status === "awaiting-approval") tc.status = "denied";
+  return tc;
+}
+
+function sanitizeTurn(value: unknown): StoredChatTurn | null {
+  if (!value || typeof value !== "object") return null;
+  const t = value as Record<string, unknown>;
+  if (t.role === "user" || t.role === "error") {
+    return { role: t.role, text: clampText(t.text) };
+  }
+  if (t.role !== "assistant") return null;
+  const toolCalls = Array.isArray(t.toolCalls)
+    ? t.toolCalls.map(sanitizeToolCall).filter((tc) => tc !== null)
+    : [];
+  return {
+    role: "assistant",
+    text: clampText(t.text),
+    ...(typeof t.reasoning === "string" ? { reasoning: clampText(t.reasoning) } : {}),
+    toolCalls,
+  };
+}
+
+function sanitizeTurns(turns: unknown[]): StoredChatTurn[] {
+  const clean = turns
+    .slice(-MAX_TURNS_PER_CHAT)
+    .map(sanitizeTurn)
+    .filter((turn) => turn !== null);
+  let size = byteLength(clean);
+  let start = 0;
+  while (size > MAX_CHAT_BYTES && start < clean.length) {
+    size -= byteLength(clean[start]) + 1;
+    start++;
+  }
+  const kept = clean.slice(start);
+  if (kept.length === 0) throw new ChatTooLargeError();
+  return kept;
 }
 
 function deriveTitle(turns: StoredChatTurn[]): string {
