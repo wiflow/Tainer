@@ -1,4 +1,4 @@
-FROM node:24-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1 AS builder
+FROM node:25-alpine@sha256:bdf2cca6fe3dabd014ea60163eca3f0f7015fbd5c7ee1b0e9ccb4ced6eb02ef4 AS builder
 WORKDIR /app
 
 COPY package.json package-lock.json ./
@@ -15,7 +15,7 @@ RUN ./node_modules/.bin/esbuild server.mjs --bundle --platform=node --target=nod
     --minify --format=esm --outfile=server.min.mjs \
     --external:next --external:@next/env --external:ws --banner:js="import{createRequire}from'module';const require=createRequire(import.meta.url);"
 
-FROM node:24-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1 AS runtime
+FROM node:25-alpine@sha256:bdf2cca6fe3dabd014ea60163eca3f0f7015fbd5c7ee1b0e9ccb4ced6eb02ef4 AS runtime
 WORKDIR /app
 
 ARG TAINER_VERSION=dev
