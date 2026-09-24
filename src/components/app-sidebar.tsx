@@ -720,11 +720,10 @@ function ScopeLabel({
   className?: string;
 }) {
   return (
-    <div className={cn("mb-2 flex items-center gap-2 px-3", className)}>
-      <span className="truncate text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-600">
+    <div className={cn("mb-2 px-3", className)}>
+      <span className="block truncate text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-600">
         {children}
       </span>
-      <span aria-hidden="true" className="h-px flex-1 bg-white/[0.06]" />
     </div>
   );
 }
