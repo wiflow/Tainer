@@ -603,6 +603,41 @@ function decodeDeploymentId(id) {
   }
 }
 
+async function resolveConsoleConfig(userId, siteId) {
+  const authStore = await readJsonDataFileCached("auth-store.json", () => ({
+    sessions: [],
+    users: [],
+  }));
+  const user = (authStore.users || []).find((u) => u.id === userId);
+  if (!user) {
+    return { error: "Unauthorized.", status: 401 };
+  }
+
+  const groupIds = Array.isArray(user.groupIds) ? user.groupIds : [];
+  const groupStore = await readJsonDataFileCached("user-groups.json", () => ({ groups: [] }));
+  const groups = (Array.isArray(groupStore.groups) ? groupStore.groups : []).filter(
+    (group) => groupIds.includes(group?.id),
+  );
+  const isAdmin = user.role === "admin" || groups.some((group) => group.isAdmin === true);
+  const hasAccess = isAdmin || (
+    Boolean(siteId) &&
+    groups.some((group) =>
+      Array.isArray(group.siteAccess) && group.siteAccess.some((entry) => entry?.siteId === siteId),
+    )
+  );
+
+  if (!hasAccess) {
+    return { error: "You do not have access to this site.", status: 403 };
+  }
+
+  const config = siteId ? await getProxmoxConfigForSite(siteId) : getProxmoxConfig();
+  if (!config) {
+    return { error: siteId ? "Site not found." : "Proxmox is not configured.", status: siteId ? 404 : 500 };
+  }
+
+  return { config };
+}
+
 async function authorizeConsoleDeployment(config, deploymentId) {
   const decoded = decodeDeploymentId(deploymentId);
   const guestConfig = await proxmoxTicketRequest(
@@ -779,22 +814,20 @@ async function handleConsoleTicketRequest(req, res, requestUrl) {
     return;
   }
 
-  let config;
+  let decoded;
   try {
-    const decoded = decodeDeploymentId(deploymentId);
-    if (decoded.siteId) {
-      config = await getProxmoxConfigForSite(decoded.siteId);
-    }
-  } catch {
-    // decode errors will surface in createConsoleSession with a better message
-  }
-  if (!config) {
-    config = getProxmoxConfig();
-  }
-  if (!config) {
-    sendJson(res, 500, { error: "Proxmox is not configured." });
+    decoded = decodeDeploymentId(deploymentId);
+  } catch (error) {
+    sendJson(res, 400, { error: error instanceof Error ? error.message : "Invalid console target." });
     return;
   }
+
+  const resolved = await resolveConsoleConfig(session.userId, decoded.siteId);
+  if (!resolved.config) {
+    sendJson(res, resolved.status, { error: resolved.error });
+    return;
+  }
+  const { config } = resolved;
 
   pruneConsoleSessions();
 
@@ -826,22 +859,20 @@ async function handleMobileConsoleTicketRequest(req, res, requestUrl) {
     return;
   }
 
-  let config;
+  let decoded;
   try {
-    const decoded = decodeDeploymentId(deploymentId);
-    if (decoded.siteId) {
-      config = await getProxmoxConfigForSite(decoded.siteId);
-    }
-  } catch {
-    // decode errors will surface in createConsoleSession with a better message
-  }
-  if (!config) {
-    config = getProxmoxConfig();
-  }
-  if (!config) {
-    sendJson(res, 500, { error: "Proxmox is not configured." });
+    decoded = decodeDeploymentId(deploymentId);
+  } catch (error) {
+    sendJson(res, 400, { error: error instanceof Error ? error.message : "Invalid console target." });
     return;
   }
+
+  const resolved = await resolveConsoleConfig(session.userId, decoded.siteId);
+  if (!resolved.config) {
+    sendJson(res, resolved.status, { error: resolved.error });
+    return;
+  }
+  const { config } = resolved;
 
   pruneConsoleSessions();
 
@@ -1048,19 +1079,6 @@ server.on("upgrade", async (req, socket, head) => {
     const token = String(url.searchParams.get("session") ?? "").trim();
     const consoleSession = consoleSessions.get(token);
 
-    let config;
-    if (consoleSession?.siteId) {
-      config = await getProxmoxConfigForSite(consoleSession.siteId);
-    }
-    if (!config) {
-      config = getProxmoxConfig();
-    }
-    if (!config) {
-      socket.write("HTTP/1.1 500 Internal Server Error\r\n\r\n");
-      socket.destroy();
-      return;
-    }
-
     if (
       !token ||
       !consoleSession ||
@@ -1071,6 +1089,16 @@ server.on("upgrade", async (req, socket, head) => {
       socket.destroy();
       return;
     }
+
+    const resolved = await resolveConsoleConfig(session.userId, consoleSession.siteId);
+    if (!resolved.config) {
+      consoleSessions.delete(token);
+      const reason = { 401: "Unauthorized", 403: "Forbidden", 404: "Not Found" }[resolved.status] ?? "Internal Server Error";
+      socket.write(`HTTP/1.1 ${resolved.status} ${reason}\r\n\r\n`);
+      socket.destroy();
+      return;
+    }
+    const { config } = resolved;
 
     consoleSessions.delete(token);
 
