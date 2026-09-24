@@ -1920,8 +1920,8 @@ export type SsoSignInResult = {
  *   - We match by (providerId, subject) first — that's the stable, IdP-scoped
  *     identifier and survives email rotation.
  *   - We fall back to matching by email ONLY for users that are linkable:
- *     no local password, no 2FA enrolled, and no prior SSO link to a
- *     different provider. Otherwise an attacker who registers the same
+ *     no local password, no 2FA enrolled, no LDAP link, and no prior SSO
+ *     link to a different provider. Otherwise an attacker who registers the same
  *     email at a permissive IdP could bypass the local password and 2FA.
  *     The remediation in that case is for an admin to remove the local
  *     credential or pre-link the user.
@@ -1952,7 +1952,7 @@ export async function signInWithSso(
     );
 
     // 2. Fall back to email match — but only for users that are safe to
-    //    auto-link (no local password, no 2FA, no other SSO binding).
+    //    auto-link (no local password, no 2FA, no other SSO or LDAP binding).
     if (!existing) {
       const candidate = store.users.find((u) => u.email === email);
       if (candidate) {
@@ -1962,8 +1962,9 @@ export async function signInWithSso(
           (candidate.ssoProviderId &&
             candidate.ssoProviderId !== input.providerId) ||
           (candidate.ssoSubject && candidate.ssoSubject !== input.subject);
+        const linkedToLdap = Boolean(candidate.ldapDN);
 
-        if (hasLocalPassword || hasTwoFactor || linkedToDifferentProvider) {
+        if (hasLocalPassword || hasTwoFactor || linkedToDifferentProvider || linkedToLdap) {
           throw new Error(
             "An account with this email already exists in Tainer with " +
               "different credentials. Ask an administrator to link your " +
