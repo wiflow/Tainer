@@ -142,7 +142,7 @@ function ProviderForm({
           className={fieldClassName}
           defaultValue={initial?.allowedEmailDomains ?? ""}
           name="allowedEmailDomains"
-          placeholder="example.com, subsidiary.com"
+          placeholder="example.com, subsidiary.example.com"
         />
       </label>
 
