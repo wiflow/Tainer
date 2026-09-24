@@ -116,10 +116,14 @@ export async function readDataJsonFileCached<TValue>(
   return readJsonFileCached(await resolveDataFilePath(fileName), options);
 }
 
-export async function writeJsonFileAtomically(filePath: string, value: unknown) {
+export async function writeJsonFileAtomically(
+  filePath: string,
+  value: unknown,
+  { compact = false }: { compact?: boolean } = {},
+) {
   await mkdir(dirname(filePath), { mode: 0o700, recursive: true });
   const tempPath = `${filePath}.${randomUUID()}.tmp`;
-  await writeFile(tempPath, `${JSON.stringify(value, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
+  await writeFile(tempPath, `${JSON.stringify(value, null, compact ? undefined : 2)}\n`, { encoding: "utf8", mode: 0o600 });
   await chmod(tempPath, 0o600);
   await rename(tempPath, filePath);
   primeJsonFileCache(filePath, value);
