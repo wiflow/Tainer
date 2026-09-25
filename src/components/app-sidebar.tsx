@@ -157,6 +157,31 @@ const SITE_SECTIONS: NavItemGroup[] = [
 
 const SITE_SETTINGS_ITEM: NavItem = { path: "/settings", icon: Settings, label: "Site settings" };
 
+const GROUPS_ITEM: NavItem = { path: "/groups", icon: FolderOpen, label: "Groups" };
+
+const GLOBAL_SECTIONS: NavItemGroup[] = [
+  {
+    id: "platform",
+    label: "Platform",
+    items: [
+      { path: "/sites", icon: Globe, label: "Sites", exact: true },
+      { path: "/heartbeat", icon: Activity, label: "Heartbeat" },
+      { path: "/integrations", icon: Plug, label: "Integrations" },
+      { path: "/settings/copilot", icon: Sparkles, label: "Tainy settings", exact: true },
+      { path: "/audit-log", icon: ScrollText, label: "Audit Log" },
+    ],
+  },
+  {
+    id: "access",
+    label: "Access",
+    items: [
+      { path: "/users", icon: Users, label: "Users" },
+      GROUPS_ITEM,
+      { path: "/identity-providers", icon: KeyRound, label: "Identity Providers" },
+    ],
+  },
+];
+
 const PREFETCH_PATHS = [
   "",
   "/deployments",
@@ -193,6 +218,10 @@ function isSiteItemActive(pathname: string, siteSlug: string, item: NavItem) {
   if (!siteSlug) return false;
   const href = `/sites/${siteSlug}${item.path}`;
   return pathname === href || (!item.exact && pathname.startsWith(`${href}/`));
+}
+
+function isGlobalItemActive(pathname: string, item: NavItem) {
+  return item.exact ? pathname === item.path : pathname.startsWith(item.path);
 }
 
 function useSiteCookie(pathSlug: string) {
@@ -396,90 +425,7 @@ export function AppSidebar({
 
           <ScopeLabel className="mt-1">All sites</ScopeLabel>
 
-          {currentUser.role === "admin" && (
-            <NavSection
-              containsActive={
-                pathname === "/sites" ||
-                pathname.startsWith("/heartbeat") ||
-                pathname.startsWith("/integrations") ||
-                pathname === "/settings/copilot" ||
-                pathname.startsWith("/audit-log")
-              }
-              id="platform"
-              label="Platform"
-            >
-              <NavLink
-                active={pathname === "/sites"}
-                href="/sites"
-                icon={Globe}
-                label="Sites"
-              />
-              <NavLink
-                active={pathname.startsWith("/heartbeat")}
-                href="/heartbeat"
-                icon={Activity}
-                label="Heartbeat"
-              />
-              <NavLink
-                active={pathname.startsWith("/integrations")}
-                href="/integrations"
-                icon={Plug}
-                label="Integrations"
-              />
-              <NavLink
-                active={pathname === "/settings/copilot"}
-                href="/settings/copilot"
-                icon={Sparkles}
-                label="Tainy settings"
-              />
-              <NavLink
-                active={pathname.startsWith("/audit-log")}
-                href="/audit-log"
-                icon={ScrollText}
-                label="Audit Log"
-              />
-            </NavSection>
-          )}
-
-          {currentUser.role === "admin" && (
-            <NavSection
-              containsActive={
-                pathname.startsWith("/users") ||
-                pathname.startsWith("/groups") ||
-                pathname.startsWith("/identity-providers")
-              }
-              id="access"
-              label="Access"
-            >
-              <NavLink
-                active={pathname.startsWith("/users")}
-                href="/users"
-                icon={Users}
-                label="Users"
-              />
-              <NavLink
-                active={pathname.startsWith("/groups")}
-                href="/groups"
-                icon={FolderOpen}
-                label="Groups"
-              />
-              <NavLink
-                active={pathname.startsWith("/identity-providers")}
-                href="/identity-providers"
-                icon={KeyRound}
-                label="Identity Providers"
-              />
-            </NavSection>
-          )}
-
-          {currentUser.role !== "admin" && (
-            <NavLink
-              active={pathname.startsWith("/groups")}
-              href="/groups"
-              icon={FolderOpen}
-              label="Groups"
-            />
-          )}
+          <GlobalNav isAdmin={isAdmin} pathname={pathname} />
         </nav>
 
       </div>
@@ -753,6 +699,36 @@ function SiteNav({
         icon={SITE_SETTINGS_ITEM.icon}
         label={SITE_SETTINGS_ITEM.label}
       />
+    </>
+  );
+}
+
+function GlobalNav({ isAdmin, pathname }: { isAdmin: boolean; pathname: string }) {
+  const isActive = (item: NavItem) => isGlobalItemActive(pathname, item);
+  const hrefFor = (item: NavItem) => item.path;
+
+  if (!isAdmin) {
+    return (
+      <NavLink
+        active={isActive(GROUPS_ITEM)}
+        href={hrefFor(GROUPS_ITEM)}
+        icon={GROUPS_ITEM.icon}
+        label={GROUPS_ITEM.label}
+      />
+    );
+  }
+
+  return (
+    <>
+      {GLOBAL_SECTIONS.map((section) => (
+        <NavItemSection
+          hrefFor={hrefFor}
+          isActive={isActive}
+          isAdmin={isAdmin}
+          key={section.id}
+          section={section}
+        />
+      ))}
     </>
   );
 }
