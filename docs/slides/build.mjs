@@ -1,23 +1,20 @@
-// Build: npm install --no-save pptxgenjs && node docs/slides/build.js
+// Build: npm install --no-save pptxgenjs && node docs/slides/build.mjs
 
-const fs   = require("fs");
-const path = require("path");
-const pptxgen = require("pptxgenjs");
-const React = require("react");
-const ReactDOMServer = require("react-dom/server");
-const sharp = require("sharp");
-
-// Lucide-style icons — using FA as stand-ins but rendered in zinc, not blue.
-const {
-  FaPlay, FaArrowRight, FaCircle,
-} = require("react-icons/fa");
-const {
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import pptxgen from "pptxgenjs";
+import React from "react";
+import ReactDOMServer from "react-dom/server";
+import sharp from "sharp";
+import { FaArrowRight } from "react-icons/fa";
+import {
   FiServer, FiBox, FiDatabase, FiMap, FiUsers, FiSettings,
   FiShield, FiTerminal, FiPlayCircle, FiPackage, FiLayers,
   FiClock, FiCheck, FiHardDrive, FiChevronRight, FiZap,
-} = require("react-icons/fi");
+} from "react-icons/fi";
 
-// ── Design tokens (sampled from globals.css + auth-shell) ────────────────
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
 const C = {
   bg:        "09090B",          // main background (zinc-950)
   surface:   "111113",          // card background (#111113)
@@ -42,7 +39,6 @@ const FONT_BODY  = "Plus Jakarta Sans";
 
 const LOGO_PATH = path.resolve(__dirname, "logo.png");
 
-// ── Icon helper (rasterize react-icons → base64 PNG) ─────────────────────
 async function icon(Icon, colorHex = C.text, size = 256) {
   const svg = ReactDOMServer.renderToStaticMarkup(
     React.createElement(Icon, { color: "#" + colorHex, size: String(size) })
@@ -51,13 +47,10 @@ async function icon(Icon, colorHex = C.text, size = 256) {
   return "image/png;base64," + buf.toString("base64");
 }
 
-// ── Primitives ───────────────────────────────────────────────────────────
 function paintBackground(slide) {
   slide.background = { color: C.bg };
 }
 
-// Soft "gradient drift" blobs from auth-shell (bg-zinc-400/[0.025], blur-[120px]).
-// pptxgenjs can't blur; we approximate with low-opacity ellipses.
 function addGlow(slide, opts = {}) {
   const {
     x = -1.6, y = -1.2, w = 6.5, h = 6.5, transparency = 92,
@@ -70,7 +63,6 @@ function addGlow(slide, opts = {}) {
 }
 
 function addLogo(slide, { x = 0.5, y = 0.45, w = 0.32, labelSize = 13 } = {}) {
-  // Real product logo (public/logo.png) — square crane+container mark.
   slide.addImage({ path: LOGO_PATH, x, y, w, h: w });
   if (labelSize) {
     slide.addText("Tainer", {
@@ -109,7 +101,6 @@ function addFooter(slide, pageLabel) {
   });
 }
 
-// Ultra-subtle card: thin 1px-ish border via slightly larger outer rect.
 function addCard(slide, { x, y, w, h, fill = C.surface, radius = 0.14 }) {
   slide.addShape("roundRect", {
     x: x - 0.008, y: y - 0.008, w: w + 0.016, h: h + 0.016, rectRadius: radius + 0.002,
@@ -121,7 +112,6 @@ function addCard(slide, { x, y, w, h, fill = C.surface, radius = 0.14 }) {
   });
 }
 
-// Tiny pill label — mirrors the tracking-wide uppercase labels in the app.
 function addChip(slide, x, y, w, h, label, {
   fill = C.surface2, textColor = C.zinc400,
 } = {}) {
@@ -147,14 +137,12 @@ function addStatusDot(slide, x, y, color, d = 0.1) {
   });
 }
 
-// ── Build ────────────────────────────────────────────────────────────────
 async function build() {
   const pres = new pptxgen();
   pres.layout = "LAYOUT_16x9";
   pres.author = "Tainer";
-  pres.title  = "Tainer — Tutorial Series";
+  pres.title  = "Tainer: Tutorial Series";
 
-  // Pre-render monochrome icons (zinc-400, like sidebar/toolbar icons).
   const Ic = {
     server:   await icon(FiServer,    C.zinc300),
     box:      await icon(FiBox,       C.zinc300),
@@ -175,15 +163,12 @@ async function build() {
     zap:      await icon(FiZap,       C.zinc300),
   };
 
-  // ═══════════════════════ Slide 1 — Title ═══════════════════════════════
   {
     const s = pres.addSlide();
     paintBackground(s);
     addGlow(s, { x: -1.8, y: -2.0, w: 7, h: 7, transparency: 93 });
     addGlow(s, { x: 5.5,  y: 3.0,  w: 6, h: 6, transparency: 94 });
 
-    // Logo lockup centered top — matches auth-shell header (logo + tagline).
-    // Logo is the real public/logo.png. Size ~0.55" keeps it prominent but restrained.
     const logoW = 0.55;
     s.addImage({ path: LOGO_PATH, x: 0.5, y: 0.5, w: logoW, h: logoW });
     s.addText("Tainer", {
@@ -197,7 +182,6 @@ async function build() {
       align: "right", charSpacing: 10, valign: "middle", margin: 0,
     });
 
-    // Headline — big, tight, Outfit
     s.addText("Tutorial series.", {
       x: 0.5, y: 1.85, w: 9, h: 1.0,
       fontFace: FONT_TITLE, fontSize: 76, bold: true, color: C.text,
@@ -214,7 +198,6 @@ async function build() {
       charSpacing: -0.5, margin: 0,
     });
 
-    // Episode count row
     addStatusDot(s, 0.52, 4.55, C.emerald, 0.09);
     s.addText("10 episodes", {
       x: 0.72, y: 4.44, w: 1.6, h: 0.3,
@@ -222,7 +205,7 @@ async function build() {
       valign: "middle", margin: 0, bold: true,
     });
     s.addText("·", { x: 2.2, y: 4.44, w: 0.1, h: 0.3, color: C.zinc700, valign: "middle", margin: 0 });
-    s.addText("2–5 minutes each", {
+    s.addText("2-5 minutes each", {
       x: 2.35, y: 4.44, w: 2.0, h: 0.3,
       fontFace: FONT_BODY, fontSize: 11, color: C.zinc500,
       valign: "middle", margin: 0,
@@ -237,7 +220,6 @@ async function build() {
     addFooter(s, "01 / 10");
   }
 
-  // ═══════════════════════ Slide 2 — What is Tainer ══════════════════════
   {
     const s = pres.addSlide();
     paintBackground(s);
@@ -255,7 +237,7 @@ async function build() {
     });
 
     const cards = [
-      { ic: Ic.box,   t: "Template Catalog", b: "Launch LXC and VMs from a curated library — or bring your own." },
+      { ic: Ic.box,   t: "Template Catalog", b: "Launch LXC and VMs from a curated library, or bring your own." },
       { ic: Ic.package, t: "Docker & OCI",   b: "Pull from Docker Hub, Gitea, or any OCI registry. Works offline." },
       { ic: Ic.db,    t: "Backup Policies",  b: "Scheduled snapshots, tag-scoped retention, one-click restore." },
       { ic: Ic.map,   t: "Overview Map",     b: "Every site on one canvas. CPU, RAM and storage at a glance." },
@@ -282,7 +264,6 @@ async function build() {
     addFooter(s, "02 / 10");
   }
 
-  // ═══════════════════════ Slide 3 — Roadmap (12 tiles) ══════════════════
   {
     const s = pres.addSlide();
     paintBackground(s);
@@ -294,7 +275,7 @@ async function build() {
       fontFace: FONT_TITLE, fontSize: 44, bold: true, color: C.text,
       charSpacing: -1.5, margin: 0,
     });
-    s.addText("Short, focused videos — watch the whole series or jump straight to what you need.", {
+    s.addText("Short, focused videos. Watch the whole series or jump straight to what you need.", {
       x: 0.5, y: 1.95, w: 9, h: 0.5,
       fontFace: FONT_BODY, fontSize: 13, color: C.zinc400, margin: 0,
     });
@@ -346,7 +327,6 @@ async function build() {
     addFooter(s, "03 / 10");
   }
 
-  // ═══════════════════ Helper — chapter slide (for each episode) ═════════
   function chapterSlide({ pageLabel, num, tag, title, subtitle, bullets, hint, iconData }) {
     const s = pres.addSlide();
     paintBackground(s);
@@ -354,14 +334,12 @@ async function build() {
     addGlow(s, { x: 6.5,  y: 3.5,  w: 5,   h: 5,   transparency: 95 });
     addTopBar(s, tag);
 
-    // Number — giant, low-contrast, monochrome (no indigo accent).
     s.addText(num, {
       x: 0.5, y: 1.15, w: 3.5, h: 2.2,
       fontFace: FONT_TITLE, fontSize: 180, bold: true, color: C.zinc800,
       charSpacing: -6, margin: 0, valign: "top",
     });
 
-    // Title block
     s.addText(title, {
       x: 3.7, y: 1.3, w: 5.8, h: 0.9,
       fontFace: FONT_TITLE, fontSize: 40, bold: true, color: C.text,
@@ -372,14 +350,12 @@ async function build() {
       fontFace: FONT_BODY, fontSize: 12.5, color: C.zinc400, margin: 0,
     });
 
-    // Bullets card (right)
     addCard(s, { x: 3.7, y: 2.9, w: 5.8, h: 2.3 });
     const items = bullets;
     const padY = 0.22;
     const rowH = (2.3 - padY * 2) / items.length;
     items.forEach((b, i) => {
       const y = 2.9 + padY + i * rowH;
-      // Tiny chev indicator — matches sidebar's FiChevronRight language.
       s.addImage({ data: Ic.chev, x: 3.9, y: y + (rowH - 0.18) / 2, w: 0.18, h: 0.18 });
       s.addText(b, {
         x: 4.18, y, w: 5.2, h: rowH,
@@ -388,7 +364,6 @@ async function build() {
       });
     });
 
-    // Side card (left) — icon + hint
     addCard(s, { x: 0.5, y: 3.5, w: 3, h: 1.7 });
     s.addImage({ data: iconData, x: 0.5 + (3 - 0.9) / 2, y: 3.7, w: 0.9, h: 0.9 });
     s.addText(hint, {
@@ -400,7 +375,6 @@ async function build() {
     addFooter(s, pageLabel);
   }
 
-  // ═══════════════════════ Slides 4–8 — chapter covers ═══════════════════
   chapterSlide({
     pageLabel: "04 / 10", num: "01", tag: "EPISODE 01",
     title: "Getting Started",
@@ -408,10 +382,10 @@ async function build() {
     iconData: Ic.zap,
     bullets: [
       "Create a Proxmox API token (user@realm!tokenname)",
-      "Configure .env — PROXMOX_URL, token, default node & storage",
+      "Configure .env: PROXMOX_URL, token, default node & storage",
       "npm install → npm run build → npm run start",
       "First-run /setup screen creates your admin user",
-      "Land on the dashboard — you're live",
+      "Land on the dashboard, and you're live",
     ],
     hint: "Keep your Proxmox token secret. Rotate it yearly.",
   });
@@ -424,7 +398,7 @@ async function build() {
     bullets: [
       "Browse /templates and pick one",
       "Fill in hostname, resources, storage, env vars",
-      "Submit — follow the task toast to 100%",
+      "Submit, then follow the task toast to 100%",
       "Start / stop / restart from the detail page",
       "Open the in-browser console",
     ],
@@ -441,7 +415,7 @@ async function build() {
       "Browse tags, platforms and sizes in /images",
       "Sync an image into a site & inspect its env-var cache",
       "Pull from Gitea or any custom OCI registry",
-      "Offline mode — point DOCKER_LIBRARY_PATH at a Samba share",
+      "Offline mode: point DOCKER_LIBRARY_PATH at a Samba share",
     ],
     hint: "Env-var cache auto-populates launch forms.",
   });
@@ -452,10 +426,10 @@ async function build() {
     subtitle: "Schedule snapshots, scope by tag, and restore with one click.",
     iconData: Ic.db,
     bullets: [
-      "Scope — all deployments, or only tagged ones",
-      "Mode — snapshot, suspend, or stop",
-      "Compression — none / LZO / gzip / zstd",
-      "Interval — 6h, 12h, 24h, 48h, or custom",
+      "Scope: all deployments, or only tagged ones",
+      "Mode: snapshot, suspend, or stop",
+      "Compression: none / LZO / gzip / zstd",
+      "Interval: 6h, 12h, 24h, 48h, or custom",
       "Per-deployment on-demand backup & restore",
     ],
     hint: "Retention is per-policy. Older backups prune automatically.",
@@ -467,8 +441,8 @@ async function build() {
     subtitle: "Your whole Proxmox estate on a single geographic canvas.",
     iconData: Ic.map,
     bullets: [
-      "Add a site — URL, token, and map location pin",
-      "Status dots — green online, amber degraded, red offline",
+      "Add a site: URL, token, and map location pin",
+      "Status dots: green online, amber degraded, red offline",
       "Mini-gauges for CPU, RAM, storage per site",
       "Search & filter sites from the sidebar",
       "Click a pin to drill into /sites/[siteSlug]",
@@ -476,7 +450,6 @@ async function build() {
     hint: "Ideal for multi-region or multi-DC setups.",
   });
 
-  // ═══════════════════════ Slide 9 — Production rhythm ═══════════════════
   {
     const s = pres.addSlide();
     paintBackground(s);
@@ -494,7 +467,7 @@ async function build() {
     });
 
     const rows = [
-      { ic: Ic.clock, k: "2–5 minutes",       v: "Each episode under 5 minutes. Viewers pick what they need." },
+      { ic: Ic.clock, k: "2-5 minutes",       v: "Each episode under 5 minutes. Viewers pick what they need." },
       { ic: Ic.zap,   k: "3-second intro",    v: "Logo + one-sentence summary. No long title cards." },
       { ic: Ic.term,  k: "Copy-paste ready",  v: "Every env var, CLI command, and API path is pinned on-screen." },
       { ic: Ic.arrow, k: "Clear next step",   v: "Outro always points at the next episode in the series." },
@@ -522,7 +495,6 @@ async function build() {
     addFooter(s, "09 / 10");
   }
 
-  // ═══════════════════════ Slide 10 — Closing ════════════════════════════
   {
     const s = pres.addSlide();
     paintBackground(s);
@@ -537,12 +509,11 @@ async function build() {
       fontFace: FONT_TITLE, fontSize: 72, bold: true, color: C.text,
       charSpacing: -2, margin: 0,
     });
-    s.addText("Start with Episode 01 — and we'll have you deploying in five.", {
+    s.addText("Start with Episode 01, and we'll have you deploying in five.", {
       x: 0.5, y: 3.1, w: 9, h: 0.5,
       fontFace: FONT_BODY, fontSize: 14, color: C.zinc400, margin: 0,
     });
 
-    // Two quiet CTA cards — no color accent, just the hairline outline.
     const ctas = [
       { t: "Watch Episode 01",   s: "Install Tainer and run your first deployment.", ic: Ic.play },
       { t: "Read the roadmap",   s: "docs/video-series-plan.md has the full plan.",  ic: Ic.term },
