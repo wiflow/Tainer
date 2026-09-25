@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { getCurrentSession, hasSiteAccess } from "@/lib/auth";
+import { logSafe } from "@/lib/log-safe";
 import { getClusterRRDData, withSiteConfig } from "@/lib/proxmox";
 import { resolveSiteConfigBySlug } from "@/lib/site-resolver";
 
@@ -38,7 +39,7 @@ export async function GET(request: NextRequest) {
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
-    console.error("[rrd] Failed to fetch RRD data:", message);
+    console.error("[rrd] Failed to fetch RRD data:", logSafe(message));
     return NextResponse.json({ error: "Failed to fetch RRD data", detail: message }, { status: 500 });
   }
 }

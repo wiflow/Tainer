@@ -7,6 +7,7 @@ import type {
   NodeScore,
   PendingMigration,
 } from "./types";
+import { logSafe } from "@/lib/log-safe";
 import type { LiveNodeMetrics } from "@/lib/proxmox";
 import { NodeCircuitBreaker } from "./circuit-breaker";
 import { updateEwma } from "./ewma";
@@ -570,8 +571,8 @@ async function tickSite(siteId: string, settings: LoadBalancerSettings): Promise
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
           console.error(
-            `[load-balancer] Migration failed for ${decision.type} ${decision.vmid}:`,
-            message,
+            `[load-balancer] Migration failed for ${decision.type} ${logSafe(decision.vmid)}:`,
+            logSafe(message),
           );
 
           recordLbEvent({

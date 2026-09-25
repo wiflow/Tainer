@@ -18,6 +18,7 @@ import {
   waitForTask,
 } from "@/lib/proxmox";
 import { getIpPoolCatalog, resolveIpPoolSelection } from "@/lib/ip-pools";
+import { logSafe } from "@/lib/log-safe";
 import { buildDescription, type TainerMeta } from "@/lib/tainer-meta";
 import { registerTool } from "@/lib/copilot/registry";
 import {
@@ -217,12 +218,12 @@ registerTool({
             const envParams = new URLSearchParams();
             envParams.set("env", envTextToString(mergedEnv));
             await updateContainerConfig(template.node, vmid, envParams).catch((err) => {
-              console.error(`[copilot] env apply failed for ${vmid}:`, err);
+              console.error(`[copilot] env apply failed for ${logSafe(vmid)}:`, logSafe(err));
             });
           }
           if (startAfterCreate) {
             await runContainerLifecycleAction(template.node, vmid, "start").catch((err) => {
-              console.error(`[copilot] start failed for ${vmid}:`, err);
+              console.error(`[copilot] start failed for ${logSafe(vmid)}:`, logSafe(err));
             });
           }
         })
@@ -508,12 +509,12 @@ registerTool({
                 const envParams = new URLSearchParams();
                 envParams.set("env", envTextToString(baseEnv));
                 await updateContainerConfig(template.node, row.vmid, envParams).catch((err) =>
-                  console.error(`[copilot] batch env apply failed for ${row.vmid}:`, err),
+                  console.error(`[copilot] batch env apply failed for ${logSafe(row.vmid)}:`, logSafe(err)),
                 );
               }
               if (startAfterCreate) {
                 await runContainerLifecycleAction(template.node, row.vmid, "start").catch((err) =>
-                  console.error(`[copilot] batch start failed for ${row.vmid}:`, err),
+                  console.error(`[copilot] batch start failed for ${logSafe(row.vmid)}:`, logSafe(err)),
                 );
               }
             })

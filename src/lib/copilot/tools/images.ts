@@ -9,6 +9,7 @@ import {
   buildOciTemplateFileNameAliases,
 } from "@/lib/oci-template";
 import { getIpPoolCatalog, resolveIpPoolSelection } from "@/lib/ip-pools";
+import { logSafe } from "@/lib/log-safe";
 import {
   buildContainerNetworkConfig,
   createContainer,
@@ -300,12 +301,12 @@ registerTool({
             const envParams = new URLSearchParams();
             envParams.set("env", envTextToString(mergedEnv));
             await updateContainerConfig(node, vmid, envParams).catch((err) => {
-              console.error(`[copilot] env apply failed for ${vmid}:`, err);
+              console.error(`[copilot] env apply failed for ${logSafe(vmid)}:`, logSafe(err));
             });
           }
           if (startAfterCreate) {
             await runContainerLifecycleAction(node, vmid, "start").catch((err) => {
-              console.error(`[copilot] start failed for ${vmid}:`, err);
+              console.error(`[copilot] start failed for ${logSafe(vmid)}:`, logSafe(err));
             });
           }
         })

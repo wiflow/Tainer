@@ -6,6 +6,7 @@ import { revalidatePath, revalidateTag } from "next/cache";
 
 import type { ProxmoxActionState } from "@/lib/action-states";
 import { requireSession, requireSitePermission } from "@/lib/auth";
+import { logSafe } from "@/lib/log-safe";
 import { createRateLimiterOrThrow } from "@/lib/rate-limit";
 
 const enforceRateLimit = createRateLimiterOrThrow("vm-actions", 10, 5 * 60_000);
@@ -274,7 +275,7 @@ export async function createVmAction(
           await runVmLifecycleAction(node, Number(vmid), "start");
         })
         .catch((error) => {
-          console.error(`Post-create start failed for VM ${vmid}:`, error);
+          console.error(`Post-create start failed for VM ${logSafe(vmid)}:`, logSafe(error));
         });
     }
 

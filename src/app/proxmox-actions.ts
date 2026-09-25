@@ -20,6 +20,7 @@ import {
   recordDeploymentActivity,
 } from "@/lib/deployment-activity-log";
 import { assertSafeDownloadUrl } from "@/lib/import-url";
+import { logSafe } from "@/lib/log-safe";
 import { buildDescription, stripTainerMeta, type TainerMeta } from "@/lib/tainer-meta";
 import {
   createContainer,
@@ -432,7 +433,7 @@ export async function createLxcAction(
             await updateContainerConfig(node, Number(vmid), updateParams);
           }
         } catch (error) {
-          console.error(`Post-create env setup failed for VMID ${vmid}:`, error);
+          console.error(`Post-create env setup failed for VMID ${logSafe(vmid)}:`, logSafe(error));
         }
       })
       .then(async () => {
@@ -454,12 +455,12 @@ export async function createLxcAction(
             );
             console.log(`[post-create] Installed debsecan in CT ${vmid}`);
           } catch (error) {
-            console.error(`[post-create] debsecan install in CT ${vmid} failed:`, error instanceof Error ? error.message : error);
+            console.error(`[post-create] debsecan install in CT ${logSafe(vmid)} failed:`, logSafe(error instanceof Error ? error.message : error));
           }
         }
       })
       .catch((error) => {
-        console.error(`Post-create actions failed for VMID ${vmid}:`, error);
+        console.error(`Post-create actions failed for VMID ${logSafe(vmid)}:`, logSafe(error));
       });
 
     revalidatePath(`/sites/${siteSlug}`);
@@ -1207,7 +1208,7 @@ export async function recreateFromTemplateAction(
             await updateContainerConfig(node, vmid, updateParams);
           }
         } catch (error) {
-          console.error(`Post-recreate env restore failed for VMID ${vmid}:`, error);
+          console.error(`Post-recreate env restore failed for VMID ${logSafe(vmid)}:`, logSafe(error));
         }
       })
       .then(async () => {
@@ -1216,7 +1217,7 @@ export async function recreateFromTemplateAction(
         }
       })
       .catch((error) => {
-        console.error(`Post-recreate actions failed for VMID ${vmid}:`, error);
+        console.error(`Post-recreate actions failed for VMID ${logSafe(vmid)}:`, logSafe(error));
       });
 
     revalidatePath(`/sites/${siteSlug}`);
