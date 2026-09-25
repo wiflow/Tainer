@@ -2262,6 +2262,101 @@ async function listStoragePoolsInternal(nodes: LiveNode[]) {
   };
 }
 
+type GuestUsageSample = {
+  cpu?: number;
+  disk?: number;
+  maxdisk?: number;
+  maxmem?: number;
+  mem?: number;
+};
+
+const GUEST_KINDS = {
+  lxc: { environmentMode: "Runtime env", namePrefix: "CT", templateName: "Proxmox LXC" },
+  qemu: { environmentMode: "QEMU VM", namePrefix: "VM", templateName: "QEMU VM" },
+} as const;
+
+function formatVcpuCount(cpus?: number) {
+  return cpus && cpus > 0 ? `${cpus} vCPU` : null;
+}
+
+function mapGuestUsage(guest: GuestUsageSample) {
+  return {
+    cpuUsage: typeof guest.cpu === "number" ? guest.cpu : null,
+    disk: formatBytes(guest.maxdisk ?? 0),
+    diskTotalBytes: guest.maxdisk ?? null,
+    diskUsedBytes: typeof guest.disk === "number" ? guest.disk : null,
+    memTotalBytes: guest.maxmem ?? null,
+    memUsedBytes: typeof guest.mem === "number" ? guest.mem : null,
+    memory: formatBytes(guest.maxmem ?? 0),
+  };
+}
+
+function mapGuestListEntry(
+  node: LiveNode,
+  guest: ProxmoxLxcListResponse | ProxmoxQemuListResponse,
+  type: "lxc" | "qemu",
+): LiveDeployment {
+  const kind = GUEST_KINDS[type];
+
+  return {
+    ...mapGuestUsage(guest),
+    cpu: "Unavailable",
+    environmentMode: kind.environmentMode,
+    id: encodeDeploymentId(node.name, guest.vmid, type),
+    ipAddress: "Unavailable",
+    name: guest.name ?? `${kind.namePrefix} ${guest.vmid}`,
+    node: node.name,
+    rawStatus: guest.status ?? "unknown",
+    statusLabel: formatStatusLabel(guest.status),
+    tagList: parseTags(guest.tags),
+    tainerMeta: null,
+    templateName: kind.templateName,
+    type,
+    uptime: formatUptime(guest.uptime),
+    vmid: guest.vmid,
+  };
+}
+
+function lxcTemplateName(ostemplate?: string) {
+  return ostemplate
+    ? titleFromTemplateFile(ostemplate.split("/").at(-1) ?? ostemplate)
+    : "Proxmox LXC";
+}
+
+function mapContainerDeployment({ node, container, config, runtimeIp }: {
+  node: LiveNode;
+  container: ProxmoxLxcListResponse;
+  config: SafeResult<ProxmoxLxcConfigResponse>;
+  runtimeIp: string | null;
+}): LiveDeployment {
+  return {
+    ...mapGuestListEntry(node, container, "lxc"),
+    cpu: formatVcpuCount(container.cpus) ?? "Unavailable",
+    ipAddress: runtimeIp || parseIpFromNet(config.data?.net0),
+    tainerMeta: parseTainerMeta(config.data?.description ?? ""),
+    templateName: lxcTemplateName(config.data?.ostemplate),
+  };
+}
+
+function mapVmDeployment({ node, vm, config, runtimeIp }: {
+  node: LiveNode;
+  vm: ProxmoxQemuListResponse;
+  config: SafeResult<ProxmoxQemuConfigResponse>;
+  runtimeIp: string | null;
+}): LiveDeployment {
+  const isoVolid = extractVmIsoVolid(config.data ?? {});
+
+  return {
+    ...mapGuestListEntry(node, vm, "qemu"),
+    cpu: formatVcpuCount(vm.cpus) ?? "Unavailable",
+    ipAddress: runtimeIp || "Unavailable",
+    tainerMeta: parseTainerMeta(config.data?.description ?? ""),
+    templateName: isoVolid
+      ? titleFromTemplateFile(isoVolid.split("/").at(-1) ?? "QEMU VM")
+      : "QEMU VM",
+  };
+}
+
 async function listDeploymentsInternal(nodes: LiveNode[]) {
   const issues: ProxmoxIssue[] = [];
 
@@ -2305,38 +2400,7 @@ async function listDeploymentsInternal(nodes: LiveNode[]) {
     }),
   );
 
-  const deployments: LiveDeployment[] = configResults.map(
-    ({ node, container, config, runtimeIp }) => ({
-      cpu:
-        container.cpus && container.cpus > 0
-          ? `${container.cpus} vCPU`
-          : "Unavailable",
-      cpuUsage: typeof container.cpu === "number" ? container.cpu : null,
-      disk: formatBytes(container.maxdisk ?? 0),
-      diskTotalBytes: container.maxdisk ?? null,
-      diskUsedBytes: typeof container.disk === "number" ? container.disk : null,
-      environmentMode: "Runtime env",
-      id: encodeDeploymentId(node.name, container.vmid),
-      ipAddress: runtimeIp || (config.data ? parseIpFromNet(config.data.net0) : "Unavailable"),
-      memTotalBytes: container.maxmem ?? null,
-      memUsedBytes: typeof container.mem === "number" ? container.mem : null,
-      memory: formatBytes(container.maxmem ?? 0),
-      name: container.name ?? `CT ${container.vmid}`,
-      node: node.name,
-      rawStatus: container.status ?? "unknown",
-      statusLabel: formatStatusLabel(container.status),
-      tagList: parseTags(container.tags),
-      tainerMeta: parseTainerMeta(config.data?.description ?? ""),
-      templateName: config.data?.ostemplate
-        ? titleFromTemplateFile(
-            config.data.ostemplate.split("/").at(-1) ?? config.data.ostemplate,
-          )
-        : "Proxmox LXC",
-      type: "lxc" as const,
-      uptime: formatUptime(container.uptime),
-      vmid: container.vmid,
-    }),
-  );
+  const deployments = configResults.map(mapContainerDeployment);
 
   deployments.sort((left, right) => left.vmid - right.vmid);
 
@@ -2383,36 +2447,7 @@ async function listVmsInternal(nodes: LiveNode[]) {
     }),
   );
 
-  const deployments: LiveDeployment[] = configResults.map(
-    ({ node, vm, config, runtimeIp }) => ({
-      cpu:
-        vm.cpus && vm.cpus > 0
-          ? `${vm.cpus} vCPU`
-          : "Unavailable",
-      cpuUsage: typeof vm.cpu === "number" ? vm.cpu : null,
-      disk: formatBytes(vm.maxdisk ?? 0),
-      diskTotalBytes: vm.maxdisk ?? null,
-      diskUsedBytes: typeof vm.disk === "number" ? vm.disk : null,
-      environmentMode: "QEMU VM",
-      id: encodeDeploymentId(node.name, vm.vmid, "qemu"),
-      ipAddress: runtimeIp || "Unavailable",
-      memTotalBytes: vm.maxmem ?? null,
-      memUsedBytes: typeof vm.mem === "number" ? vm.mem : null,
-      memory: formatBytes(vm.maxmem ?? 0),
-      name: vm.name ?? `VM ${vm.vmid}`,
-      node: node.name,
-      rawStatus: vm.status ?? "unknown",
-      statusLabel: formatStatusLabel(vm.status),
-      tagList: parseTags(vm.tags),
-      tainerMeta: parseTainerMeta(config.data?.description ?? ""),
-      templateName: extractVmIsoVolid(config.data ?? {})
-        ? titleFromTemplateFile(extractVmIsoVolid(config.data ?? {}).split("/").at(-1) ?? "QEMU VM")
-        : "QEMU VM",
-      type: "qemu" as const,
-      uptime: formatUptime(vm.uptime),
-      vmid: vm.vmid,
-    }),
-  );
+  const deployments = configResults.map(mapVmDeployment);
 
   deployments.sort((left, right) => left.vmid - right.vmid);
 
