@@ -1728,6 +1728,52 @@ export async function createSession(userId: string) {
   await setSessionCookie(sessionId, expiresAt);
 }
 
+type ExternalIdentity = Pick<StoredUser, "ldapDN" | "ssoProviderId" | "ssoSubject">;
+
+function linkOrProvisionExternalUser(
+  store: AuthStore,
+  existing: StoredUser | undefined,
+  input: { autoProvision: boolean; email: string; identity: ExternalIdentity; name: string },
+) {
+  const { email, name } = input;
+
+  if (existing) {
+    const timestamp = nowIso();
+    Object.assign(existing, input.identity);
+    if (name && name !== existing.name) existing.name = name;
+    existing.updatedAt = timestamp;
+    return { provisioned: false, user: existing };
+  }
+
+  if (!input.autoProvision) {
+    throw new Error(
+      "Your account isn't set up in Tainer yet. Ask an administrator to add you, then try signing in again.",
+    );
+  }
+
+  const timestamp = nowIso();
+  const newUser: StoredUser = {
+    createdAt: timestamp,
+    email,
+    groupIds: [],
+    id: randomUUID(),
+    name,
+    passwordHash: "",
+    passwordUpdatedAt: timestamp,
+    pendingTwoFactorSecret: null,
+    pendingTwoFactorExpiresAt: null,
+    // defaultRole is ignored: new users get no groups until an admin assigns them.
+    role: "operator",
+    twoFactorRecoveryCodeHashes: [],
+    twoFactorSecret: null,
+    twoFactorUpdatedAt: null,
+    updatedAt: timestamp,
+    ...input.identity,
+  };
+  store.users.push(newUser);
+  return { provisioned: true, user: newUser };
+}
+
 export type SsoSignInInput = {
   providerId: string;
   providerName: string;
@@ -1758,8 +1804,7 @@ export async function signInWithSso(
   }
   const name = input.name.trim() || email;
 
-  let provisioned = false;
-  const user = await mutateAuthStore((store) => {
+  const { provisioned, user } = await mutateAuthStore((store) => {
     let existing = store.users.find(
       (u) => u.ssoProviderId === input.providerId && u.ssoSubject === input.subject,
     );
@@ -1796,44 +1841,12 @@ export async function signInWithSso(
       }
     }
 
-    if (existing) {
-      const timestamp = nowIso();
-      existing.ssoProviderId = input.providerId;
-      existing.ssoSubject = input.subject;
-      if (name && name !== existing.name) existing.name = name;
-      existing.updatedAt = timestamp;
-      return existing;
-    }
-
-    if (!input.autoProvision) {
-      throw new Error(
-        "Your account isn't set up in Tainer yet. Ask an administrator to add you, then try signing in again.",
-      );
-    }
-
-    const timestamp = nowIso();
-    const newUser: StoredUser = {
-      createdAt: timestamp,
+    return linkOrProvisionExternalUser(store, existing, {
+      autoProvision: input.autoProvision,
       email,
-      groupIds: [],
-      id: randomUUID(),
+      identity: { ssoProviderId: input.providerId, ssoSubject: input.subject },
       name,
-      passwordHash: "",
-      passwordUpdatedAt: timestamp,
-      pendingTwoFactorSecret: null,
-      pendingTwoFactorExpiresAt: null,
-      // defaultRole is ignored: new users get no groups until an admin assigns them.
-      role: "operator",
-      twoFactorRecoveryCodeHashes: [],
-      twoFactorSecret: null,
-      twoFactorUpdatedAt: null,
-      updatedAt: timestamp,
-      ssoProviderId: input.providerId,
-      ssoSubject: input.subject,
-    };
-    store.users.push(newUser);
-    provisioned = true;
-    return newUser;
+    });
   });
 
   if (user.twoFactorSecret) {
@@ -1870,8 +1883,7 @@ export async function signInWithLdap(
   if (!email) throw new Error("LDAP returned an empty email. Refusing to sign in.");
   const name = input.name.trim() || email;
 
-  let provisioned = false;
-  const user = await mutateAuthStore((store) => {
+  const { provisioned, user } = await mutateAuthStore((store) => {
     let existing = store.users.find((u) => u.ldapDN && u.ldapDN === input.dn);
 
     if (!existing) {
@@ -1896,42 +1908,12 @@ export async function signInWithLdap(
       }
     }
 
-    if (existing) {
-      const timestamp = nowIso();
-      existing.ldapDN = input.dn;
-      if (name && name !== existing.name) existing.name = name;
-      existing.updatedAt = timestamp;
-      return existing;
-    }
-
-    if (!input.autoProvision) {
-      throw new Error(
-        "Your account isn't set up in Tainer yet. Ask an administrator to add you, then try signing in again.",
-      );
-    }
-
-    const timestamp = nowIso();
-    const newUser: StoredUser = {
-      createdAt: timestamp,
+    return linkOrProvisionExternalUser(store, existing, {
+      autoProvision: input.autoProvision,
       email,
-      groupIds: [],
-      id: randomUUID(),
+      identity: { ldapDN: input.dn },
       name,
-      passwordHash: "",
-      passwordUpdatedAt: timestamp,
-      pendingTwoFactorSecret: null,
-      pendingTwoFactorExpiresAt: null,
-      // defaultRole is ignored: new users get no groups until an admin assigns them.
-      role: "operator",
-      twoFactorRecoveryCodeHashes: [],
-      twoFactorSecret: null,
-      twoFactorUpdatedAt: null,
-      updatedAt: timestamp,
-      ldapDN: input.dn,
-    };
-    store.users.push(newUser);
-    provisioned = true;
-    return newUser;
+    });
   });
 
   return { provisioned, user };
