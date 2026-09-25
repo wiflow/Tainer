@@ -108,6 +108,55 @@ function healthDot(site: SiteInfo, size: "sm" | "md" = "sm") {
   );
 }
 
+type NavItem = {
+  path: string;
+  icon: ComponentType<{ className?: string }>;
+  label: string;
+  exact?: boolean;
+  adminOnly?: boolean;
+};
+
+type NavItemGroup = {
+  id: string;
+  label: string;
+  items: NavItem[];
+};
+
+const SITE_SECTIONS: NavItemGroup[] = [
+  {
+    id: "workloads",
+    label: "Workloads",
+    items: [
+      { path: "", icon: Home, label: "Dashboard", exact: true },
+      { path: "/deployments", icon: RefreshCw, label: "Deployments" },
+      { path: "/backups", icon: ShieldCheck, label: "Backups" },
+      { path: "/tags", icon: Tags, label: "Tags" },
+    ],
+  },
+  {
+    id: "reliability",
+    label: "Reliability",
+    items: [
+      { path: "/alerts", icon: Bell, label: "Alerts" },
+      { path: "/node-configs", icon: Settings2, label: "Node Configs" },
+      { path: "/network", icon: Cable, label: "Network" },
+      { path: "/cve-scanner", icon: ShieldAlert, label: "CVE Scanner" },
+      { path: "/load-balancer", icon: Scale, label: "Load Balancer", adminOnly: true },
+    ],
+  },
+  {
+    id: "library",
+    label: "Library",
+    items: [
+      { path: "/templates", icon: FileBox, label: "Templates" },
+      { path: "/images", icon: Database, label: "Images" },
+      { path: "/iso-images", icon: Disc3, label: "ISOs" },
+    ],
+  },
+];
+
+const SITE_SETTINGS_ITEM: NavItem = { path: "/settings", icon: Settings, label: "Site settings" };
+
 const PREFETCH_PATHS = [
   "",
   "/deployments",
@@ -138,6 +187,12 @@ function resolveSiteSlug(pathSlug: string, sites: SiteInfo[]) {
 
 function siteHref(siteSlug: string, path: string) {
   return siteSlug ? `/sites/${siteSlug}${path}` : path || "/";
+}
+
+function isSiteItemActive(pathname: string, siteSlug: string, item: NavItem) {
+  if (!siteSlug) return false;
+  const href = `/sites/${siteSlug}${item.path}`;
+  return pathname === href || (!item.exact && pathname.startsWith(`${href}/`));
 }
 
 function useSiteCookie(pathSlug: string) {
@@ -236,12 +291,12 @@ export function AppSidebar({
   const pathname = usePathname();
   const pathSlug = getPathSlug(pathname);
   const siteSlug = resolveSiteSlug(pathSlug, sites);
-  const effectiveSlug = siteSlug;
 
   useSiteCookie(pathSlug);
 
-  const currentSite = sites.find((s) => s.slug === effectiveSlug) ?? sites[0];
+  const currentSite = sites.find((s) => s.slug === siteSlug) ?? sites[0];
   const currentSiteHealth = currentSite ? getSiteHealth(currentSite) : "unknown";
+  const isAdmin = currentUser.role === "admin";
 
   const { rootRef, searchInputRef, ...switcher } = useSiteSwitcher();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -254,12 +309,6 @@ export function AppSidebar({
 
   usePrefetchSiteRoutes(siteSlug);
   useBodyScrollLock(mobileOpen);
-
-  const isActive = (path: string) => {
-    if (!effectiveSlug) return false;
-    const href = `/sites/${effectiveSlug}${path}`;
-    return pathname === href || pathname.startsWith(`${href}/`);
-  };
 
   const initials = currentUser.name.slice(0, 2).toUpperCase();
 
@@ -343,120 +392,7 @@ export function AppSidebar({
         <ScopeLabel>{currentSite?.name ?? "This site"}</ScopeLabel>
 
         <nav className="flex flex-col gap-3 mb-4">
-          <NavSection
-            containsActive={
-              (effectiveSlug && pathname === `/sites/${effectiveSlug}`) ||
-              isActive("/deployments") ||
-              isActive("/backups") ||
-              isActive("/tags")
-            }
-            id="workloads"
-            label="Workloads"
-          >
-            <NavLink
-              active={effectiveSlug ? pathname === `/sites/${effectiveSlug}` : false}
-              href={effectiveSlug ? `/sites/${effectiveSlug}` : "/"}
-              icon={Home}
-              label="Dashboard"
-            />
-            <NavLink
-              active={isActive("/deployments")}
-              href={effectiveSlug ? `/sites/${effectiveSlug}/deployments` : "/deployments"}
-              icon={RefreshCw}
-              label="Deployments"
-            />
-            <NavLink
-              active={isActive("/backups")}
-              href={effectiveSlug ? `/sites/${effectiveSlug}/backups` : "/backups"}
-              icon={ShieldCheck}
-              label="Backups"
-            />
-            <NavLink
-              active={isActive("/tags")}
-              href={effectiveSlug ? `/sites/${effectiveSlug}/tags` : "/tags"}
-              icon={Tags}
-              label="Tags"
-            />
-          </NavSection>
-
-          <NavSection
-            containsActive={
-              isActive("/alerts") ||
-              isActive("/node-configs") ||
-              isActive("/cve-scanner") ||
-              isActive("/load-balancer") ||
-              isActive("/network")
-            }
-            id="reliability"
-            label="Reliability"
-          >
-            <NavLink
-              active={isActive("/alerts")}
-              href={effectiveSlug ? `/sites/${effectiveSlug}/alerts` : "/alerts"}
-              icon={Bell}
-              label="Alerts"
-            />
-            <NavLink
-              active={isActive("/node-configs")}
-              href={effectiveSlug ? `/sites/${effectiveSlug}/node-configs` : "/node-configs"}
-              icon={Settings2}
-              label="Node Configs"
-            />
-            <NavLink
-              active={isActive("/network")}
-              href={effectiveSlug ? `/sites/${effectiveSlug}/network` : "/network"}
-              icon={Cable}
-              label="Network"
-            />
-            <NavLink
-              active={isActive("/cve-scanner")}
-              href={effectiveSlug ? `/sites/${effectiveSlug}/cve-scanner` : "/cve-scanner"}
-              icon={ShieldAlert}
-              label="CVE Scanner"
-            />
-            {currentUser.role === "admin" && (
-              <NavLink
-                active={isActive("/load-balancer")}
-                href={effectiveSlug ? `/sites/${effectiveSlug}/load-balancer` : "/load-balancer"}
-                icon={Scale}
-                label="Load Balancer"
-              />
-            )}
-          </NavSection>
-
-          <NavSection
-            containsActive={
-              isActive("/templates") || isActive("/images") || isActive("/iso-images")
-            }
-            id="library"
-            label="Library"
-          >
-            <NavLink
-              active={isActive("/templates")}
-              href={effectiveSlug ? `/sites/${effectiveSlug}/templates` : "/templates"}
-              icon={FileBox}
-              label="Templates"
-            />
-            <NavLink
-              active={isActive("/images")}
-              href={effectiveSlug ? `/sites/${effectiveSlug}/images` : "/images"}
-              icon={Database}
-              label="Images"
-            />
-            <NavLink
-              active={isActive("/iso-images")}
-              href={effectiveSlug ? `/sites/${effectiveSlug}/iso-images` : "/iso-images"}
-              icon={Disc3}
-              label="ISOs"
-            />
-          </NavSection>
-
-          <NavLink
-            active={isActive("/settings")}
-            href={effectiveSlug ? `/sites/${effectiveSlug}/settings` : "/settings"}
-            icon={Settings}
-            label="Site settings"
-          />
+          <SiteNav isAdmin={isAdmin} pathname={pathname} siteSlug={siteSlug} />
 
           <ScopeLabel className="mt-1">All sites</ScopeLabel>
 
@@ -784,6 +720,72 @@ function SiteUnreachableNotice() {
       <WifiOff className="h-3.5 w-3.5 shrink-0 text-rose-400/60" />
       <span className="text-[11px] text-rose-400/80">Site unreachable</span>
     </div>
+  );
+}
+
+function SiteNav({
+  isAdmin,
+  pathname,
+  siteSlug,
+}: {
+  isAdmin: boolean;
+  pathname: string;
+  siteSlug: string;
+}) {
+  const isActive = (item: NavItem) => isSiteItemActive(pathname, siteSlug, item);
+  const hrefFor = (item: NavItem) => siteHref(siteSlug, item.path);
+
+  return (
+    <>
+      {SITE_SECTIONS.map((section) => (
+        <NavItemSection
+          hrefFor={hrefFor}
+          isActive={isActive}
+          isAdmin={isAdmin}
+          key={section.id}
+          section={section}
+        />
+      ))}
+
+      <NavLink
+        active={isActive(SITE_SETTINGS_ITEM)}
+        href={hrefFor(SITE_SETTINGS_ITEM)}
+        icon={SITE_SETTINGS_ITEM.icon}
+        label={SITE_SETTINGS_ITEM.label}
+      />
+    </>
+  );
+}
+
+function NavItemSection({
+  hrefFor,
+  isActive,
+  isAdmin,
+  section,
+}: {
+  hrefFor: (item: NavItem) => string;
+  isActive: (item: NavItem) => boolean;
+  isAdmin: boolean;
+  section: NavItemGroup;
+}) {
+  const visibleItems = section.items.filter((item) => isAdmin || !item.adminOnly);
+
+  return (
+    <NavSection
+      containsActive={section.items.some(isActive)}
+      id={section.id}
+      label={section.label}
+    >
+      {visibleItems.map((item) => (
+        <NavLink
+          active={isActive(item)}
+          href={hrefFor(item)}
+          icon={item.icon}
+          key={item.label}
+          label={item.label}
+        />
+      ))}
+    </NavSection>
   );
 }
 
