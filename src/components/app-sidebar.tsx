@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ComponentType } from "react";
 import Cookies from "js-cookie";
 import { AnimatePresence, motion } from "framer-motion";
 
@@ -15,14 +15,11 @@ import {
   Disc3,
   FileBox,
   FolderOpen,
-  HelpCircle,
   Home,
   KeyRound,
   LogOut,
   ScrollText,
-  Mail,
   Menu,
-  MoreHorizontal,
   Plug,
   RefreshCw,
   Scale,
@@ -150,6 +147,13 @@ export function AppSidebar({
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [lastPathname, setLastPathname] = useState(pathname);
+  if (lastPathname !== pathname) {
+    setLastPathname(pathname);
+    setMobileOpen(false);
+    setSwitcherOpen(false);
+  }
+
   const switcherRef = useRef<HTMLDivElement>(null);
   const toggleClickedRef = useRef(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -201,11 +205,6 @@ export function AppSidebar({
     }, 500);
     return () => clearTimeout(timer);
   }, [effectiveSlug, router]);
-
-  useEffect(() => {
-    setMobileOpen(false);
-    setSwitcherOpen(false);
-  }, [pathname]);
 
   useEffect(() => {
     if (mobileOpen) {
@@ -690,7 +689,7 @@ function NavLink({
   active,
   href,
 }: {
-  icon: any;
+  icon: ComponentType<{ className?: string }>;
   label: string;
   active: boolean;
   href: string;
