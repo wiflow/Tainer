@@ -1138,18 +1138,7 @@ export function resetSiteConnection(siteId: string) {
   httpAgentCache.delete(siteId);
 }
 
-async function proxmoxRequest<T>(endpoint: string, options: RequestOptions = {}) {
-  const config = getActiveSiteConfig();
-
-  if (checkAuthCircuitBreaker(config.siteId)) {
-    throw new ProxmoxApiError(
-      "Authentication failed. Credentials may be invalid or expired. Requests paused to avoid delays. Will retry automatically.",
-      endpoint,
-    );
-  }
-
-  const method = options.method ?? "GET";
-
+function splitProxmoxEndpoint(endpoint: string) {
   // Keep the query out of the URL constructor so it is not encoded into the path.
   const qIdx = endpoint.indexOf("?");
   const endpointPath = qIdx >= 0 ? endpoint.slice(0, qIdx) : endpoint;
@@ -1159,7 +1148,14 @@ async function proxmoxRequest<T>(endpoint: string, options: RequestOptions = {})
     throw new ProxmoxApiError("Invalid Proxmox API path.", endpoint);
   }
 
-  const url = buildProxmoxUrl(`/api2/json${endpointPath}`, config.apiUrl);
+  return { endpointPath, endpointQuery };
+}
+
+function buildProxmoxRequestTarget(endpoint: string, options: RequestOptions, apiUrl: string) {
+  const method = options.method ?? "GET";
+  const { endpointPath, endpointQuery } = splitProxmoxEndpoint(endpoint);
+
+  const url = buildProxmoxUrl(`/api2/json${endpointPath}`, apiUrl);
   const query = options.params?.toString() || endpointQuery;
   const body = method === "GET" ? undefined : (options.params?.toString() || undefined);
 
@@ -1167,24 +1163,36 @@ async function proxmoxRequest<T>(endpoint: string, options: RequestOptions = {})
     url.search = query;
   }
 
-  const canCache =
-    method === "GET" &&
-    !body &&
-    !endpoint.includes("/tasks/");
-  const cacheKey = `${config.siteId}::${method}:${url.pathname}${url.search}`;
+  return { body, method, url };
+}
 
-  if (canCache) {
-    const cached = proxmoxGetCache.get(cacheKey);
-    if (cached && cached.expiresAt > Date.now()) {
-      return cached.value as T;
-    }
-
-    const inflight = proxmoxGetInflight.get(cacheKey);
-    if (inflight) {
-      return inflight as Promise<T>;
-    }
+function readProxmoxGetCache<T>(cacheKey: string): { value: T | Promise<T> } | null {
+  const cached = proxmoxGetCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    return { value: cached.value as T };
   }
 
+  const inflight = proxmoxGetInflight.get(cacheKey);
+  return inflight ? { value: inflight as Promise<T> } : null;
+}
+
+function cacheProxmoxGet<T>(cacheKey: string, requestPromise: Promise<T>) {
+  proxmoxGetInflight.set(cacheKey, requestPromise);
+
+  return requestPromise
+    .then((value) => {
+      proxmoxGetCache.set(cacheKey, {
+        expiresAt: Date.now() + PROXMOX_GET_CACHE_TTL_MS,
+        value,
+      });
+      return value;
+    })
+    .finally(() => {
+      proxmoxGetInflight.delete(cacheKey);
+    });
+}
+
+async function openProxmoxConnection(config: ResolvedSiteConfig, url: URL) {
   const pveAuth = await getPveTicket(config);
   const tlsOpts = url.protocol === "https:" ? await buildTlsOptions(config) : {};
   const requestModule = url.protocol === "https:" ? https : http;
@@ -1193,52 +1201,80 @@ async function proxmoxRequest<T>(endpoint: string, options: RequestOptions = {})
       ? getHttpsAgent(config.siteId, tlsOpts as { rejectUnauthorized: boolean; ca?: string[] })
       : getHttpAgent(config.siteId);
 
-  const requestPromise = new Promise<T>((resolve, reject) => {
+  return { agent, pveAuth, requestModule, tlsOpts };
+}
+
+function buildProxmoxHeaders(method: string, body: string | undefined, pveAuth: PveTicket) {
+  return {
+    Cookie: `PVEAuthCookie=${pveAuth.ticket}`,
+    ...(method !== "GET" ? { CSRFPreventionToken: pveAuth.csrfToken } : {}),
+    ...(body
+      ? {
+          "Content-Length": Buffer.byteLength(body),
+          "Content-Type": "application/x-www-form-urlencoded",
+        }
+      : {}),
+  };
+}
+
+function recordResponseAuth(siteId: string, statusCode?: number) {
+  if (statusCode === 401 || statusCode === 403) {
+    clearPveTicket(siteId);
+    recordAuthFailure(siteId);
+  } else {
+    recordAuthSuccess(siteId);
+  }
+}
+
+function collectProxmoxResponse<T>(
+  response: http.IncomingMessage,
+  endpoint: string,
+  resolve: (value: T) => void,
+  reject: (reason: unknown) => void,
+) {
+  let raw = "";
+
+  response.setEncoding("utf8");
+  response.on("data", (chunk) => {
+    raw += chunk;
+  });
+  response.on("end", () => {
+    try {
+      const parsed = parseJson<T>(raw);
+
+      if (parsed.message) {
+        reject(new ProxmoxApiError(parsed.message, endpoint));
+        return;
+      }
+
+      resolve(parsed.data as T);
+    } catch (error) {
+      reject(error);
+    }
+  });
+}
+
+function sendProxmoxRequest<T>(
+  target: ReturnType<typeof buildProxmoxRequestTarget>,
+  endpoint: string,
+  siteId: string,
+  connection: Awaited<ReturnType<typeof openProxmoxConnection>>,
+) {
+  const { body, method, url } = target;
+  const { agent, pveAuth, requestModule, tlsOpts } = connection;
+
+  return new Promise<T>((resolve, reject) => {
     const request = requestModule.request(
       url,
       {
         agent,
-        headers: {
-          Cookie: `PVEAuthCookie=${pveAuth.ticket}`,
-          ...(method !== "GET" ? { CSRFPreventionToken: pveAuth.csrfToken } : {}),
-          ...(body
-            ? {
-                "Content-Length": Buffer.byteLength(body),
-                "Content-Type": "application/x-www-form-urlencoded",
-              }
-            : {}),
-        },
+        headers: buildProxmoxHeaders(method, body, pveAuth),
         method,
         ...tlsOpts,
       },
       (response) => {
-        if (response.statusCode === 401 || response.statusCode === 403) {
-          clearPveTicket(config.siteId);
-          recordAuthFailure(config.siteId);
-        } else {
-          recordAuthSuccess(config.siteId);
-        }
-
-        let raw = "";
-
-        response.setEncoding("utf8");
-        response.on("data", (chunk) => {
-          raw += chunk;
-        });
-        response.on("end", () => {
-          try {
-            const parsed = parseJson<T>(raw);
-
-            if (parsed.message) {
-              reject(new ProxmoxApiError(parsed.message, endpoint));
-              return;
-            }
-
-            resolve(parsed.data as T);
-          } catch (error) {
-            reject(error);
-          }
-        });
+        recordResponseAuth(siteId, response.statusCode);
+        collectProxmoxResponse(response, endpoint, resolve, reject);
       },
     );
 
@@ -1257,24 +1293,36 @@ async function proxmoxRequest<T>(endpoint: string, options: RequestOptions = {})
 
     request.end();
   });
+}
 
-  if (!canCache) {
-    return requestPromise;
+async function proxmoxRequest<T>(endpoint: string, options: RequestOptions = {}) {
+  const config = getActiveSiteConfig();
+
+  if (checkAuthCircuitBreaker(config.siteId)) {
+    throw new ProxmoxApiError(
+      "Authentication failed. Credentials may be invalid or expired. Requests paused to avoid delays. Will retry automatically.",
+      endpoint,
+    );
   }
 
-  proxmoxGetInflight.set(cacheKey, requestPromise);
+  const target = buildProxmoxRequestTarget(endpoint, options, config.apiUrl);
+  const canCache =
+    target.method === "GET" &&
+    !target.body &&
+    !endpoint.includes("/tasks/");
+  const cacheKey = `${config.siteId}::${target.method}:${target.url.pathname}${target.url.search}`;
 
-  return requestPromise
-    .then((value) => {
-      proxmoxGetCache.set(cacheKey, {
-        expiresAt: Date.now() + PROXMOX_GET_CACHE_TTL_MS,
-        value,
-      });
-      return value;
-    })
-    .finally(() => {
-      proxmoxGetInflight.delete(cacheKey);
-    });
+  if (canCache) {
+    const hit = readProxmoxGetCache<T>(cacheKey);
+    if (hit) {
+      return hit.value;
+    }
+  }
+
+  const connection = await openProxmoxConnection(config, target.url);
+  const requestPromise = sendProxmoxRequest<T>(target, endpoint, config.siteId, connection);
+
+  return canCache ? cacheProxmoxGet(cacheKey, requestPromise) : requestPromise;
 }
 
 async function safeRequest<T>(endpoint: string, options: RequestOptions = {}): Promise<SafeResult<T>> {
