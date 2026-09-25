@@ -29,3 +29,7 @@ test("logSafe output never contains control characters or line separators", () =
     }),
   );
 });
+
+test("logSafe removes direction controls and zero width characters", () => {
+  assert.equal(logSafe("vm\u202E101\u202C\u200Bx"), "vm101x");
+});
