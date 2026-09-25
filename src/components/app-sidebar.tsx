@@ -368,16 +368,24 @@ export function AppSidebar({
           </button>
         </div>
 
+        <nav className="mb-4 flex flex-col">
+          <NavLink
+            active={pathname === "/"}
+            href="/"
+            icon={MapIcon}
+            label="Overview"
+          />
+        </nav>
+
         <ScopeLabel>{currentSite?.name ?? "This site"}</ScopeLabel>
 
         <nav className="flex flex-col gap-3 mb-4">
           <NavSection
-            defaultOpen={
+            containsActive={
               (effectiveSlug && pathname === `/sites/${effectiveSlug}`) ||
               isActive("/deployments") ||
               isActive("/backups") ||
-              isActive("/tags") ||
-              true
+              isActive("/tags")
             }
             id="workloads"
             label="Workloads"
@@ -409,7 +417,7 @@ export function AppSidebar({
           </NavSection>
 
           <NavSection
-            defaultOpen={
+            containsActive={
               isActive("/alerts") ||
               isActive("/node-configs") ||
               isActive("/cve-scanner") ||
@@ -454,7 +462,7 @@ export function AppSidebar({
           </NavSection>
 
           <NavSection
-            defaultOpen={
+            containsActive={
               isActive("/templates") || isActive("/images") || isActive("/iso-images")
             }
             id="library"
@@ -489,16 +497,9 @@ export function AppSidebar({
 
           <ScopeLabel className="mt-1">All sites</ScopeLabel>
 
-          <NavLink
-            active={pathname === "/"}
-            href="/"
-            icon={MapIcon}
-            label="Overview"
-          />
-
           {currentUser.role === "admin" && (
             <NavSection
-              defaultOpen={
+              containsActive={
                 pathname === "/sites" ||
                 pathname.startsWith("/heartbeat") ||
                 pathname.startsWith("/integrations") ||
@@ -543,7 +544,7 @@ export function AppSidebar({
 
           {currentUser.role === "admin" && (
             <NavSection
-              defaultOpen={
+              containsActive={
                 pathname.startsWith("/users") ||
                 pathname.startsWith("/groups") ||
                 pathname.startsWith("/identity-providers")
@@ -719,45 +720,46 @@ function ScopeLabel({
   className?: string;
 }) {
   return (
-    <div className={cn("mb-2 flex items-center gap-2 px-3", className)}>
-      <span className="truncate text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-600">
+    <div className={cn("mb-2 px-3", className)}>
+      <span className="block truncate text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-600">
         {children}
       </span>
-      <span aria-hidden="true" className="h-px flex-1 bg-white/[0.06]" />
     </div>
   );
 }
 
 function NavSection({
   children,
-  defaultOpen,
+  containsActive,
   id,
   label,
 }: {
   children: React.ReactNode;
-  defaultOpen: boolean;
+  containsActive: boolean;
   id: string;
   label: string;
 }) {
   const storageKey = `tainer_nav_section_${id}`;
+  const pathname = usePathname();
 
   // localStorage is read after mount so the first render matches the server.
-  const [open, setOpen] = useState(defaultOpen);
+  const [open, setOpen] = useState(true);
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
     try {
       const stored = localStorage.getItem(storageKey);
       if (stored === "1") setOpen(true);
-      else if (stored === "0") setOpen(false);
+      else if (stored === "0" && !containsActive) setOpen(false);
     } catch {}
     setHydrated(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storageKey]);
 
   useEffect(() => {
-    if (defaultOpen && !open) setOpen(true);
+    if (containsActive && !open) setOpen(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [defaultOpen]);
+  }, [containsActive, pathname]);
 
   function toggle() {
     setOpen((current) => {
