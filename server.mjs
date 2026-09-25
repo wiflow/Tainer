@@ -918,7 +918,6 @@ async function migrateLegacySiteOnBoot() {
     let needsMigration = true;
 
     try {
-      await access(sitesPath);
       const raw = await readFile(sitesPath, "utf8");
       const store = JSON.parse(raw);
       if (store.legacyImportedEnvSiteId || (store.sites && store.sites.length > 0)) {
@@ -987,7 +986,7 @@ async function migrateLegacySiteOnBoot() {
       }],
     };
 
-    await writeFile(sitesPath, JSON.stringify(store, null, 2) + "\n", "utf8");
+    await writeFile(sitesPath, JSON.stringify(store, null, 2) + "\n", { encoding: "utf8", mode: 0o600 });
     await chmod(sitesPath, 0o600);
     console.log(`[server.mjs] Created site "${slug}" from env vars.`);
 
