@@ -26,6 +26,10 @@
 
 Tainer is a self-service dashboard for Proxmox VE. Teams deploy and run LXC containers and VMs from a curated catalog, while admins keep control over who can touch which cluster. One Tainer instance manages any number of Proxmox clusters (sites).
 
+<p align="center">
+  <img src="docs/screenshots/overview.webp" alt="Tainer overview map with all sites" width="100%">
+</p>
+
 **Workloads:**
 - Deployments: create, start, stop, migrate and delete containers and VMs, edit resources and environment variables, and open a console in the browser
 - Templates: a catalog of container and VM templates with a launch form
@@ -55,6 +59,12 @@ Tainer is a self-service dashboard for Proxmox VE. Teams deploy and run LXC cont
 **Tainy:**
 - A built-in assistant that answers questions about your clusters and carries out actions after you approve them
 - Works with DeepInfra or any OpenAI-compatible endpoint you host yourself
+
+## Screenshots
+
+| Dashboard | Deployments | Tainy |
+|---|---|---|
+| <img src="docs/screenshots/dashboard.webp" alt="Site dashboard with CPU, memory, storage and network charts"> | <img src="docs/screenshots/deployments.webp" alt="Deployments list with status, resources and actions"> | <img src="docs/screenshots/tainy.webp" alt="Tainy assistant panel"> |
 
 ## Usage
 
