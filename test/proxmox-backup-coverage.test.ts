@@ -178,7 +178,12 @@ test("coverage reasons, status and archive stats follow the inputs", () => {
 test("a covered guest with a fresh backup on healthy storage is protected", () => {
   const [archive] = fc.sample(archiveArb, { numRuns: 1, seed: 1 });
   const result = coverage({
-    archives: [{ ...archive, ctime: NOW / 1000 - 3600, vmid: 100 }],
+    archives: [{
+      ...archive,
+      ctime: NOW / 1000 - 3600,
+      ctimeIso: new Date(NOW - 3600_000).toISOString(),
+      vmid: 100,
+    }],
     jobs: [{ ...fc.sample(jobArb, { numRuns: 1, seed: 1 })[0], all: true, enabled: true }],
     mountPoints: [],
     pools: [{ ...fc.sample(poolArb, { numRuns: 1, seed: 1 })[0], issues: [] }],
