@@ -906,49 +906,7 @@ export async function getCurrentSession(): Promise<AuthSession | null> {
     return getApiTokenSession();
   }
 
-  const { ensureUserGroupsMigrated } = await import("@/lib/user-groups");
-  await ensureUserGroupsMigrated();
-
-  const store = await readAuthStore();
-  const session = store.sessions.find(
-    (entry) =>
-      entry.id === sessionId &&
-      !entry.revokedAt &&
-      new Date(entry.expiresAt).getTime() > Date.now(),
-  );
-
-  if (!session) {
-    return null;
-  }
-
-  const user = store.users.find((entry) => entry.id === session.userId);
-
-  if (!user) {
-    return null;
-  }
-
-  if (Date.now() - new Date(session.lastSeenAt).getTime() >= SESSION_LAST_SEEN_UPDATE_MS) {
-    const refreshedAt = nowIso();
-
-    await mutateAuthStore((nextStore) => {
-      const nextSession = nextStore.sessions.find(
-        (entry) =>
-          entry.id === session.id &&
-          !entry.revokedAt &&
-          new Date(entry.expiresAt).getTime() > Date.now(),
-      );
-
-      if (nextSession) {
-        nextSession.lastSeenAt = refreshedAt;
-      }
-    });
-  }
-
-  return {
-    expiresAt: session.expiresAt,
-    id: session.id,
-    user: await sanitizeUser(user),
-  };
+  return getSessionById(sessionId);
 }
 
 export async function requireSession() {
