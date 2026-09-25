@@ -5,7 +5,12 @@ import { readFile } from "node:fs/promises";
 import { resolveDataFilePath } from "@/lib/app-data";
 import { decryptText, encryptText } from "@/lib/crypto";
 import { createStoreMutator, writeJsonFileAtomically } from "@/lib/store-utils";
-import { COPILOT_MODEL_IDS, type CopilotModel } from "@/lib/copilot/types";
+import {
+  COPILOT_MODEL_IDS,
+  isCopilotProvider,
+  type CopilotModel,
+  type CopilotProvider,
+} from "@/lib/copilot/types";
 
 const DATA_FILE = "copilot-store.json";
 
@@ -24,6 +29,7 @@ type StoredSettings = {
   /** AES-256-GCM ciphertext under AUTH_SECRET. */
   encryptedKey: string | null;
   keyHint: string | null;
+  provider: CopilotProvider;
   model: CopilotModel;
   baseUrl: string | null;
   customModelId: string | null;
@@ -56,6 +62,7 @@ function defaultSettings(): StoredSettings {
   return {
     encryptedKey: null,
     keyHint: null,
+    provider: "deepinfra",
     model: DEFAULT_MODEL,
     baseUrl: null,
     customModelId: null,
@@ -78,8 +85,12 @@ async function readStore(): Promise<CopilotStore> {
   try {
     const raw = await readFile(await resolveDataFilePath(DATA_FILE), "utf8");
     const parsed = JSON.parse(raw) as Partial<CopilotStore>;
+    const settings = { ...defaultSettings(), ...(parsed.settings ?? {}) };
+    if (!isCopilotProvider(parsed.settings?.provider)) {
+      settings.provider = settings.baseUrl ? "custom" : "deepinfra";
+    }
     return {
-      settings: { ...defaultSettings(), ...(parsed.settings ?? {}) },
+      settings,
       usage: Array.isArray(parsed.usage) ? parsed.usage : [],
     };
   } catch {
@@ -97,6 +108,7 @@ const mutateStore = createStoreMutator("copilot-store", readStore, writeStore);
 export type CopilotSettings = {
   hasKey: boolean;
   keyHint: string | null;
+  provider: CopilotProvider;
   model: CopilotModel;
   modelId: string;
   baseUrl: string | null;
@@ -111,15 +123,24 @@ export type CopilotSettings = {
   updatedAt: string | null;
 };
 
+function resolveModelId(stored: StoredSettings): string {
+  switch (stored.provider) {
+    case "openai":
+      return stored.customModelId ?? "";
+    case "custom":
+      return stored.customModelId || COPILOT_MODEL_IDS[stored.model];
+    default:
+      return COPILOT_MODEL_IDS[stored.model];
+  }
+}
+
 function toPublic(stored: StoredSettings): CopilotSettings {
   return {
     hasKey: Boolean(stored.encryptedKey),
     keyHint: stored.keyHint,
+    provider: stored.provider,
     model: stored.model,
-    modelId:
-      stored.baseUrl && stored.customModelId
-        ? stored.customModelId
-        : COPILOT_MODEL_IDS[stored.model],
+    modelId: resolveModelId(stored),
     baseUrl: stored.baseUrl,
     customModelId: stored.customModelId,
     dailyTokenBudget: stored.dailyTokenBudget,
@@ -171,8 +192,16 @@ export async function getCopilotApiKey(): Promise<string | null> {
   }
 }
 
+export class CopilotSettingsError extends Error {}
+
+function inferProvider(current: CopilotProvider, baseUrl: string | null): CopilotProvider {
+  if (baseUrl) return "custom";
+  return current === "custom" ? "deepinfra" : current;
+}
+
 export type CopilotSettingsInput = {
   apiKey?: string | null;
+  provider?: CopilotProvider;
   model?: CopilotModel;
   baseUrl?: string | null;
   customModelId?: string | null;
@@ -202,17 +231,30 @@ export async function saveCopilotSettings(
       }
     }
     if (input.model) settings.model = input.model;
-    if (input.baseUrl !== undefined) {
-      const nextBaseUrl = input.baseUrl?.trim() || null;
-      if (nextBaseUrl !== settings.baseUrl && input.apiKey === undefined) {
-        settings.encryptedKey = null;
-        settings.keyHint = null;
-      }
-      settings.baseUrl = nextBaseUrl;
+
+    const requestedBaseUrl =
+      input.baseUrl === undefined ? settings.baseUrl : input.baseUrl?.trim() || null;
+    const nextProvider = input.provider ?? inferProvider(settings.provider, requestedBaseUrl);
+    const nextBaseUrl = nextProvider === "custom" ? requestedBaseUrl : null;
+    if (nextProvider === "custom" && !nextBaseUrl) {
+      throw new CopilotSettingsError("Enter the endpoint URL for the custom provider.");
     }
+    // A stored key must never reach a different endpoint unless it is entered again.
+    const endpointChanged =
+      nextProvider !== settings.provider || nextBaseUrl !== settings.baseUrl;
+    if (endpointChanged && input.apiKey === undefined) {
+      settings.encryptedKey = null;
+      settings.keyHint = null;
+    }
+    settings.provider = nextProvider;
+    settings.baseUrl = nextBaseUrl;
+
     if (input.customModelId !== undefined) {
       settings.customModelId =
         input.customModelId?.trim().slice(0, MAX_CUSTOM_MODEL_ID_LENGTH) || null;
+    }
+    if (settings.provider === "openai" && !settings.customModelId) {
+      throw new CopilotSettingsError("Enter a model id for OpenAI.");
     }
     if (typeof input.dailyTokenBudget === "number" && input.dailyTokenBudget > 0) {
       settings.dailyTokenBudget = Math.floor(input.dailyTokenBudget);

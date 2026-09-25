@@ -1,12 +1,8 @@
 import "server-only";
 
 import type { AuthSession } from "@/lib/auth";
-import {
-  DeepInfraApiError,
-  streamDeepInfra,
-  type OpenAiMessage,
-  type OpenAiToolCall,
-} from "@/lib/copilot/deepinfra";
+import type { OpenAiToolCall } from "@/lib/copilot/deepinfra";
+import { createModelProvider, type ConversationMessage } from "@/lib/copilot/provider";
 import { recordCopilotAudit } from "@/lib/copilot/audit";
 import { mintApprovalToken } from "@/lib/copilot/approval";
 import { redactCredentials } from "@/lib/copilot/redact";
@@ -29,7 +25,6 @@ import type {
 
 const MAX_TOOL_CALLS_PER_TURN = 15;
 const MAX_ROUNDS_PER_TURN = 8;
-const MAX_TOKENS_PER_RESPONSE = 4096;
 
 // In-memory per-user window; assumes a single server process.
 const MAX_TURNS_PER_MINUTE = 10;
@@ -89,11 +84,17 @@ export async function* runCopilotTurn(
   }
 
   const apiKey = await getCopilotApiKey();
-  if (!apiKey && !settings.baseUrl) {
+  if (!apiKey && settings.provider !== "custom") {
     yield {
       type: "error",
-      message:
-        "No DeepInfra API key configured. An admin can add one in Settings → Tainy. Get a key at https://deepinfra.com/dash/api_keys.",
+      message: "No API key configured for Tainy. An admin can add one in Settings > Tainy.",
+    };
+    return;
+  }
+  if (!settings.modelId) {
+    yield {
+      type: "error",
+      message: "No model configured for Tainy. An admin can pick one in Settings > Tainy.",
     };
     return;
   }
@@ -143,9 +144,9 @@ export async function* runCopilotTurn(
   });
   const policy = await getGroupToolPolicyForUser(session.user);
   const tools = listToolsForModel((tool) => klassAllowedByPolicy(tool.klass, policy));
-  const modelId = settings.modelId;
+  const provider = createModelProvider(settings, apiKey);
 
-  const chatMessages: OpenAiMessage[] = [
+  const chatMessages: ConversationMessage[] = [
     { role: "system", content: systemPrompt },
     ...toOpenAiMessages(input.messages),
   ];
@@ -203,16 +204,7 @@ export async function* runCopilotTurn(
           }
         });
 
-        const stream = streamDeepInfra(
-          apiKey,
-          {
-            model: modelId,
-            max_tokens: MAX_TOKENS_PER_RESPONSE,
-            messages: chatMessages,
-            tools,
-          },
-          { signal: AbortSignal.timeout(120_000), baseUrl: settings.baseUrl },
-        );
+        const stream = provider.stream(chatMessages, tools);
 
         while (true) {
           const { value, done } = await stream.next();
@@ -223,8 +215,8 @@ export async function* runCopilotTurn(
               Math.min(MAX_TOOL_CALLS_PER_TURN, usage.toolCallsRemaining) - toolCallsThisTurn,
             );
             finishReason = value.finishReason;
-            inputTokensAccum += value.usage?.prompt_tokens ?? 0;
-            outputTokensAccum += value.usage?.completion_tokens ?? 0;
+            inputTokensAccum += value.usage.input;
+            outputTokensAccum += value.usage.output;
             for (const ev of roundEvents.splice(0)) yield ev;
             break;
           }
@@ -236,14 +228,7 @@ export async function* runCopilotTurn(
           for (const ev of roundEvents.splice(0)) yield ev;
         }
       } catch (err) {
-        const apiLabel = settings.baseUrl ? "Model API" : "DeepInfra API";
-        const message =
-          err instanceof DeepInfraApiError
-            ? `${apiLabel} ${err.status}: ${err.message}`
-            : err instanceof Error
-              ? err.message
-              : `Unknown ${apiLabel} error`;
-        yield { type: "error", message };
+        yield { type: "error", message: provider.describeError(err) };
         break;
       }
 
@@ -263,7 +248,7 @@ export async function* runCopilotTurn(
       }
 
       // The API needs a tool message for every tool_call, so reads run before pausing.
-      const toolResults: OpenAiMessage[] = [];
+      const toolResults: ConversationMessage[] = [];
       let pendingApproval: {
         tc: OpenAiToolCall;
         args: Record<string, unknown>;
@@ -271,10 +256,11 @@ export async function* runCopilotTurn(
       } | null = null;
 
       for (const tc of toolCalls) {
-        const emitError = (message: string): OpenAiMessage => ({
+        const emitError = (message: string): ConversationMessage => ({
           role: "tool",
           tool_call_id: tc.id,
           content: JSON.stringify({ error: message }),
+          isError: true,
         });
 
         const tool = getTool(tc.function.name);
@@ -494,8 +480,8 @@ function createThinkSplitter(
   return { push, flush };
 }
 
-function toOpenAiMessages(messages: ChatMessage[]): OpenAiMessage[] {
-  const out: OpenAiMessage[] = [];
+function toOpenAiMessages(messages: ChatMessage[]): ConversationMessage[] {
+  const out: ConversationMessage[] = [];
   const toolNames = new Map<string, string>();
   for (const msg of messages) {
     if (msg.role === "user") {
@@ -520,6 +506,7 @@ function toOpenAiMessages(messages: ChatMessage[]): OpenAiMessage[] {
           role: "tool",
           tool_call_id: r.toolCallId,
           content: external ? fenceExternalContent(json) : json,
+          ...(r.isError ? { isError: true } : {}),
         });
       }
     }
