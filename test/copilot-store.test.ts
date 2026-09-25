@@ -107,6 +107,14 @@ test("changing the provider drops the stored key unless a new one is entered", a
   assert.equal(await getCopilotApiKey(), "sk-new");
 });
 
+test("switching provider without a model id drops the previous provider's custom model id", async () => {
+  await useFreshDataDir();
+  await saveCopilotSettings({ provider: "openai", customModelId: "my-openai-model", apiKey: "sk-openai" });
+  const switched = await saveCopilotSettings({ provider: "anthropic", apiKey: "sk-other" });
+  assert.notEqual(switched.modelId, "my-openai-model");
+  assert.equal(switched.modelId, switched.anthropicModel);
+});
+
 test("changing the custom endpoint drops the key, and the old base URL field still selects custom", async () => {
   await useFreshDataDir();
   const custom = await saveCopilotSettings({

@@ -234,8 +234,9 @@ test("only the model that served after a fallback supplies tool calls and thinki
     ],
   };
 
-  const { turn } = await runProvider(provider("claude-opus-5"), question);
+  const { deltas, turn } = await runProvider(provider("claude-opus-5"), question);
 
+  assert.deepEqual(deltas, ["reasoning:check the node first"]);
   assert.deepEqual(turn.reasoning, [THINKING]);
   assert.deepEqual(turn.toolCalls.map((tc) => tc.id), ["toolu_2"]);
 });

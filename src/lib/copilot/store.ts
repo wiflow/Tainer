@@ -251,8 +251,8 @@ export async function saveCopilotSettings(
       throw new CopilotSettingsError("Enter the endpoint URL for the custom provider.");
     }
     // A stored key must never reach a different endpoint unless it is entered again.
-    const endpointChanged =
-      nextProvider !== settings.provider || nextBaseUrl !== settings.baseUrl;
+    const providerChanged = nextProvider !== settings.provider;
+    const endpointChanged = providerChanged || nextBaseUrl !== settings.baseUrl;
     if (endpointChanged && input.apiKey === undefined) {
       settings.encryptedKey = null;
       settings.keyHint = null;
@@ -263,6 +263,8 @@ export async function saveCopilotSettings(
     if (input.customModelId !== undefined) {
       settings.customModelId =
         input.customModelId?.trim().slice(0, MAX_CUSTOM_MODEL_ID_LENGTH) || null;
+    } else if (providerChanged) {
+      settings.customModelId = null;
     }
     if (settings.provider === "openai" && !settings.customModelId) {
       throw new CopilotSettingsError("Enter a model id for OpenAI.");

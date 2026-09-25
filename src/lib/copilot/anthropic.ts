@@ -4,6 +4,7 @@ import Anthropic from "@anthropic-ai/sdk";
 
 import type { OpenAiTool, OpenAiToolCall } from "@/lib/copilot/deepinfra";
 import type {
+  ModelStreamDelta,
   ConversationMessage,
   ModelProvider,
   ModelTurn,
@@ -18,6 +19,7 @@ const MAX_TOKENS = 64_000;
 const BUDGET_THINKING_TOKENS = 16_000;
 const REFUSAL_FALLBACK_MODEL = "claude-opus-5";
 const REFUSAL_FALLBACK_BETA = "server-side-fallback-2026-07-01";
+const STREAM_IDLE_TIMEOUT_MS = 120_000;
 
 const FINISH_REASONS: Record<string, string> = {
   end_turn: "stop",
@@ -184,26 +186,51 @@ export function createAnthropicProvider(options: {
     async *stream(conversation, tools) {
       const { system, messages } = toAnthropicMessages(conversation);
       const thinking = thinkingConfig(model, messages);
-      const stream = client.beta.messages.stream({
-        model,
-        max_tokens: MAX_TOKENS,
-        cache_control: { type: "ephemeral" },
-        ...(system ? { system } : {}),
-        tools: toAnthropicTools(tools),
-        messages,
-        ...(thinking ? { thinking } : {}),
-        ...(model === REFUSAL_FALLBACK_MODEL
-          ? { betas: [REFUSAL_FALLBACK_BETA], fallbacks: "default" as const }
-          : {}),
-      });
-      for await (const event of stream) {
-        if (event.type !== "content_block_delta") continue;
-        if (event.delta.type === "text_delta") yield { type: "content", text: event.delta.text };
-        else if (event.delta.type === "thinking_delta") {
-          yield { type: "reasoning", text: event.delta.thinking };
+      const idle = new AbortController();
+      let idleTimer = setTimeout(() => idle.abort(), STREAM_IDLE_TIMEOUT_MS);
+      const stream = client.beta.messages.stream(
+        {
+          model,
+          max_tokens: MAX_TOKENS,
+          cache_control: { type: "ephemeral" },
+          ...(system ? { system } : {}),
+          tools: toAnthropicTools(tools),
+          messages,
+          ...(thinking ? { thinking } : {}),
+          ...(model === REFUSAL_FALLBACK_MODEL
+            ? { betas: [REFUSAL_FALLBACK_BETA], fallbacks: "default" as const }
+            : {}),
+        },
+        { signal: idle.signal },
+      );
+      const pending: ModelStreamDelta[] = [];
+      let live = model !== REFUSAL_FALLBACK_MODEL;
+      try {
+        for await (const event of stream) {
+          clearTimeout(idleTimer);
+          idleTimer = setTimeout(() => idle.abort(), STREAM_IDLE_TIMEOUT_MS);
+          if (event.type === "content_block_start" && event.content_block.type === "fallback") {
+            pending.length = 0;
+            live = true;
+            continue;
+          }
+          if (event.type !== "content_block_delta") continue;
+          const delta: ModelStreamDelta | null =
+            event.delta.type === "text_delta"
+              ? { type: "content", text: event.delta.text }
+              : event.delta.type === "thinking_delta"
+                ? { type: "reasoning", text: event.delta.thinking }
+                : null;
+          if (!delta) continue;
+          if (live) yield delta;
+          else pending.push(delta);
         }
+        const message = await stream.finalMessage();
+        for (const delta of pending) yield delta;
+        return fromAnthropicMessage(message);
+      } finally {
+        clearTimeout(idleTimer);
       }
-      return fromAnthropicMessage(await stream.finalMessage());
     },
     describeError: describeAnthropicError,
   };
