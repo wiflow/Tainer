@@ -4356,6 +4356,89 @@ export async function getLxcMountPoints(
   return parseLxcMountPoints(result.data as Record<string, unknown>);
 }
 
+function backupStorageReasons(backupPools: ProxmoxBackupStoragePool[]): ProtectionReason[] {
+  if (backupPools.some((p) => p.issues.length === 0)) {
+    return [];
+  }
+
+  return [{ level: "error", message: "No healthy backup storage is currently available" }];
+}
+
+function backupJobReasons(vmid: number, jobs: ProxmoxBackupJob[]): ProtectionReason[] {
+  const coveredByJob = jobs.some(
+    (job) =>
+      job.enabled &&
+      (job.all || job.vmids.includes(vmid)),
+  );
+
+  if (coveredByJob) {
+    return [];
+  }
+
+  return [{ level: "warning", message: `No scheduled backup job includes VMID ${vmid}` }];
+}
+
+function backupAgeReasons(
+  vmid: number,
+  lastBackupAge: number | null,
+  slaHours: number,
+): ProtectionReason[] {
+  if (lastBackupAge == null) {
+    return [{ level: "error", message: `No backup archives exist for VMID ${vmid}` }];
+  }
+
+  if (slaHours > 0 && lastBackupAge > slaHours) {
+    return [{
+      level: "warning",
+      message: `Last backup is ${Math.round(lastBackupAge)}h old, exceeding the ${slaHours}h SLA`,
+    }];
+  }
+
+  return [];
+}
+
+function mountPointReasons(mountPoints: LxcMountInfo[]): ProtectionReason[] {
+  return mountPoints.flatMap((mp): ProtectionReason[] => {
+    if (mp.isBind) {
+      return [{
+        level: "warning",
+        message: `Bind mount ${mp.volume} at ${mp.mountPoint} is not included in archive data`,
+      }];
+    }
+
+    if (!mp.backup) {
+      return [{
+        level: "warning",
+        message: `Mount point ${mp.source} (${mp.mountPoint}) is excluded from vzdump backups (backup=0)`,
+      }];
+    }
+
+    return [];
+  });
+}
+
+function backupStorageIssueReasons(
+  vmArchives: ProxmoxBackupArchive[],
+  backupPools: ProxmoxBackupStoragePool[],
+): ProtectionReason[] {
+  const usedStorages = new Set(vmArchives.map((a) => a.storage));
+
+  return backupPools
+    .filter((pool) => usedStorages.has(pool.storage) && pool.issues.length > 0)
+    .map((pool): ProtectionReason => ({
+      level: "warning",
+      message: `Backup storage "${pool.storage}" has issues: ${pool.issues.join(", ")}`,
+    }));
+}
+
+function protectionStatusFor(reasons: ProtectionReason[]): ProtectionStatus {
+  if (reasons.some((r) => r.level === "error")) {
+    return "unprotected";
+  }
+
+  return reasons.length > 0 ? "warning" : "protected";
+}
+
 export function computeBackupCoverage(
   vmid: number,
   type: "lxc" | "qemu",
@@ -4365,87 +4448,24 @@ export function computeBackupCoverage(
   mountPoints: LxcMountInfo[],
   slaHours: number,
 ): ProxmoxBackupCoverage {
-  const reasons: ProtectionReason[] = [];
-  const now = Date.now();
-
-  const healthyPools = backupPools.filter((p) => p.issues.length === 0);
-  if (healthyPools.length === 0) {
-    reasons.push({
-      level: "error",
-      message: "No healthy backup storage is currently available",
-    });
-  }
-
-  const coveredByJob = jobs.some(
-    (job) =>
-      job.enabled &&
-      (job.all || job.vmids.includes(vmid)),
-  );
-
-  if (!coveredByJob) {
-    reasons.push({
-      level: "warning",
-      message: `No scheduled backup job includes VMID ${vmid}`,
-    });
-  }
-
   const vmArchives = archives.filter((a) => a.vmid === vmid);
   const latestArchive = vmArchives[0] ?? null;
   const lastBackupAge =
-    latestArchive ? (now - latestArchive.ctime * 1000) / 3600000 : null;
-  const lastBackupDate = latestArchive?.ctimeIso ?? null;
+    latestArchive ? (Date.now() - latestArchive.ctime * 1000) / 3600000 : null;
 
-  if (!latestArchive) {
-    reasons.push({
-      level: "error",
-      message: `No backup archives exist for VMID ${vmid}`,
-    });
-  } else if (slaHours > 0 && lastBackupAge != null && lastBackupAge > slaHours) {
-    reasons.push({
-      level: "warning",
-      message: `Last backup is ${Math.round(lastBackupAge)}h old, exceeding the ${slaHours}h SLA`,
-    });
-  }
-
-  if (type === "lxc") {
-    for (const mp of mountPoints) {
-      if (mp.isBind) {
-        reasons.push({
-          level: "warning",
-          message: `Bind mount ${mp.volume} at ${mp.mountPoint} is not included in archive data`,
-        });
-      } else if (!mp.backup) {
-        reasons.push({
-          level: "warning",
-          message: `Mount point ${mp.source} (${mp.mountPoint}) is excluded from vzdump backups (backup=0)`,
-        });
-      }
-    }
-  }
-
-  const usedStorages = new Set(vmArchives.map((a) => a.storage));
-  for (const pool of backupPools) {
-    if (usedStorages.has(pool.storage) && pool.issues.length > 0) {
-      reasons.push({
-        level: "warning",
-        message: `Backup storage "${pool.storage}" has issues: ${pool.issues.join(", ")}`,
-      });
-    }
-  }
-
-  let protectionStatus: ProtectionStatus = "protected";
-
-  if (reasons.some((r) => r.level === "error")) {
-    protectionStatus = "unprotected";
-  } else if (reasons.length > 0) {
-    protectionStatus = "warning";
-  }
+  const reasons = [
+    ...backupStorageReasons(backupPools),
+    ...backupJobReasons(vmid, jobs),
+    ...backupAgeReasons(vmid, lastBackupAge, slaHours),
+    ...(type === "lxc" ? mountPointReasons(mountPoints) : []),
+    ...backupStorageIssueReasons(vmArchives, backupPools),
+  ];
 
   return {
     lastBackupAge,
-    lastBackupDate,
+    lastBackupDate: latestArchive?.ctimeIso ?? null,
     protectionReasons: reasons,
-    protectionStatus,
+    protectionStatus: protectionStatusFor(reasons),
     totalArchives: vmArchives.length,
   };
 }
