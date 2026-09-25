@@ -15,6 +15,7 @@ import next from "next";
 import { WebSocketServer, WebSocket } from "ws";
 
 import { migrateLegacyAuthSecret } from "./src/lib/auth-key-migration.mjs";
+import { logText } from "./src/lib/log-text.mjs";
 
 const dev = process.env.NODE_ENV !== "production";
 
@@ -788,7 +789,7 @@ async function createConsoleSession(config, session, deploymentId) {
   });
 
   console.log(
-    `[console-ticket] ${session.userName} prepared ${consoleKind} access for ${target.node}/${type}/${target.vmid}`,
+    `[console-ticket] ${logText(session.userName)} prepared ${consoleKind} access for ${target.node}/${type}/${target.vmid}`,
   );
 
   if (useTerm) {
@@ -1133,7 +1134,7 @@ server.on("upgrade", async (req, socket, head) => {
     upstreamUrl.searchParams.set("vncticket", consoleSession.ticket);
 
     console.log(
-      `[console] ${session.userName} opening ${consoleSession.kind} console for ${consoleSession.node}/${consoleSession.type}/${consoleSession.vmid} (deployment=${consoleSession.deploymentId})`,
+      `[console] ${logText(session.userName)} opening ${consoleSession.kind} console for ${consoleSession.node}/${consoleSession.type}/${consoleSession.vmid} (deployment=${logText(consoleSession.deploymentId)})`,
     );
 
     wss.handleUpgrade(req, socket, head, (ws) => {
