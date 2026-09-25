@@ -986,6 +986,11 @@ async function migrateLegacySiteOnBoot() {
       }],
     };
 
+    try {
+      await chmod(sitesPath, 0o600);
+    } catch (error) {
+      if (error?.code !== "ENOENT") throw error;
+    }
     await writeFile(sitesPath, JSON.stringify(store, null, 2) + "\n", { encoding: "utf8", mode: 0o600 });
     await chmod(sitesPath, 0o600);
     console.log(`[server.mjs] Created site "${slug}" from env vars.`);
