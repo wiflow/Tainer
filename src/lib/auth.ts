@@ -1598,6 +1598,73 @@ export async function beginLogin(email: string, password: string, clientIp?: str
   };
 }
 
+async function verifyTwoFactorChallenge(challenge: LoginChallenge, code: string) {
+  await checkTotpRateLimit(challenge.userId);
+
+  const store = await readAuthStore();
+  const user = store.users.find((entry) => entry.id === challenge.userId);
+
+  if (!user || !user.twoFactorSecret) {
+    throw new Error("Two-factor authentication is not available for this account.");
+  }
+
+  const normalizedRecoveryCode = normalizeRecoveryCode(code);
+  const normalizedTotpCode = normalizeTotpCode(code);
+  const isTotp = await verifyStoredTotp(user, normalizedTotpCode);
+
+  if (!isTotp) {
+    const recoveryHash = hashOpaqueValue(normalizedRecoveryCode);
+
+    // Record the nonce before consuming the code so the challenge cannot be replayed.
+    if (!(await recordChallengeNonce(challenge.nonce))) {
+      throw new Error("This login challenge has already been used.");
+    }
+
+    const consumed = await mutateAuthStore((nextStore) => {
+      const nextUser = nextStore.users.find((entry) => entry.id === user.id);
+
+      if (!nextUser) {
+        throw new Error("Two-factor authentication is not available for this account.");
+      }
+
+      const recoveryIndex = nextUser.twoFactorRecoveryCodeHashes.findIndex(
+        (entry) => timingSafeHashEqual(entry, recoveryHash),
+      );
+
+      if (recoveryIndex === -1) {
+        return false;
+      }
+
+      nextUser.twoFactorRecoveryCodeHashes.splice(recoveryIndex, 1);
+      nextUser.updatedAt = nowIso();
+
+      return true;
+    });
+
+    if (!consumed) {
+      throw new Error("Invalid authenticator code or recovery code.");
+    }
+  } else {
+    const claimResult = await claimTotpCodeForChallenge(
+      user.id,
+      normalizedTotpCode,
+      challenge.nonce,
+    );
+
+    if (claimResult === "challenge-used") {
+      throw new Error("This login challenge has already been used.");
+    }
+
+    if (claimResult === "code-used") {
+      throw new Error("This code has already been used. Wait for a new code.");
+    }
+  }
+
+  await clearTotpRateLimit(challenge.userId);
+
+  return user;
+}
+
 export async function completeTwoFactorLogin(code: string) {
   return serializeTwoFactorLogin(async () => {
     const challenge = await readLoginChallengeCookie();
@@ -1606,68 +1673,7 @@ export async function completeTwoFactorLogin(code: string) {
       throw new Error("Your login session expired. Sign in again.");
     }
 
-    await checkTotpRateLimit(challenge.userId);
-
-    const store = await readAuthStore();
-    const user = store.users.find((entry) => entry.id === challenge.userId);
-
-    if (!user || !user.twoFactorSecret) {
-      throw new Error("Two-factor authentication is not available for this account.");
-    }
-
-    const normalizedRecoveryCode = normalizeRecoveryCode(code);
-    const normalizedTotpCode = normalizeTotpCode(code);
-    const isTotp = await verifyStoredTotp(user, normalizedTotpCode);
-
-    if (!isTotp) {
-      const recoveryHash = hashOpaqueValue(normalizedRecoveryCode);
-
-      // Record the nonce before consuming the code so the challenge cannot be replayed.
-      if (!(await recordChallengeNonce(challenge.nonce))) {
-        throw new Error("This login challenge has already been used.");
-      }
-
-      const consumed = await mutateAuthStore((nextStore) => {
-        const nextUser = nextStore.users.find((entry) => entry.id === user.id);
-
-        if (!nextUser) {
-          throw new Error("Two-factor authentication is not available for this account.");
-        }
-
-        const recoveryIndex = nextUser.twoFactorRecoveryCodeHashes.findIndex(
-          (entry) => timingSafeHashEqual(entry, recoveryHash),
-        );
-
-        if (recoveryIndex === -1) {
-          return false;
-        }
-
-        nextUser.twoFactorRecoveryCodeHashes.splice(recoveryIndex, 1);
-        nextUser.updatedAt = nowIso();
-
-        return true;
-      });
-
-      if (!consumed) {
-        throw new Error("Invalid authenticator code or recovery code.");
-      }
-    } else {
-      const claimResult = await claimTotpCodeForChallenge(
-        user.id,
-        normalizedTotpCode,
-        challenge.nonce,
-      );
-
-      if (claimResult === "challenge-used") {
-        throw new Error("This login challenge has already been used.");
-      }
-
-      if (claimResult === "code-used") {
-        throw new Error("This code has already been used. Wait for a new code.");
-      }
-    }
-
-    await clearTotpRateLimit(challenge.userId);
+    const user = await verifyTwoFactorChallenge(challenge, code);
     await clearLoginChallengeCookie();
     await createSession(user.id);
 
@@ -1733,67 +1739,7 @@ export async function completeMobileTwoFactorLogin(challengeToken: string, code:
       throw new Error("Your login session expired. Enter email and password again.");
     }
 
-    await checkTotpRateLimit(challenge.userId);
-
-    const store = await readAuthStore();
-    const user = store.users.find((entry) => entry.id === challenge.userId);
-
-    if (!user || !user.twoFactorSecret) {
-      throw new Error("Two-factor authentication is not available for this account.");
-    }
-
-    const normalizedRecoveryCode = normalizeRecoveryCode(code);
-    const normalizedTotpCode = normalizeTotpCode(code);
-    const isTotp = await verifyStoredTotp(user, normalizedTotpCode);
-
-    if (!isTotp) {
-      const recoveryHash = hashOpaqueValue(normalizedRecoveryCode);
-
-      if (!(await recordChallengeNonce(challenge.nonce))) {
-        throw new Error("This login challenge has already been used.");
-      }
-
-      const consumed = await mutateAuthStore((nextStore) => {
-        const nextUser = nextStore.users.find((entry) => entry.id === user.id);
-
-        if (!nextUser) {
-          throw new Error("Two-factor authentication is not available for this account.");
-        }
-
-        const recoveryIndex = nextUser.twoFactorRecoveryCodeHashes.findIndex(
-          (entry) => timingSafeHashEqual(entry, recoveryHash),
-        );
-
-        if (recoveryIndex === -1) {
-          return false;
-        }
-
-        nextUser.twoFactorRecoveryCodeHashes.splice(recoveryIndex, 1);
-        nextUser.updatedAt = nowIso();
-
-        return true;
-      });
-
-      if (!consumed) {
-        throw new Error("Invalid authenticator code or recovery code.");
-      }
-    } else {
-      const claimResult = await claimTotpCodeForChallenge(
-        user.id,
-        normalizedTotpCode,
-        challenge.nonce,
-      );
-
-      if (claimResult === "challenge-used") {
-        throw new Error("This login challenge has already been used.");
-      }
-
-      if (claimResult === "code-used") {
-        throw new Error("This code has already been used. Wait for a new code.");
-      }
-    }
-
-    await clearTotpRateLimit(challenge.userId);
+    const user = await verifyTwoFactorChallenge(challenge, code);
 
     const sessionId = await createSessionForMobile(user.id);
 
