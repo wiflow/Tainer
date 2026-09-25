@@ -206,6 +206,20 @@ test("mobile 2FA consumes a recovery code once and burns the challenge on failur
   assert.equal((await readStore()).sessions.length, 1);
 });
 
+test("mobile 2FA removes one stored copy of a recovery code per use", async () => {
+  const code = recoveryCode();
+  const other = recoveryCode();
+  const { user } = await twoFactorUser([code, other, code]);
+  await seedFreshStore({ users: [user] });
+
+  await completeMobileTwoFactorLogin(await challengeToken(user.id), code);
+  assert.deepEqual((await storedUser(user.id)).twoFactorRecoveryCodeHashes, [recoveryHash(other), recoveryHash(code)]);
+  await completeMobileTwoFactorLogin(await challengeToken(user.id), code);
+  assert.deepEqual((await storedUser(user.id)).twoFactorRecoveryCodeHashes, [recoveryHash(other)]);
+  await assert.rejects(completeMobileTwoFactorLogin(await challengeToken(user.id), code), { message: INVALID });
+  assert.deepEqual((await storedUser(user.id)).twoFactorRecoveryCodeHashes, [recoveryHash(other)]);
+});
+
 test("mobile 2FA rejects expired, forged and unusable challenges", async () => {
   const { secret, user } = await twoFactorUser();
   const plain = makeUser();
