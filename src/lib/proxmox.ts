@@ -2946,6 +2946,114 @@ export async function getContainerEnvText(node: string, vmid: number): Promise<s
   return envPairsToText(result.data.env);
 }
 
+type GuestConfigSample = {
+  cores?: number | string;
+  description?: string;
+  digest?: string;
+  memory?: number | string;
+  tags?: string;
+};
+
+type GuestStatusSample = GuestUsageSample & {
+  diskread?: number;
+  diskwrite?: number;
+  netin?: number;
+  netout?: number;
+  status?: string;
+  uptime?: number;
+};
+
+function hasConfiguredCores(cores: unknown): cores is number | string {
+  return typeof cores === "number" || typeof cores === "string";
+}
+
+function mapResourceUsage(status: GuestStatusSample): ContainerResourceUsage {
+  return {
+    cpuRatio: status.cpu ?? 0,
+    diskReadBytes: status.diskread ?? 0,
+    diskTotalBytes: status.maxdisk ?? 0,
+    diskUsedBytes: status.disk ?? 0,
+    diskWriteBytes: status.diskwrite ?? 0,
+    memTotalBytes: status.maxmem ?? 0,
+    memUsedBytes: status.mem ?? 0,
+    netInBytes: status.netin ?? 0,
+    netOutBytes: status.netout ?? 0,
+  };
+}
+
+function mapGuestDetailBase(
+  id: string,
+  node: string,
+  vmid: number,
+  configResult: SafeResult<GuestConfigSample>,
+  statusResult: SafeResult<GuestStatusSample>,
+) {
+  const config = configResult.data ?? {};
+  const status = statusResult.data ?? {};
+  const issues = [configResult.issue, statusResult.issue].filter(
+    (issue): issue is ProxmoxIssue => Boolean(issue),
+  );
+
+  return {
+    ...mapGuestUsage(status),
+    configAccessible: Boolean(configResult.data),
+    coresConfigured: toOptionalNumber(config.cores),
+    description: config.description ?? "",
+    digest: config.digest ?? "",
+    id,
+    issues: dedupeIssues(issues),
+    memory: formatBytes(
+      status.maxmem ??
+        (typeof config.memory === "number" ? config.memory * 1024 * 1024 : 0),
+    ),
+    memoryConfiguredMb: toOptionalNumber(config.memory),
+    node,
+    rawStatus: status.status ?? "unknown",
+    resourceUsage: status.status === "running" ? mapResourceUsage(status) : null,
+    statusLabel: formatStatusLabel(status.status),
+    tagList: parseTags(config.tags),
+    tainerMeta: parseTainerMeta(config.description ?? ""),
+    uptime: formatUptime(status.uptime),
+    vmid,
+  };
+}
+
+function mapContainerConfigFields(config: ProxmoxLxcConfigResponse) {
+  return {
+    environmentMode: config.env ? "Runtime env" : "No env configured",
+    envCount: parseEnvText(config.env).length,
+    envText: envPairsToText(config.env),
+    guestOsType: "linux",
+    ostemplate: config.ostemplate ?? "Unavailable",
+    rootfs: config.rootfs ?? "Unavailable",
+    swapConfiguredMb: toOptionalNumber(config.swap),
+    templateName: lxcTemplateName(config.ostemplate),
+    type: "lxc" as const,
+  };
+}
+
+function mapContainerDetail(
+  id: string,
+  node: string,
+  vmid: number,
+  configResult: SafeResult<ProxmoxLxcConfigResponse>,
+  statusResult: SafeResult<ProxmoxLxcStatusResponse>,
+  networkInfo: NetworkInfo | null,
+): LiveDeploymentDetail {
+  const config = configResult.data ?? {};
+  const status = statusResult.data ?? {};
+  const configuredCpu = hasConfiguredCores(config.cores) ? `${config.cores} vCPU` : "Unavailable";
+
+  return {
+    ...mapGuestDetailBase(id, node, vmid, configResult, statusResult),
+    ...mapContainerConfigFields(config),
+    cpu: formatVcpuCount(status.cpus) ?? configuredCpu,
+    ipAddress: networkInfo?.ipAddress || parseIpFromNet(config.net0),
+    name: status.name ?? config.hostname ?? `CT ${vmid}`,
+    networkInfo,
+  };
+}
+
 export async function getDeploymentDetail(id: string): Promise<LiveDeploymentDetail | null> {
   const { node, vmid, type } = decodeDeploymentId(id);
 
@@ -2953,7 +3061,6 @@ export async function getDeploymentDetail(id: string): Promise<LiveDeploymentDet
     return getVmDetail(id);
   }
 
-  const issues: ProxmoxIssue[] = [];
   const [configResult, statusResult] = await Promise.all([
     safeRequest<ProxmoxLxcConfigResponse>(`/nodes/${node}/lxc/${vmid}/config`),
     safeRequest<ProxmoxLxcStatusResponse>(
@@ -2963,79 +3070,11 @@ export async function getDeploymentDetail(id: string): Promise<LiveDeploymentDet
 
   const networkInfo = await getRuntimeNetworkInfo(node, vmid, configResult.data);
 
-  if (configResult.issue) issues.push(configResult.issue);
-  if (statusResult.issue) issues.push(statusResult.issue);
-
   if (!configResult.data && !statusResult.data) {
     return null;
   }
 
-  const config = configResult.data ?? {};
-  const status = statusResult.data ?? {};
-
-  const lxcCoresConfigured = toOptionalNumber(config.cores);
-  const lxcMemoryConfiguredMb = toOptionalNumber(config.memory);
-  const lxcSwapConfiguredMb = toOptionalNumber(config.swap);
-
-  return {
-    configAccessible: Boolean(configResult.data),
-    coresConfigured: lxcCoresConfigured,
-    cpu:
-      status.cpus && status.cpus > 0
-        ? `${status.cpus} vCPU`
-        : typeof config.cores === "number" || typeof config.cores === "string"
-          ? `${config.cores} vCPU`
-          : "Unavailable",
-    cpuUsage: typeof status.cpu === "number" ? status.cpu : null,
-    description: config.description ?? "",
-    digest: config.digest ?? "",
-    disk: formatBytes(status.maxdisk ?? 0),
-    diskTotalBytes: status.maxdisk ?? null,
-    diskUsedBytes: typeof status.disk === "number" ? status.disk : null,
-    environmentMode: config.env ? "Runtime env" : "No env configured",
-    envCount: parseEnvText(config.env).length,
-    envText: envPairsToText(config.env),
-    guestOsType: "linux",
-    id,
-    ipAddress: networkInfo?.ipAddress || parseIpFromNet(config.net0),
-    issues: dedupeIssues(issues),
-    memTotalBytes: status.maxmem ?? null,
-    memUsedBytes: typeof status.mem === "number" ? status.mem : null,
-    memory: formatBytes(
-      status.maxmem ??
-        (typeof config.memory === "number" ? config.memory * 1024 * 1024 : 0),
-    ),
-    memoryConfiguredMb: lxcMemoryConfiguredMb,
-    swapConfiguredMb: lxcSwapConfiguredMb,
-    name: status.name ?? config.hostname ?? `CT ${vmid}`,
-    networkInfo,
-    node,
-    ostemplate: config.ostemplate ?? "Unavailable",
-    rawStatus: status.status ?? "unknown",
-    resourceUsage: status.status === "running"
-      ? {
-          cpuRatio: status.cpu ?? 0,
-          diskReadBytes: status.diskread ?? 0,
-          diskTotalBytes: status.maxdisk ?? 0,
-          diskUsedBytes: status.disk ?? 0,
-          diskWriteBytes: status.diskwrite ?? 0,
-          memTotalBytes: status.maxmem ?? 0,
-          memUsedBytes: status.mem ?? 0,
-          netInBytes: status.netin ?? 0,
-          netOutBytes: status.netout ?? 0,
-        }
-      : null,
-    rootfs: config.rootfs ?? "Unavailable",
-    statusLabel: formatStatusLabel(status.status),
-    tagList: parseTags(config.tags),
-    tainerMeta: parseTainerMeta(config.description ?? ""),
-    templateName: config.ostemplate
-      ? titleFromTemplateFile(config.ostemplate.split("/").at(-1) ?? config.ostemplate)
-      : "Proxmox LXC",
-    type: "lxc" as const,
-    uptime: formatUptime(status.uptime),
-    vmid,
-  };
+  return mapContainerDetail(id, node, vmid, configResult, statusResult, networkInfo);
 }
 
 async function getVmDetail(id: string): Promise<LiveDeploymentDetail | null> {
