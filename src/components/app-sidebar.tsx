@@ -339,8 +339,6 @@ export function AppSidebar({
   usePrefetchSiteRoutes(siteSlug);
   useBodyScrollLock(mobileOpen);
 
-  const initials = currentUser.name.slice(0, 2).toUpperCase();
-
   const sidebarContent = (
     <>
       <div className="flex flex-1 flex-col overflow-y-auto px-3 py-4">
@@ -430,63 +428,13 @@ export function AppSidebar({
 
       </div>
 
-      <div className="p-3 border-t border-white/5">
-        <div className="flex items-start gap-3 px-3 py-2">
-          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-zinc-800 border border-white/10 text-[11px] font-bold text-zinc-400 shrink-0">
-            {initials}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-[13px] font-medium text-zinc-200 break-words leading-tight">
-              {currentUser.name}
-            </p>
-            <div className="mt-0.5 flex items-end justify-between gap-6">
-              <div className="min-w-0">
-                <p className="text-[11px] text-zinc-400">{currentUser.role}</p>
-                <p
-                  className="text-[10px] text-zinc-600 whitespace-nowrap"
-                  title={
-                    buildTag
-                      ? `v${version} · build ${formatBuildTag(buildTag)} (${buildTag})`
-                      : undefined
-                  }
-                >
-                  v{version}
-                  {updateAvailable && latestVersion ? (
-                    <a
-                      href={`https://hub.docker.com/r/tainersh/tainer/tags?name=${encodeURIComponent(latestVersion)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      title={`Update available: v${latestVersion}. View on Docker Hub`}
-                      className="ml-2 inline-flex items-center gap-0.5 rounded-full bg-emerald-500/15 px-2 py-px text-[10px] font-semibold text-emerald-300 hover:bg-emerald-500/25 hover:text-emerald-200 transition-colors"
-                    >
-                      v{latestVersion}
-                      <span aria-hidden="true" className="text-emerald-400/80">↗</span>
-                    </a>
-                  ) : null}
-                </p>
-              </div>
-              <div className="flex shrink-0 items-center gap-1">
-                <IntentLink
-                  aria-label="Account settings"
-                  className="flex items-center justify-center w-7 h-7 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-white/5 transition-colors cursor-pointer"
-                  href="/account"
-                >
-                  <Settings className="w-3.5 h-3.5" />
-                </IntentLink>
-                <Form action={signOutAction}>
-                  <button
-                    aria-label="Sign out"
-                    className="flex items-center justify-center w-7 h-7 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-white/5 transition-colors cursor-pointer"
-                    type="submit"
-                  >
-                    <LogOut className="w-3.5 h-3.5" />
-                  </button>
-                </Form>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <SidebarFooter
+        buildTag={buildTag}
+        currentUser={currentUser}
+        latestVersion={latestVersion}
+        updateAvailable={updateAvailable}
+        version={version}
+      />
     </>
   );
 
@@ -762,6 +710,88 @@ function NavItemSection({
         />
       ))}
     </NavSection>
+  );
+}
+
+function SidebarFooter({
+  buildTag,
+  currentUser,
+  latestVersion,
+  updateAvailable,
+  version,
+}: {
+  buildTag: string | null;
+  currentUser: SessionUser;
+  latestVersion: string | null;
+  updateAvailable: boolean;
+  version: string;
+}) {
+  const initials = currentUser.name.slice(0, 2).toUpperCase();
+
+  return (
+    <div className="p-3 border-t border-white/5">
+      <div className="flex items-start gap-3 px-3 py-2">
+        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-zinc-800 border border-white/10 text-[11px] font-bold text-zinc-400 shrink-0">
+          {initials}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-[13px] font-medium text-zinc-200 break-words leading-tight">
+            {currentUser.name}
+          </p>
+          <div className="mt-0.5 flex items-end justify-between gap-6">
+            <div className="min-w-0">
+              <p className="text-[11px] text-zinc-400">{currentUser.role}</p>
+              <p
+                className="text-[10px] text-zinc-600 whitespace-nowrap"
+                title={
+                  buildTag
+                    ? `v${version} · build ${formatBuildTag(buildTag)} (${buildTag})`
+                    : undefined
+                }
+              >
+                v{version}
+                {updateAvailable && latestVersion ? (
+                  <UpdateBadge latestVersion={latestVersion} />
+                ) : null}
+              </p>
+            </div>
+            <div className="flex shrink-0 items-center gap-1">
+              <IntentLink
+                aria-label="Account settings"
+                className="flex items-center justify-center w-7 h-7 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-white/5 transition-colors cursor-pointer"
+                href="/account"
+              >
+                <Settings className="w-3.5 h-3.5" />
+              </IntentLink>
+              <Form action={signOutAction}>
+                <button
+                  aria-label="Sign out"
+                  className="flex items-center justify-center w-7 h-7 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-white/5 transition-colors cursor-pointer"
+                  type="submit"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                </button>
+              </Form>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function UpdateBadge({ latestVersion }: { latestVersion: string }) {
+  return (
+    <a
+      href={`https://hub.docker.com/r/tainersh/tainer/tags?name=${encodeURIComponent(latestVersion)}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      title={`Update available: v${latestVersion}. View on Docker Hub`}
+      className="ml-2 inline-flex items-center gap-0.5 rounded-full bg-emerald-500/15 px-2 py-px text-[10px] font-semibold text-emerald-300 hover:bg-emerald-500/25 hover:text-emerald-200 transition-colors"
+    >
+      v{latestVersion}
+      <span aria-hidden="true" className="text-emerald-400/80">↗</span>
+    </a>
   );
 }
 
