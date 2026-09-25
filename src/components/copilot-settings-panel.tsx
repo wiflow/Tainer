@@ -272,7 +272,26 @@ export function CopilotSettingsPanel() {
     <div className="space-y-4">
       <SectionPanel
         title="Tainy"
-        description="AI assistant for diagnosing and managing your Proxmox cluster. Runs on one site-wide API key from the provider you pick. Every action still runs through each user's own permissions."
+        description={
+          <>
+            AI assistant for diagnosing and managing your Proxmox cluster. Runs on one site-wide
+            API key from the provider you pick. Every action still runs through each user&apos;s
+            own permissions.{" "}
+            <InfoTip label="Permissions and safety" side="bottom" className="align-text-bottom">
+              <span className="block mb-1">
+                Tainy uses your Tainer permissions. It cannot see or change anything you can&apos;t.
+              </span>
+              <ul className="list-disc space-y-1 pl-4">
+                <li>Every tool call passes the same permission and site checks as the UI.</li>
+                <li>Read tools (list, get, metrics) run without asking.</li>
+                <li>Write tools (start, stop, restart, resource changes) need a click to approve.</li>
+                <li>Destructive tools (delete) need the deployment name typed to confirm.</li>
+                <li>Every approved or denied action goes to the admin audit log.</li>
+                <li>The site API key is encrypted at rest with AES-256-GCM.</li>
+              </ul>
+            </InfoTip>
+          </>
+        }
         headerRight={
           isAdmin ? (
             <div className="flex items-center gap-2">
@@ -783,20 +802,6 @@ export function CopilotSettingsPanel() {
           )}
         </SectionPanel>
       )}
-
-      <SectionPanel
-        title="Permissions & safety"
-        description="The copilot uses your existing Tainer permissions. It cannot see or change anything you can't."
-      >
-        <ul className="space-y-1.5 text-[12px] text-zinc-400">
-          <li>• Every tool call goes through the same permission and site-access checks as the UI.</li>
-          <li>• Read tools (list, get, metrics) auto-run without prompting.</li>
-          <li>• Write tools (start/stop/restart, resource updates) require a click to approve in the sidebar.</li>
-          <li>• Destructive tools (delete) require typing the deployment name to confirm.</li>
-          <li>• Every approved or denied action is recorded in the admin audit log.</li>
-          <li>• The site API key is encrypted at rest with the same AES-256-GCM helpers Tainer uses for 2FA secrets.</li>
-        </ul>
-      </SectionPanel>
     </div>
   );
 }
