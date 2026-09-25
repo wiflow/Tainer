@@ -224,6 +224,10 @@ function isGlobalItemActive(pathname: string, item: NavItem) {
   return item.exact ? pathname === item.path : pathname.startsWith(item.path);
 }
 
+function dispatchShortcut(key: string) {
+  document.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key, metaKey: true }));
+}
+
 function useSiteCookie(pathSlug: string) {
   useEffect(() => {
     if (pathSlug && pathSlug !== Cookies.get("tainer_site")) {
@@ -342,25 +346,7 @@ export function AppSidebar({
   const sidebarContent = (
     <>
       <div className="flex flex-1 flex-col overflow-y-auto px-3 py-4">
-        <div className="mb-2 flex items-start px-1 -mt-2">
-          <Image
-            alt="Tainer"
-            className="h-12 w-auto brightness-90"
-            height={48}
-            priority
-            src="/tainerlong.png"
-            width={127}
-          />
-          <div className="flex-1" />
-          <button
-            aria-label="Close navigation menu"
-            className="shrink-0 flex items-center justify-center w-8 h-8 mt-2 rounded-md text-zinc-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer lg:hidden"
-            onClick={() => setMobileOpen(false)}
-            type="button"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+        <SidebarHeader onClose={() => setMobileOpen(false)} />
 
         {sites.length > 0 && (
           <SiteSwitcher
@@ -375,37 +361,7 @@ export function AppSidebar({
 
         {siteSlug && currentSiteHealth === "unreachable" && <SiteUnreachableNotice />}
 
-        <div className="mx-2 mb-4 flex items-center gap-1.5">
-          <button
-            className="flex min-w-0 flex-1 items-center gap-2 rounded-md border border-white/5 bg-white/[0.02] px-3 py-2 text-left transition-colors hover:border-white/10 hover:bg-white/[0.05]"
-            onClick={() =>
-              document.dispatchEvent(
-                new KeyboardEvent("keydown", { bubbles: true, key: "k", metaKey: true }),
-              )
-            }
-            type="button"
-          >
-            <Search className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
-            <span className="truncate text-[12px] text-zinc-500">Search…</span>
-            <kbd className="ml-auto rounded border border-white/10 bg-white/5 px-1.5 py-0.5 font-sans text-[10px] text-zinc-500">
-              ⌘K
-            </kbd>
-          </button>
-
-          <button
-            aria-label="Ask Tainy"
-            className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-md border border-white/5 bg-white/[0.02] text-zinc-500 transition-colors hover:border-white/10 hover:bg-white/[0.05] hover:text-zinc-300"
-            onClick={() =>
-              document.dispatchEvent(
-                new KeyboardEvent("keydown", { bubbles: true, key: "j", metaKey: true }),
-              )
-            }
-            title="Ask Tainy (⌘J)"
-            type="button"
-          >
-            <Sparkles className="h-3.5 w-3.5" />
-          </button>
-        </div>
+        <SidebarSearchRow />
 
         <nav className="mb-4 flex flex-col">
           <NavLink
@@ -440,32 +396,11 @@ export function AppSidebar({
 
   return (
     <>
-      <button
-        className="fixed top-4 left-4 z-50 flex items-center justify-center w-10 h-10 rounded-lg border border-white/10 bg-zinc-900/90 text-zinc-300 backdrop-blur transition-colors hover:bg-zinc-800 hover:text-white cursor-pointer lg:hidden"
-        onClick={() => setMobileOpen(true)}
-        aria-label="Open navigation menu"
-        type="button"
-      >
-        <Menu className="w-5 h-5" />
-      </button>
+      <MobileSidebarToggle onOpen={() => setMobileOpen(true)} />
 
-      {mobileOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden"
-          onClick={() => setMobileOpen(false)}
-          aria-hidden="true"
-        />
-      )}
-
-      <aside
-        aria-label="Main navigation"
-        className={cn(
-          "fixed inset-y-0 left-0 z-50 w-[280px] border-r border-white/5 bg-[#0a0a0a] flex flex-col transition-transform duration-300 ease-out lg:hidden",
-          mobileOpen ? "translate-x-0" : "-translate-x-full",
-        )}
-      >
+      <MobileSidebar onClose={() => setMobileOpen(false)} open={mobileOpen}>
         {sidebarContent}
-      </aside>
+      </MobileSidebar>
 
       <aside
         aria-label="Main navigation"
@@ -474,6 +409,30 @@ export function AppSidebar({
         {sidebarContent}
       </aside>
     </>
+  );
+}
+
+function SidebarHeader({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="mb-2 flex items-start px-1 -mt-2">
+      <Image
+        alt="Tainer"
+        className="h-12 w-auto brightness-90"
+        height={48}
+        priority
+        src="/tainerlong.png"
+        width={127}
+      />
+      <div className="flex-1" />
+      <button
+        aria-label="Close navigation menu"
+        className="shrink-0 flex items-center justify-center w-8 h-8 mt-2 rounded-md text-zinc-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer lg:hidden"
+        onClick={onClose}
+        type="button"
+      >
+        <X className="w-4 h-4" />
+      </button>
+    </div>
   );
 }
 
@@ -613,6 +572,34 @@ function SiteUnreachableNotice() {
     <div className="mx-2 mb-4 flex items-center gap-2 rounded-md border border-rose-500/10 bg-rose-500/5 px-3 py-2">
       <WifiOff className="h-3.5 w-3.5 shrink-0 text-rose-400/60" />
       <span className="text-[11px] text-rose-400/80">Site unreachable</span>
+    </div>
+  );
+}
+
+function SidebarSearchRow() {
+  return (
+    <div className="mx-2 mb-4 flex items-center gap-1.5">
+      <button
+        className="flex min-w-0 flex-1 items-center gap-2 rounded-md border border-white/5 bg-white/[0.02] px-3 py-2 text-left transition-colors hover:border-white/10 hover:bg-white/[0.05]"
+        onClick={() => dispatchShortcut("k")}
+        type="button"
+      >
+        <Search className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
+        <span className="truncate text-[12px] text-zinc-500">Search…</span>
+        <kbd className="ml-auto rounded border border-white/10 bg-white/5 px-1.5 py-0.5 font-sans text-[10px] text-zinc-500">
+          ⌘K
+        </kbd>
+      </button>
+
+      <button
+        aria-label="Ask Tainy"
+        className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-md border border-white/5 bg-white/[0.02] text-zinc-500 transition-colors hover:border-white/10 hover:bg-white/[0.05] hover:text-zinc-300"
+        onClick={() => dispatchShortcut("j")}
+        title="Ask Tainy (⌘J)"
+        type="button"
+      >
+        <Sparkles className="h-3.5 w-3.5" />
+      </button>
     </div>
   );
 }
@@ -792,6 +779,51 @@ function UpdateBadge({ latestVersion }: { latestVersion: string }) {
       v{latestVersion}
       <span aria-hidden="true" className="text-emerald-400/80">↗</span>
     </a>
+  );
+}
+
+function MobileSidebarToggle({ onOpen }: { onOpen: () => void }) {
+  return (
+    <button
+      className="fixed top-4 left-4 z-50 flex items-center justify-center w-10 h-10 rounded-lg border border-white/10 bg-zinc-900/90 text-zinc-300 backdrop-blur transition-colors hover:bg-zinc-800 hover:text-white cursor-pointer lg:hidden"
+      onClick={onOpen}
+      aria-label="Open navigation menu"
+      type="button"
+    >
+      <Menu className="w-5 h-5" />
+    </button>
+  );
+}
+
+function MobileSidebar({
+  children,
+  onClose,
+  open,
+}: {
+  children: React.ReactNode;
+  onClose: () => void;
+  open: boolean;
+}) {
+  return (
+    <>
+      {open && (
+        <div
+          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden"
+          onClick={onClose}
+          aria-hidden="true"
+        />
+      )}
+
+      <aside
+        aria-label="Main navigation"
+        className={cn(
+          "fixed inset-y-0 left-0 z-50 w-[280px] border-r border-white/5 bg-[#0a0a0a] flex flex-col transition-transform duration-300 ease-out lg:hidden",
+          open ? "translate-x-0" : "-translate-x-full",
+        )}
+      >
+        {children}
+      </aside>
+    </>
   );
 }
 
