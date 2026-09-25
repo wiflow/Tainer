@@ -1314,74 +1314,36 @@ function parseTaskUpidDetails(upid: string) {
   };
 }
 
+const DEPLOYMENT_TASK_LABELS: { keywords: string[]; label: string }[] = [
+  { keywords: ["backup"], label: "Backed up" },
+  { keywords: ["restore"], label: "Restored" },
+  { keywords: ["migrate"], label: "Migrated" },
+  { keywords: ["clone", "create"], label: "Deployed" },
+  { keywords: ["destroy", "delete"], label: "Deleted" },
+  { keywords: ["restart", "reboot"], label: "Restarted" },
+  { keywords: ["shutdown"], label: "Shutdown" },
+  { keywords: ["stop"], label: "Stopped" },
+  { keywords: ["start"], label: "Started" },
+  { keywords: ["resume"], label: "Resumed" },
+  { keywords: ["suspend"], label: "Suspended" },
+  { keywords: ["reset"], label: "Reset" },
+  { keywords: ["snapshot"], label: "Snapshotted" },
+  { keywords: ["rollback"], label: "Rolled back" },
+  { keywords: ["config", "set", "update"], label: "Updated" },
+];
+
 function formatDeploymentTaskLabel(taskType: string) {
   const normalized = taskType.trim().toLowerCase();
 
-  if (normalized === "vzdump" || normalized.includes("backup")) {
+  if (normalized === "vzdump") {
     return "Backed up";
   }
 
-  if (normalized.includes("restore")) {
-    return "Restored";
-  }
+  const match = DEPLOYMENT_TASK_LABELS.find(({ keywords }) =>
+    keywords.some((keyword) => normalized.includes(keyword)),
+  );
 
-  if (normalized.includes("migrate")) {
-    return "Migrated";
-  }
-
-  if (normalized.includes("clone") || normalized.includes("create")) {
-    return "Deployed";
-  }
-
-  if (normalized.includes("destroy") || normalized.includes("delete")) {
-    return "Deleted";
-  }
-
-  if (normalized.includes("restart") || normalized.includes("reboot")) {
-    return "Restarted";
-  }
-
-  if (normalized.includes("shutdown")) {
-    return "Shutdown";
-  }
-
-  if (normalized.includes("stop")) {
-    return "Stopped";
-  }
-
-  if (normalized.includes("start")) {
-    return "Started";
-  }
-
-  if (normalized.includes("resume")) {
-    return "Resumed";
-  }
-
-  if (normalized.includes("suspend")) {
-    return "Suspended";
-  }
-
-  if (normalized.includes("reset")) {
-    return "Reset";
-  }
-
-  if (normalized.includes("snapshot")) {
-    return "Snapshotted";
-  }
-
-  if (normalized.includes("rollback")) {
-    return "Rolled back";
-  }
-
-  if (
-    normalized.includes("config") ||
-    normalized.includes("set") ||
-    normalized.includes("update")
-  ) {
-    return "Updated";
-  }
-
-  return `Ran ${taskType}`;
+  return match?.label ?? `Ran ${taskType}`;
 }
 
 function deploymentActivityFromTask(task: ProxmoxTaskListEntryResponse): DeploymentActivity | null {
