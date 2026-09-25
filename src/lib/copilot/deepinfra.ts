@@ -46,7 +46,8 @@ export type OpenAiTool = {
 
 export type OpenAiRequest = {
   model: string;
-  max_tokens: number;
+  max_tokens?: number;
+  max_completion_tokens?: number;
   messages: OpenAiMessage[];
   tools?: OpenAiTool[];
   tool_choice?: "auto" | "none" | "required";

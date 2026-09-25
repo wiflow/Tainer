@@ -55,6 +55,14 @@ export type ChatMessage =
 
 export type CopilotModel = "fast" | "smart" | "kimi";
 
+export const COPILOT_PROVIDERS = ["deepinfra", "openai", "custom"] as const;
+
+export type CopilotProvider = (typeof COPILOT_PROVIDERS)[number];
+
+export function isCopilotProvider(value: unknown): value is CopilotProvider {
+  return COPILOT_PROVIDERS.includes(value as CopilotProvider);
+}
+
 export const COPILOT_MODEL_IDS: Record<CopilotModel, string> = {
   fast: "google/gemma-4-26B-A4B-it",
   smart: "google/gemma-4-31B-it",

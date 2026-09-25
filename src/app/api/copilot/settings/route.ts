@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { recordAdminAudit } from "@/lib/admin-audit-log";
 import { getCurrentSession, listManagedUsers } from "@/lib/auth";
 import {
+  CopilotSettingsError,
   getCopilotSettings,
   getCopilotUsage,
   listCopilotUsageSummaries,
@@ -12,7 +13,7 @@ import {
   type GroupToolPolicy,
 } from "@/lib/copilot/store";
 import { listUserGroups } from "@/lib/user-groups";
-import type { CopilotModel } from "@/lib/copilot/types";
+import { isCopilotProvider, type CopilotModel } from "@/lib/copilot/types";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -78,6 +79,7 @@ export async function PUT(request: Request) {
   } else if (typeof body.apiKey === "string") {
     update.apiKey = body.apiKey.trim() || null;
   }
+  if (isCopilotProvider(body.provider)) update.provider = body.provider;
   if (body.model === "fast" || body.model === "smart" || body.model === "kimi") {
     update.model = body.model;
   }
@@ -128,13 +130,21 @@ export async function PUT(request: Request) {
     update.costPerMOutputUsd = body.costPerMOutputUsd;
   }
 
-  const updated = await saveCopilotSettings(update);
+  let updated;
+  try {
+    updated = await saveCopilotSettings(update);
+  } catch (err) {
+    if (err instanceof CopilotSettingsError) {
+      return NextResponse.json({ error: err.message }, { status: 400 });
+    }
+    throw err;
+  }
 
   await recordAdminAudit({
     action: "copilot-settings-updated",
     actorEmail: session.user.email,
     actorName: session.user.name,
-    message: `Updated site-wide copilot settings: model=${updated.modelId}, endpoint=${updated.baseUrl ?? "deepinfra"}, enabled=${updated.enabled}, tokenBudget=${updated.dailyTokenBudget}, hasKey=${updated.hasKey}, restrictedGroups=${Object.keys(updated.groupPolicies).length}`,
+    message: `Updated site-wide copilot settings: provider=${updated.provider}, model=${updated.modelId}, endpoint=${updated.baseUrl ?? "default"}, enabled=${updated.enabled}, tokenBudget=${updated.dailyTokenBudget}, hasKey=${updated.hasKey}, restrictedGroups=${Object.keys(updated.groupPolicies).length}`,
   });
 
   return NextResponse.json({ settings: updated });
