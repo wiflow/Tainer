@@ -2478,29 +2478,7 @@ async function listDashboardDeploymentsInternal(nodes: LiveNode[]) {
     }
 
     for (const container of containersResult.data ?? []) {
-      deployments.push({
-        cpu: "Unavailable",
-        cpuUsage: typeof container.cpu === "number" ? container.cpu : null,
-        disk: formatBytes(container.maxdisk ?? 0),
-        diskTotalBytes: container.maxdisk ?? null,
-        diskUsedBytes: typeof container.disk === "number" ? container.disk : null,
-        environmentMode: "Runtime env",
-        id: encodeDeploymentId(node.name, container.vmid),
-        ipAddress: "Unavailable",
-        memTotalBytes: container.maxmem ?? null,
-        memUsedBytes: typeof container.mem === "number" ? container.mem : null,
-        memory: formatBytes(container.maxmem ?? 0),
-        name: container.name ?? `CT ${container.vmid}`,
-        node: node.name,
-        rawStatus: container.status ?? "unknown",
-        statusLabel: formatStatusLabel(container.status),
-        tagList: parseTags(container.tags),
-        tainerMeta: null,
-        templateName: "Proxmox LXC",
-        type: "lxc",
-        uptime: formatUptime(container.uptime),
-        vmid: container.vmid,
-      });
+      deployments.push(mapGuestListEntry(node, container, "lxc"));
     }
 
     if (vmsResult.issue) {
@@ -2512,29 +2490,7 @@ async function listDashboardDeploymentsInternal(nodes: LiveNode[]) {
         continue;
       }
 
-      deployments.push({
-        cpu: "Unavailable",
-        cpuUsage: typeof vm.cpu === "number" ? vm.cpu : null,
-        disk: formatBytes(vm.maxdisk ?? 0),
-        diskTotalBytes: vm.maxdisk ?? null,
-        diskUsedBytes: typeof vm.disk === "number" ? vm.disk : null,
-        environmentMode: "QEMU VM",
-        id: encodeDeploymentId(node.name, vm.vmid, "qemu"),
-        ipAddress: "Unavailable",
-        memTotalBytes: vm.maxmem ?? null,
-        memUsedBytes: typeof vm.mem === "number" ? vm.mem : null,
-        memory: formatBytes(vm.maxmem ?? 0),
-        name: vm.name ?? `VM ${vm.vmid}`,
-        node: node.name,
-        rawStatus: vm.status ?? "unknown",
-        statusLabel: formatStatusLabel(vm.status),
-        tagList: parseTags(vm.tags),
-        tainerMeta: null,
-        templateName: "QEMU VM",
-        type: "qemu",
-        uptime: formatUptime(vm.uptime),
-        vmid: vm.vmid,
-      });
+      deployments.push(mapGuestListEntry(node, vm, "qemu"));
     }
   }
 
