@@ -1556,6 +1556,29 @@ export async function beginLogin(email: string, password: string, clientIp?: str
   };
 }
 
+async function consumeRecoveryCode(userId: string, recoveryHash: string) {
+  return mutateAuthStore((nextStore) => {
+    const nextUser = nextStore.users.find((entry) => entry.id === userId);
+
+    if (!nextUser) {
+      throw new Error("Two-factor authentication is not available for this account.");
+    }
+
+    const recoveryIndex = nextUser.twoFactorRecoveryCodeHashes.findIndex(
+      (entry) => timingSafeHashEqual(entry, recoveryHash),
+    );
+
+    if (recoveryIndex === -1) {
+      return false;
+    }
+
+    nextUser.twoFactorRecoveryCodeHashes.splice(recoveryIndex, 1);
+    nextUser.updatedAt = nowIso();
+
+    return true;
+  });
+}
+
 async function verifyTwoFactorChallenge(challenge: LoginChallenge, code: string) {
   await checkTotpRateLimit(challenge.userId);
 
@@ -1578,26 +1601,7 @@ async function verifyTwoFactorChallenge(challenge: LoginChallenge, code: string)
       throw new Error("This login challenge has already been used.");
     }
 
-    const consumed = await mutateAuthStore((nextStore) => {
-      const nextUser = nextStore.users.find((entry) => entry.id === user.id);
-
-      if (!nextUser) {
-        throw new Error("Two-factor authentication is not available for this account.");
-      }
-
-      const recoveryIndex = nextUser.twoFactorRecoveryCodeHashes.findIndex(
-        (entry) => timingSafeHashEqual(entry, recoveryHash),
-      );
-
-      if (recoveryIndex === -1) {
-        return false;
-      }
-
-      nextUser.twoFactorRecoveryCodeHashes.splice(recoveryIndex, 1);
-      nextUser.updatedAt = nowIso();
-
-      return true;
-    });
+    const consumed = await consumeRecoveryCode(user.id, recoveryHash);
 
     if (!consumed) {
       throw new Error("Invalid authenticator code or recovery code.");
@@ -2614,25 +2618,7 @@ export async function verifyGuestShellStepUp(code: string) {
 
   if (!isTotp) {
     const recoveryHash = hashOpaqueValue(normalizedRecoveryCode);
-    const consumed = await mutateAuthStore((nextStore) => {
-      const nextUser = nextStore.users.find((entry) => entry.id === user.id);
-
-      if (!nextUser) {
-        throw new Error("Two-factor authentication is not available for this account.");
-      }
-
-      const recoveryIndex = nextUser.twoFactorRecoveryCodeHashes.findIndex(
-        (entry) => timingSafeHashEqual(entry, recoveryHash),
-      );
-
-      if (recoveryIndex === -1) {
-        return false;
-      }
-
-      nextUser.twoFactorRecoveryCodeHashes.splice(recoveryIndex, 1);
-      nextUser.updatedAt = nowIso();
-      return true;
-    });
+    const consumed = await consumeRecoveryCode(user.id, recoveryHash);
 
     if (!consumed) {
       throw new Error("Invalid authenticator code or recovery code.");
