@@ -254,6 +254,7 @@ export function CopilotSettingsPanel() {
   const keyUrl = PROVIDERS[provider].keyUrl;
   const chooseProvider = (next: CopilotProvider) => {
     setProvider(next);
+    setApiKey("");
     setCustomModelId(next === settings.provider ? (settings.customModelId ?? "") : "");
   };
   const tokenPct = Math.min(
@@ -369,7 +370,9 @@ export function CopilotSettingsPanel() {
               </div>
             ) : (
               <div className="mt-2 rounded-xl border border-amber-500/20 bg-amber-500/[0.04] px-3 py-2 text-[11.5px] text-amber-200">
-                No key configured. Tainy is disabled until an admin adds one.
+                {settings.provider === "custom"
+                  ? "No key configured. Tainy sends requests to the custom endpoint without one."
+                  : "No key configured. Tainy is disabled until an admin adds one."}
               </div>
             )}
             {isAdmin && (
