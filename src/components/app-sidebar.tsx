@@ -372,8 +372,6 @@ export function AppSidebar({
           />
         </nav>
 
-        <ScopeLabel>{currentSite?.name ?? "This site"}</ScopeLabel>
-
         <nav className="flex flex-col gap-3 mb-4">
           <SiteNav isAdmin={isAdmin} pathname={pathname} siteSlug={siteSlug} />
 
