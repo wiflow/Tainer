@@ -108,6 +108,110 @@ function healthDot(site: SiteInfo, size: "sm" | "md" = "sm") {
   );
 }
 
+const PREFETCH_PATHS = [
+  "",
+  "/deployments",
+  "/backups",
+  "/alerts",
+  "/node-configs",
+  "/network",
+  "/templates",
+  "/images",
+  "/iso-images",
+  "/load-balancer",
+  "/settings",
+];
+
+function getPathSlug(pathname: string) {
+  return pathname.match(/^\/sites\/([^/]+)/)?.[1] ?? "";
+}
+
+function resolveSiteSlug(pathSlug: string, sites: SiteInfo[]) {
+  const cookieSlug = Cookies.get("tainer_site") ?? "";
+  return (
+    pathSlug ||
+    (sites.some((s) => s.slug === cookieSlug) ? cookieSlug : "") ||
+    sites[0]?.slug ||
+    ""
+  );
+}
+
+function useSiteCookie(pathSlug: string) {
+  useEffect(() => {
+    if (pathSlug && pathSlug !== Cookies.get("tainer_site")) {
+      Cookies.set("tainer_site", pathSlug, { path: "/", expires: 365 });
+    }
+  }, [pathSlug]);
+}
+
+function useSiteSwitcher() {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const rootRef = useRef<HTMLDivElement>(null);
+  const toggleClickedRef = useRef(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (toggleClickedRef.current) {
+        toggleClickedRef.current = false;
+        return;
+      }
+      if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("click", handleClickOutside);
+    return () => document.removeEventListener("click", handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    if (open && searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
+  }, [open]);
+
+  function toggle() {
+    toggleClickedRef.current = true;
+    setOpen((prev) => !prev);
+  }
+
+  function select(slug: string) {
+    Cookies.set("tainer_site", slug, { path: "/" });
+    router.push(`/sites/${slug}`);
+    setOpen(false);
+    setQuery("");
+  }
+
+  return { open, setOpen, query, setQuery, rootRef, searchInputRef, toggle, select };
+}
+
+function usePrefetchSiteRoutes(siteSlug: string) {
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!siteSlug) return;
+    const timer = setTimeout(() => {
+      for (const path of PREFETCH_PATHS) {
+        router.prefetch(`/sites/${siteSlug}${path}`);
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [siteSlug, router]);
+}
+
+function useBodyScrollLock(locked: boolean) {
+  useEffect(() => {
+    if (locked) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => { document.body.style.overflow = ""; };
+  }, [locked]);
+}
+
 export function AppSidebar({
   currentUser,
   version,
@@ -124,29 +228,26 @@ export function AppSidebar({
   sites: SiteInfo[];
 }) {
   const pathname = usePathname();
-  const router = useRouter();
-
-  const pathSlug = pathname.match(/^\/sites\/([^/]+)/)?.[1] ?? "";
-  const cookieSlug = Cookies.get("tainer_site") ?? "";
-  const siteSlug =
-    pathSlug ||
-    (sites.some((s) => s.slug === cookieSlug) ? cookieSlug : "") ||
-    sites[0]?.slug ||
-    "";
+  const pathSlug = getPathSlug(pathname);
+  const siteSlug = resolveSiteSlug(pathSlug, sites);
   const effectiveSlug = siteSlug;
 
-  useEffect(() => {
-    if (pathSlug && pathSlug !== Cookies.get("tainer_site")) {
-      Cookies.set("tainer_site", pathSlug, { path: "/", expires: 365 });
-    }
-  }, [pathSlug]);
+  useSiteCookie(pathSlug);
 
   const currentSite = sites.find((s) => s.slug === effectiveSlug) ?? sites[0];
   const currentSiteHealth = currentSite ? getSiteHealth(currentSite) : "unknown";
 
-  const [switcherOpen, setSwitcherOpen] = useState(false);
+  const {
+    open: switcherOpen,
+    setOpen: setSwitcherOpen,
+    query: searchQuery,
+    setQuery: setSearchQuery,
+    rootRef: switcherRef,
+    searchInputRef,
+    toggle: toggleSwitcher,
+    select: handleSiteSwitch,
+  } = useSiteSwitcher();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
   const [lastPathname, setLastPathname] = useState(pathname);
   if (lastPathname !== pathname) {
     setLastPathname(pathname);
@@ -154,73 +255,12 @@ export function AppSidebar({
     setSwitcherOpen(false);
   }
 
-  const switcherRef = useRef<HTMLDivElement>(null);
-  const toggleClickedRef = useRef(false);
-  const searchInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (toggleClickedRef.current) {
-        toggleClickedRef.current = false;
-        return;
-      }
-      if (switcherRef.current && !switcherRef.current.contains(event.target as Node)) {
-        setSwitcherOpen(false);
-      }
-    }
-    document.addEventListener("click", handleClickOutside);
-    return () => document.removeEventListener("click", handleClickOutside);
-  }, []);
-
-  useEffect(() => {
-    if (switcherOpen && searchInputRef.current) {
-      searchInputRef.current.focus();
-    }
-  }, [switcherOpen]);
+  usePrefetchSiteRoutes(siteSlug);
+  useBodyScrollLock(mobileOpen);
 
   const filteredSites = sites.filter((site) =>
     site.name.toLowerCase().includes(searchQuery.toLowerCase()),
   );
-
-  useEffect(() => {
-    if (!effectiveSlug) return;
-    const prefix = `/sites/${effectiveSlug}`;
-    const routes = [
-      prefix,
-      `${prefix}/deployments`,
-      `${prefix}/backups`,
-      `${prefix}/alerts`,
-      `${prefix}/node-configs`,
-      `${prefix}/network`,
-      `${prefix}/templates`,
-      `${prefix}/images`,
-      `${prefix}/iso-images`,
-      `${prefix}/load-balancer`,
-      `${prefix}/settings`,
-    ];
-    const timer = setTimeout(() => {
-      for (const route of routes) {
-        router.prefetch(route);
-      }
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [effectiveSlug, router]);
-
-  useEffect(() => {
-    if (mobileOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
-    return () => { document.body.style.overflow = ""; };
-  }, [mobileOpen]);
-
-  const handleSiteSwitch = (slug: string) => {
-    Cookies.set("tainer_site", slug, { path: "/" });
-    router.push(`/sites/${slug}`);
-    setSwitcherOpen(false);
-    setSearchQuery("");
-  };
 
   const isActive = (path: string) => {
     if (!effectiveSlug) return false;
@@ -258,7 +298,7 @@ export function AppSidebar({
             <div className="flex items-center gap-1">
               <button
                 className="flex flex-1 min-w-0 items-center gap-2 rounded-md bg-white/5 px-3 py-2 text-left text-[13px] font-medium text-white transition-colors hover:bg-white/10 cursor-pointer"
-                onClick={() => { toggleClickedRef.current = true; setSwitcherOpen((prev) => !prev); }}
+                onClick={toggleSwitcher}
                 aria-label={`Switch site, current: ${currentSite?.name ?? "No site"}`}
                 aria-expanded={switcherOpen}
                 type="button"
