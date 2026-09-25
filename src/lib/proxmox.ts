@@ -4085,24 +4085,44 @@ export async function listScheduledBackupJobs(): Promise<{
   return { issues: [], jobs };
 }
 
-export async function listBackupsForVm(
-  node: string,
-  vmid: number,
-): Promise<{
-  archives: ProxmoxBackupArchive[];
-  issues: ProxmoxIssue[];
-}> {
-  const { issues, pools } = await listBackupStoragePools();
+function mapBackupArchive(
+  archive: ProxmoxBackupArchiveResponse,
+  pool: ProxmoxBackupStoragePool,
+  fallbackVmid: number,
+): ProxmoxBackupArchive {
+  return {
+    ctime: archive.ctime ?? 0,
+    ctimeIso: archive.ctime
+      ? new Date(archive.ctime * 1000).toISOString()
+      : "",
+    format: archive.format ?? "unknown",
+    node: pool.node,
+    notes: archive.notes ?? "",
+    sizeBytes: archive.size ?? 0,
+    storage: pool.storage,
+    subtype: archive.subtype ?? "",
+    vmid: archive.vmid ?? fallbackVmid,
+    volid: archive.volid,
+  };
+}
+
+async function listBackupArchives(
+  pools: ProxmoxBackupStoragePool[],
+  sharedStorageNode: string,
+  query: Record<string, string>,
+  fallbackVmid: number,
+) {
+  const issues: ProxmoxIssue[] = [];
   const archives: ProxmoxBackupArchive[] = [];
 
   const results = await Promise.all(
     pools
       .filter((pool) => pool.issues.length === 0)
       .map(async (pool) => {
-        const storageNode = pool.shared ? node : pool.node;
+        const storageNode = pool.shared ? sharedStorageNode : pool.node;
         const result = await safeRequest<ProxmoxBackupArchiveResponse[]>(
           `/nodes/${storageNode}/storage/${pool.storage}/content`,
-          { params: new URLSearchParams({ content: "backup", vmid: String(vmid) }) },
+          { params: new URLSearchParams(query) },
         );
         return { pool, result };
       }),
@@ -4115,28 +4135,28 @@ export async function listBackupsForVm(
     }
 
     for (const archive of result.data ?? []) {
-      if (archive.content !== "backup") continue;
-
-      archives.push({
-        ctime: archive.ctime ?? 0,
-        ctimeIso: archive.ctime
-          ? new Date(archive.ctime * 1000).toISOString()
-          : "",
-        format: archive.format ?? "unknown",
-        node: pool.node,
-        notes: archive.notes ?? "",
-        sizeBytes: archive.size ?? 0,
-        storage: pool.storage,
-        subtype: archive.subtype ?? "",
-        vmid: archive.vmid ?? vmid,
-        volid: archive.volid,
-      });
+      if (archive.content === "backup") {
+        archives.push(mapBackupArchive(archive, pool, fallbackVmid));
+      }
     }
   }
 
   archives.sort((a, b) => b.ctime - a.ctime);
 
   return { archives, issues };
+}
+
+export async function listBackupsForVm(
+  node: string,
+  vmid: number,
+): Promise<{
+  archives: ProxmoxBackupArchive[];
+  issues: ProxmoxIssue[];
+}> {
+  const { issues, pools } = await listBackupStoragePools();
+  const listed = await listBackupArchives(pools, node, { content: "backup", vmid: String(vmid) }, vmid);
+
+  return { archives: listed.archives, issues: [...issues, ...listed.issues] };
 }
 
 export async function listAllBackups(): Promise<{
@@ -4153,51 +4173,10 @@ export async function listAllBackups(): Promise<{
   }
 
   const { issues, pools } = await listBackupStoragePools();
-  const archives: ProxmoxBackupArchive[] = [];
   const firstNode = nodesResult.data[0]?.node ?? "";
+  const listed = await listBackupArchives(pools, firstNode, { content: "backup" }, 0);
 
-  const results = await Promise.all(
-    pools
-      .filter((pool) => pool.issues.length === 0)
-      .map(async (pool) => {
-        const storageNode = pool.shared ? firstNode : pool.node;
-        const result = await safeRequest<ProxmoxBackupArchiveResponse[]>(
-          `/nodes/${storageNode}/storage/${pool.storage}/content`,
-          { params: new URLSearchParams({ content: "backup" }) },
-        );
-        return { pool, result };
-      }),
-  );
-
-  for (const { pool, result } of results) {
-    if (result.issue) {
-      issues.push(result.issue);
-      continue;
-    }
-
-    for (const archive of result.data ?? []) {
-      if (archive.content !== "backup") continue;
-
-      archives.push({
-        ctime: archive.ctime ?? 0,
-        ctimeIso: archive.ctime
-          ? new Date(archive.ctime * 1000).toISOString()
-          : "",
-        format: archive.format ?? "unknown",
-        node: pool.node,
-        notes: archive.notes ?? "",
-        sizeBytes: archive.size ?? 0,
-        storage: pool.storage,
-        subtype: archive.subtype ?? "",
-        vmid: archive.vmid ?? 0,
-        volid: archive.volid,
-      });
-    }
-  }
-
-  archives.sort((a, b) => b.ctime - a.ctime);
-
-  return { archives, issues };
+  return { archives: listed.archives, issues: [...issues, ...listed.issues] };
 }
 
 export async function triggerBackup(
