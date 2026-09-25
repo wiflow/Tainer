@@ -57,7 +57,7 @@ Tainer is a self-service dashboard for Proxmox VE. Teams deploy and run LXC cont
 
 **Tainy:**
 - A built-in assistant that answers questions about your clusters and carries out actions after you approve them
-- Works with DeepInfra or any OpenAI-compatible endpoint you host yourself
+- Works with DeepInfra, OpenAI, Anthropic or any OpenAI-compatible endpoint you host yourself
 
 ## Screenshots
 

@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 import {
+  Bot,
   Brain,
+  Cloud,
   Eye,
   EyeOff,
   KeyRound,
@@ -24,6 +26,11 @@ import type {
   CopilotUserUsageSummary,
   GroupToolPolicy,
 } from "@/lib/copilot/store";
+import {
+  ANTHROPIC_MODELS,
+  type AnthropicModel,
+  type CopilotProvider,
+} from "@/lib/copilot/types";
 
 type GroupInfo = { id: string; name: string; isAdmin: boolean };
 type UserUsageRow = CopilotUserUsageSummary & { email: string; name: string };
@@ -44,6 +51,58 @@ function formatUsd(value: number): string {
   return value < 0.01 && value > 0 ? "<$0.01" : `$${value.toFixed(2)}`;
 }
 
+const PROVIDERS: Record<
+  CopilotProvider,
+  { title: string; subtitle: string; keyUrl: string | null; icon: React.ReactNode }
+> = {
+  deepinfra: {
+    title: "DeepInfra",
+    subtitle: "Open models",
+    keyUrl: "https://deepinfra.com/dash/api_keys",
+    icon: <Cloud className="h-3.5 w-3.5" />,
+  },
+  openai: {
+    title: "OpenAI",
+    subtitle: "Your model id",
+    keyUrl: "https://platform.openai.com/api-keys",
+    icon: <Bot className="h-3.5 w-3.5" />,
+  },
+  anthropic: {
+    title: "Anthropic",
+    subtitle: "Claude models",
+    keyUrl: "https://console.anthropic.com/settings/keys",
+    icon: <Sparkles className="h-3.5 w-3.5" />,
+  },
+  custom: {
+    title: "Custom endpoint",
+    subtitle: "Self-hosted",
+    keyUrl: null,
+    icon: <ServerCog className="h-3.5 w-3.5" />,
+  },
+};
+
+const ANTHROPIC_MODEL_LABELS: Record<AnthropicModel, string> = {
+  "claude-opus-5": "Claude Opus 5 (default)",
+  "claude-sonnet-5": "Claude Sonnet 5",
+  "claude-haiku-4-5": "Claude Haiku 4.5",
+};
+
+const MODEL_TIPS: Record<CopilotProvider, React.ReactNode> = {
+  deepinfra:
+    "Fast = Gemma 4 26B A4B (MoE, cheap, great for triage). Smart = Gemma 4 31B (best for multi-step reasoning). Kimi = Kimi K3 (Moonshot's frontier MoE, strongest at agentic tool use). All served by DeepInfra.",
+  openai: "The model id to call, exactly as your OpenAI account lists it.",
+  anthropic:
+    "Pick a Claude model, or enter another model id to use instead. Tainy shows a summary of the model's reasoning under Thought process.",
+  custom: (
+    <>
+      Any OpenAI-compatible server (vLLM, Ollama, LM Studio, or a corporate gateway). Use the base
+      URL up to (not including) <code className="text-zinc-200">/chat/completions</code>, e.g.{" "}
+      <code className="text-zinc-200">https://vllm.example.com/v1</code>. https is required; the
+      API key is optional.
+    </>
+  ),
+};
+
 const inputClassName =
   "mt-1.5 w-full rounded-xl border border-white/[0.06] bg-white/[0.025] px-4 py-3 text-[13px] text-zinc-200 outline-none transition-all duration-200 placeholder:text-zinc-600 focus:border-white/[0.15] focus:bg-white/[0.04] focus:shadow-[0_0_0_3px_rgba(255,255,255,0.03)]";
 
@@ -55,7 +114,9 @@ export function CopilotSettingsPanel() {
   const [saving, setSaving] = useState(false);
   const [showKey, setShowKey] = useState(false);
   const [apiKey, setApiKey] = useState("");
+  const [provider, setProvider] = useState<CopilotProvider>("deepinfra");
   const [model, setModel] = useState<"fast" | "smart" | "kimi">("smart");
+  const [anthropicModel, setAnthropicModel] = useState<AnthropicModel>("claude-opus-5");
   const [tokenBudget, setTokenBudget] = useState(500_000);
   const [toolBudget, setToolBudget] = useState(200);
   const [enabled, setEnabled] = useState(true);
@@ -85,7 +146,9 @@ export function CopilotSettingsPanel() {
       setSettings(json.settings);
       setUsage(json.usage);
       setIsAdmin(json.isAdmin);
+      setProvider(json.settings.provider);
       setModel(json.settings.model);
+      setAnthropicModel(json.settings.anthropicModel);
       setTokenBudget(json.settings.dailyTokenBudget);
       setToolBudget(json.settings.dailyToolCallBudget);
       setEnabled(json.settings.enabled);
@@ -118,11 +181,13 @@ export function CopilotSettingsPanel() {
           headers: { "content-type": "application/json" },
           body: JSON.stringify({
             ...extra,
+            provider,
             model,
+            anthropicModel,
             dailyTokenBudget: tokenBudget,
             dailyToolCallBudget: toolBudget,
             enabled,
-            baseUrl: baseUrl.trim() || null,
+            baseUrl: provider === "custom" ? baseUrl.trim() || null : null,
             customModelId: customModelId.trim() || null,
             operatorNotes,
             groupPolicies,
@@ -138,7 +203,9 @@ export function CopilotSettingsPanel() {
         setApiKey("");
         setFeedback({
           kind: "success",
-          text: keyCleared ? "Saved. The endpoint changed, so enter the API key again." : "Saved.",
+          text: keyCleared
+            ? "Saved. The provider or endpoint changed, so enter the API key again."
+            : "Saved.",
         });
       } catch (err) {
         setFeedback({
@@ -151,7 +218,9 @@ export function CopilotSettingsPanel() {
     },
     [
       settings?.hasKey,
+      provider,
       model,
+      anthropicModel,
       tokenBudget,
       toolBudget,
       enabled,
@@ -182,6 +251,11 @@ export function CopilotSettingsPanel() {
     );
   }
 
+  const keyUrl = PROVIDERS[provider].keyUrl;
+  const chooseProvider = (next: CopilotProvider) => {
+    setProvider(next);
+    setCustomModelId(next === settings.provider ? (settings.customModelId ?? "") : "");
+  };
   const tokenPct = Math.min(
     100,
     Math.round(
@@ -197,7 +271,7 @@ export function CopilotSettingsPanel() {
     <div className="space-y-4">
       <SectionPanel
         title="Tainy"
-        description="AI assistant for diagnosing and managing your Proxmox cluster. Runs on a single site-wide DeepInfra API key. Every action still runs through each user's own permissions."
+        description="AI assistant for diagnosing and managing your Proxmox cluster. Runs on one site-wide API key from the provider you pick. Every action still runs through each user's own permissions."
         headerRight={
           isAdmin ? (
             <div className="flex items-center gap-2">
@@ -221,26 +295,59 @@ export function CopilotSettingsPanel() {
         <div className="grid gap-4">
           <div>
             <span className="flex items-center gap-1.5">
+              <label className="text-[12px] font-medium text-zinc-300">Provider</label>
+              <InfoTip label="Provider" side="right">
+                Where Tainy sends its requests. Switching provider or endpoint removes the stored
+                key, so enter the key again when you switch.
+              </InfoTip>
+            </span>
+            <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {(Object.keys(PROVIDERS) as CopilotProvider[]).map((id) => (
+                <ModelTile
+                  key={id}
+                  active={provider === id}
+                  onClick={isAdmin ? () => chooseProvider(id) : undefined}
+                  title={PROVIDERS[id].title}
+                  subtitle={PROVIDERS[id].subtitle}
+                  icon={PROVIDERS[id].icon}
+                />
+              ))}
+            </div>
+            {isAdmin && settings.hasKey && provider !== settings.provider && !apiKey.trim() && (
+              <p className="text-[11px] text-amber-200/80 mt-1.5">
+                Saving removes the stored key. Enter a {PROVIDERS[provider].title} key below.
+              </p>
+            )}
+          </div>
+
+          <div>
+            <span className="flex items-center gap-1.5">
               <label className="text-[12px] font-medium text-zinc-300 flex items-center gap-1.5">
                 <KeyRound className="h-3 w-3" />
-                DeepInfra API key (site-wide)
+                API key (site-wide)
               </label>
-              <InfoTip label="DeepInfra API key" side="right">
+              <InfoTip label="API key" side="right">
                 One key for the whole site, managed by admins. Stored AES-256-GCM encrypted under
                 your Tainer AUTH_SECRET.
               </InfoTip>
             </span>
             <p className="text-[11.5px] text-zinc-500 mt-0.5">
-              Get a key at{" "}
-              <a
-                href="https://deepinfra.com/dash/api_keys"
-                target="_blank"
-                rel="noreferrer"
-                className="text-zinc-300 hover:text-white underline underline-offset-2"
-              >
-                deepinfra.com
-              </a>
-              .
+              {keyUrl ? (
+                <>
+                  Get a key at{" "}
+                  <a
+                    href={keyUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-zinc-300 hover:text-white underline underline-offset-2"
+                  >
+                    {new URL(keyUrl).hostname}
+                  </a>
+                  .
+                </>
+              ) : (
+                "Optional for endpoints that don't need one."
+              )}
             </p>
             {settings.hasKey ? (
               <div className="mt-2 flex items-center justify-between rounded-xl border border-emerald-500/20 bg-emerald-500/[0.04] px-3 py-2.5">
@@ -272,7 +379,11 @@ export function CopilotSettingsPanel() {
                   type={showKey ? "text" : "password"}
                   value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
-                  placeholder={settings.hasKey ? "Paste new key to replace…" : "DeepInfra API key…"}
+                  placeholder={
+                    settings.hasKey
+                      ? "Paste new key to replace…"
+                      : `${PROVIDERS[provider].title} API key…`
+                  }
                   autoComplete="off"
                 />
                 <button
@@ -291,58 +402,68 @@ export function CopilotSettingsPanel() {
             <span className="flex items-center gap-1.5">
               <label className="text-[12px] font-medium text-zinc-300">Model</label>
               <InfoTip label="Model" side="right">
-                Fast = Gemma 4 26B A4B (MoE, cheap, great for triage). Smart = Gemma 4 31B (best
-                for multi-step reasoning). Kimi = Kimi K3 (Moonshot&apos;s frontier MoE, strongest
-                at agentic tool use). All served by DeepInfra.
+                {MODEL_TIPS[provider]}
               </InfoTip>
             </span>
-            <div className="mt-2 grid grid-cols-3 gap-2">
-              <ModelTile
-                active={model === "fast"}
-                onClick={isAdmin ? () => setModel("fast") : undefined}
-                title="Fast"
-                subtitle="Gemma 4 26B A4B"
-                icon={<Zap className="h-3.5 w-3.5" />}
-              />
-              <ModelTile
-                active={model === "smart"}
-                onClick={isAdmin ? () => setModel("smart") : undefined}
-                title="Smart"
-                subtitle="Gemma 4 31B"
-                icon={<Sparkles className="h-3.5 w-3.5" />}
-              />
-              <ModelTile
-                active={model === "kimi"}
-                onClick={isAdmin ? () => setModel("kimi") : undefined}
-                title="Kimi"
-                subtitle="Kimi K3"
-                icon={<Brain className="h-3.5 w-3.5" />}
-              />
-            </div>
-            {baseUrl.trim() && (
-              <p className="text-[11px] text-amber-200/80 mt-1.5">
-                A custom endpoint is set, so the model presets above are ignored in favour of
-                the custom model id below.
-              </p>
+            {provider === "deepinfra" && (
+              <div className="mt-2 grid grid-cols-3 gap-2">
+                <ModelTile
+                  active={model === "fast"}
+                  onClick={isAdmin ? () => setModel("fast") : undefined}
+                  title="Fast"
+                  subtitle="Gemma 4 26B A4B"
+                  icon={<Zap className="h-3.5 w-3.5" />}
+                />
+                <ModelTile
+                  active={model === "smart"}
+                  onClick={isAdmin ? () => setModel("smart") : undefined}
+                  title="Smart"
+                  subtitle="Gemma 4 31B"
+                  icon={<Sparkles className="h-3.5 w-3.5" />}
+                />
+                <ModelTile
+                  active={model === "kimi"}
+                  onClick={isAdmin ? () => setModel("kimi") : undefined}
+                  title="Kimi"
+                  subtitle="Kimi K3"
+                  icon={<Brain className="h-3.5 w-3.5" />}
+                />
+              </div>
             )}
-          </div>
-
-          <div>
-            <span className="flex items-center gap-1.5">
-              <label className="text-[12px] font-medium text-zinc-300 flex items-center gap-1.5">
-                <ServerCog className="h-3 w-3" />
-                Custom endpoint (self-hosted models)
-              </label>
-              <InfoTip label="Custom endpoint" side="right">
-                Point Tainy at any OpenAI-compatible server (vLLM, Ollama, LM Studio, or a
-                corporate gateway) instead of DeepInfra. Use the base URL up to (not including){" "}
-                <code className="text-zinc-200">/chat/completions</code>, e.g.{" "}
-                <code className="text-zinc-200">https://vllm.example.com/v1</code>. https is
-                required; the API key above is optional for endpoints that don&apos;t need one.
-                Leave empty to use DeepInfra.
-              </InfoTip>
-            </span>
-            {isAdmin ? (
+            {isAdmin && provider === "anthropic" && (
+              <div className="mt-1 grid grid-cols-2 gap-2">
+                <select
+                  className={inputClassName}
+                  value={anthropicModel}
+                  onChange={(e) => setAnthropicModel(e.target.value as AnthropicModel)}
+                >
+                  {ANTHROPIC_MODELS.map((id) => (
+                    <option key={id} value={id}>
+                      {ANTHROPIC_MODEL_LABELS[id]}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  className={inputClassName}
+                  type="text"
+                  value={customModelId}
+                  onChange={(e) => setCustomModelId(e.target.value)}
+                  placeholder="Other model id (optional)"
+                  autoComplete="off"
+                />
+              </div>
+            )}
+            {isAdmin && provider === "openai" && (
+              <input
+                className={inputClassName}
+                type="text"
+                value={customModelId}
+                onChange={(e) => setCustomModelId(e.target.value)}
+                placeholder="Model id from your OpenAI account"
+                autoComplete="off"
+              />
+            )}
+            {isAdmin && provider === "custom" && (
               <div className="mt-1 grid grid-cols-[2fr_1fr] gap-2">
                 <input
                   className={inputClassName}
@@ -361,11 +482,18 @@ export function CopilotSettingsPanel() {
                   autoComplete="off"
                 />
               </div>
-            ) : settings.baseUrl ? (
+            )}
+            {!isAdmin && settings.provider !== "deepinfra" && (
               <p className="text-[11.5px] text-zinc-400 mt-1">
-                Using custom endpoint <code>{settings.baseUrl}</code> ({settings.modelId}).
+                Using <code>{settings.modelId}</code>
+                {settings.baseUrl && (
+                  <>
+                    {" "}at <code>{settings.baseUrl}</code>
+                  </>
+                )}
+                .
               </p>
-            ) : null}
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
