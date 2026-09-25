@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef, useState, type ComponentType } from "react";
+import { useEffect, useRef, useState, type ComponentType, type RefObject } from "react";
 import Cookies from "js-cookie";
 import { AnimatePresence, motion } from "framer-motion";
 
@@ -136,6 +136,10 @@ function resolveSiteSlug(pathSlug: string, sites: SiteInfo[]) {
   );
 }
 
+function siteHref(siteSlug: string, path: string) {
+  return siteSlug ? `/sites/${siteSlug}${path}` : path || "/";
+}
+
 function useSiteCookie(pathSlug: string) {
   useEffect(() => {
     if (pathSlug && pathSlug !== Cookies.get("tainer_site")) {
@@ -187,6 +191,8 @@ function useSiteSwitcher() {
   return { open, setOpen, query, setQuery, rootRef, searchInputRef, toggle, select };
 }
 
+type SiteSwitcherState = Omit<ReturnType<typeof useSiteSwitcher>, "rootRef" | "searchInputRef">;
+
 function usePrefetchSiteRoutes(siteSlug: string) {
   const router = useRouter();
 
@@ -237,30 +243,17 @@ export function AppSidebar({
   const currentSite = sites.find((s) => s.slug === effectiveSlug) ?? sites[0];
   const currentSiteHealth = currentSite ? getSiteHealth(currentSite) : "unknown";
 
-  const {
-    open: switcherOpen,
-    setOpen: setSwitcherOpen,
-    query: searchQuery,
-    setQuery: setSearchQuery,
-    rootRef: switcherRef,
-    searchInputRef,
-    toggle: toggleSwitcher,
-    select: handleSiteSwitch,
-  } = useSiteSwitcher();
+  const { rootRef, searchInputRef, ...switcher } = useSiteSwitcher();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [lastPathname, setLastPathname] = useState(pathname);
   if (lastPathname !== pathname) {
     setLastPathname(pathname);
     setMobileOpen(false);
-    setSwitcherOpen(false);
+    switcher.setOpen(false);
   }
 
   usePrefetchSiteRoutes(siteSlug);
   useBodyScrollLock(mobileOpen);
-
-  const filteredSites = sites.filter((site) =>
-    site.name.toLowerCase().includes(searchQuery.toLowerCase()),
-  );
 
   const isActive = (path: string) => {
     if (!effectiveSlug) return false;
@@ -294,86 +287,17 @@ export function AppSidebar({
         </div>
 
         {sites.length > 0 && (
-          <div className="relative mb-2" ref={switcherRef}>
-            <div className="flex items-center gap-1">
-              <button
-                className="flex flex-1 min-w-0 items-center gap-2 rounded-md bg-white/5 px-3 py-2 text-left text-[13px] font-medium text-white transition-colors hover:bg-white/10 cursor-pointer"
-                onClick={toggleSwitcher}
-                aria-label={`Switch site, current: ${currentSite?.name ?? "No site"}`}
-                aria-expanded={switcherOpen}
-                type="button"
-              >
-                <SiteAvatar site={currentSite} />
-                <span className="min-w-0 flex-1 truncate">
-                  {currentSite?.name ?? "No site"}
-                </span>
-                {healthDot(currentSite ?? { slug: "", name: "", healthy: null }, "sm")}
-                <ChevronDown className={cn("h-3.5 w-3.5 shrink-0 text-zinc-400 transition-transform", switcherOpen && "rotate-180")} />
-              </button>
-              <IntentLink
-                href={effectiveSlug ? `/sites/${effectiveSlug}/settings` : "/settings"}
-                className="shrink-0 flex items-center justify-center w-9 h-9 rounded-md text-zinc-500 hover:text-zinc-200 hover:bg-white/5 transition-colors cursor-pointer"
-                aria-label="Site settings"
-              >
-                <Settings className="w-4 h-4" />
-              </IntentLink>
-            </div>
-
-            {switcherOpen && sites.length > 1 && (
-              <div className="absolute left-0 right-0 top-full z-50 mt-1.5 rounded-xl border border-white/[0.08] bg-zinc-900/95 backdrop-blur-xl shadow-2xl shadow-black/40 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
-                {sites.length > 3 && (
-                  <div className="border-b border-white/[0.06] px-3 py-2.5">
-                    <div className="flex items-center gap-2 rounded-lg bg-white/[0.04] px-2.5 py-1.5">
-                      <Search className="h-3 w-3 text-zinc-500 shrink-0" />
-                      <input
-                        ref={searchInputRef}
-                        className="w-full bg-transparent text-[12px] text-zinc-200 outline-none placeholder:text-zinc-500"
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="Search sites..."
-                        type="text"
-                        value={searchQuery}
-                      />
-                    </div>
-                  </div>
-                )}
-                <div className="px-1.5 py-1.5">
-                  <p className="px-2.5 pb-1.5 text-[10px] font-medium uppercase tracking-wider text-zinc-500">Sites</p>
-                </div>
-                <div className="max-h-[240px] overflow-y-auto px-1.5 pb-1.5">
-                  {filteredSites.map((site) => {
-                    const isCurrentSite = site.slug === effectiveSlug;
-                    return (
-                      <button
-                        key={site.slug}
-                        className={cn(
-                          "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[12px] transition-colors",
-                          isCurrentSite
-                            ? "bg-white/[0.08] text-white"
-                            : "text-zinc-400 hover:bg-white/[0.05] hover:text-zinc-200",
-                        )}
-                        onClick={(e) => { e.stopPropagation(); handleSiteSwitch(site.slug); }}
-                        type="button"
-                      >
-                        {healthDot(site, "md")}
-                        <span className="min-w-0 flex-1 truncate font-medium">{site.name}</span>
-                        {isCurrentSite && (
-                          <span className="text-[10px] text-zinc-500">Current</span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
+          <SiteSwitcher
+            currentSite={currentSite}
+            rootRef={rootRef}
+            searchInputRef={searchInputRef}
+            siteSlug={siteSlug}
+            sites={sites}
+            switcher={switcher}
+          />
         )}
 
-        {effectiveSlug && currentSiteHealth === "unreachable" && (
-          <div className="mx-2 mb-4 flex items-center gap-2 rounded-md border border-rose-500/10 bg-rose-500/5 px-3 py-2">
-            <WifiOff className="h-3.5 w-3.5 shrink-0 text-rose-400/60" />
-            <span className="text-[11px] text-rose-400/80">Site unreachable</span>
-          </div>
-        )}
+        {siteSlug && currentSiteHealth === "unreachable" && <SiteUnreachableNotice />}
 
         <div className="mx-2 mb-4 flex items-center gap-1.5">
           <button
@@ -720,6 +644,146 @@ export function AppSidebar({
         {sidebarContent}
       </aside>
     </>
+  );
+}
+
+function SiteSwitcher({
+  currentSite,
+  rootRef,
+  searchInputRef,
+  siteSlug,
+  sites,
+  switcher,
+}: {
+  currentSite: SiteInfo;
+  rootRef: RefObject<HTMLDivElement | null>;
+  searchInputRef: RefObject<HTMLInputElement | null>;
+  siteSlug: string;
+  sites: SiteInfo[];
+  switcher: SiteSwitcherState;
+}) {
+  return (
+    <div className="relative mb-2" ref={rootRef}>
+      <div className="flex items-center gap-1">
+        <button
+          className="flex flex-1 min-w-0 items-center gap-2 rounded-md bg-white/5 px-3 py-2 text-left text-[13px] font-medium text-white transition-colors hover:bg-white/10 cursor-pointer"
+          onClick={switcher.toggle}
+          aria-label={`Switch site, current: ${currentSite?.name ?? "No site"}`}
+          aria-expanded={switcher.open}
+          type="button"
+        >
+          <SiteAvatar site={currentSite} />
+          <span className="min-w-0 flex-1 truncate">
+            {currentSite?.name ?? "No site"}
+          </span>
+          {healthDot(currentSite ?? { slug: "", name: "", healthy: null }, "sm")}
+          <ChevronDown className={cn("h-3.5 w-3.5 shrink-0 text-zinc-400 transition-transform", switcher.open && "rotate-180")} />
+        </button>
+        <IntentLink
+          href={siteHref(siteSlug, "/settings")}
+          className="shrink-0 flex items-center justify-center w-9 h-9 rounded-md text-zinc-500 hover:text-zinc-200 hover:bg-white/5 transition-colors cursor-pointer"
+          aria-label="Site settings"
+        >
+          <Settings className="w-4 h-4" />
+        </IntentLink>
+      </div>
+
+      {switcher.open && sites.length > 1 && (
+        <SiteSwitcherMenu
+          searchInputRef={searchInputRef}
+          siteSlug={siteSlug}
+          sites={sites}
+          switcher={switcher}
+        />
+      )}
+    </div>
+  );
+}
+
+function SiteSwitcherMenu({
+  searchInputRef,
+  siteSlug,
+  sites,
+  switcher,
+}: {
+  searchInputRef: RefObject<HTMLInputElement | null>;
+  siteSlug: string;
+  sites: SiteInfo[];
+  switcher: SiteSwitcherState;
+}) {
+  const filteredSites = sites.filter((site) =>
+    site.name.toLowerCase().includes(switcher.query.toLowerCase()),
+  );
+
+  return (
+    <div className="absolute left-0 right-0 top-full z-50 mt-1.5 rounded-xl border border-white/[0.08] bg-zinc-900/95 backdrop-blur-xl shadow-2xl shadow-black/40 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
+      {sites.length > 3 && (
+        <div className="border-b border-white/[0.06] px-3 py-2.5">
+          <div className="flex items-center gap-2 rounded-lg bg-white/[0.04] px-2.5 py-1.5">
+            <Search className="h-3 w-3 text-zinc-500 shrink-0" />
+            <input
+              ref={searchInputRef}
+              className="w-full bg-transparent text-[12px] text-zinc-200 outline-none placeholder:text-zinc-500"
+              onChange={(e) => switcher.setQuery(e.target.value)}
+              placeholder="Search sites..."
+              type="text"
+              value={switcher.query}
+            />
+          </div>
+        </div>
+      )}
+      <div className="px-1.5 py-1.5">
+        <p className="px-2.5 pb-1.5 text-[10px] font-medium uppercase tracking-wider text-zinc-500">Sites</p>
+      </div>
+      <div className="max-h-[240px] overflow-y-auto px-1.5 pb-1.5">
+        {filteredSites.map((site) => (
+          <SiteOption
+            current={site.slug === siteSlug}
+            key={site.slug}
+            onSelect={switcher.select}
+            site={site}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SiteOption({
+  current,
+  onSelect,
+  site,
+}: {
+  current: boolean;
+  onSelect: (slug: string) => void;
+  site: SiteInfo;
+}) {
+  return (
+    <button
+      className={cn(
+        "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[12px] transition-colors",
+        current
+          ? "bg-white/[0.08] text-white"
+          : "text-zinc-400 hover:bg-white/[0.05] hover:text-zinc-200",
+      )}
+      onClick={(e) => { e.stopPropagation(); onSelect(site.slug); }}
+      type="button"
+    >
+      {healthDot(site, "md")}
+      <span className="min-w-0 flex-1 truncate font-medium">{site.name}</span>
+      {current && (
+        <span className="text-[10px] text-zinc-500">Current</span>
+      )}
+    </button>
+  );
+}
+
+function SiteUnreachableNotice() {
+  return (
+    <div className="mx-2 mb-4 flex items-center gap-2 rounded-md border border-rose-500/10 bg-rose-500/5 px-3 py-2">
+      <WifiOff className="h-3.5 w-3.5 shrink-0 text-rose-400/60" />
+      <span className="text-[11px] text-rose-400/80">Site unreachable</span>
+    </div>
   );
 }
 
