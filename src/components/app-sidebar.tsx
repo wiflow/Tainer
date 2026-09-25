@@ -740,6 +740,7 @@ function NavSection({
   label: string;
 }) {
   const storageKey = `tainer_nav_section_${id}`;
+  const pathname = usePathname();
 
   // localStorage is read after mount so the first render matches the server.
   const [open, setOpen] = useState(true);
@@ -749,15 +750,16 @@ function NavSection({
     try {
       const stored = localStorage.getItem(storageKey);
       if (stored === "1") setOpen(true);
-      else if (stored === "0") setOpen(false);
+      else if (stored === "0" && !containsActive) setOpen(false);
     } catch {}
     setHydrated(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storageKey]);
 
   useEffect(() => {
     if (containsActive && !open) setOpen(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [containsActive]);
+  }, [containsActive, pathname]);
 
   function toggle() {
     setOpen((current) => {
