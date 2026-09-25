@@ -1,5 +1,8 @@
 import "server-only";
 
+import type Anthropic from "@anthropic-ai/sdk";
+
+import { createAnthropicProvider } from "@/lib/copilot/anthropic";
 import {
   DEFAULT_OPENAI_BASE_URL,
   DeepInfraApiError,
@@ -17,8 +20,13 @@ const OPENAI_COMPATIBLE_MAX_TOKENS = 4096;
 const OPENAI_MAX_COMPLETION_TOKENS = 16_384;
 const OPENAI_COMPATIBLE_TIMEOUT_MS = 120_000;
 
+export type ReasoningBlock =
+  | Anthropic.Beta.BetaThinkingBlockParam
+  | Anthropic.Beta.BetaRedactedThinkingBlockParam;
+
 export type ConversationMessage =
-  | Exclude<OpenAiMessage, { role: "tool" }>
+  | Extract<OpenAiMessage, { role: "system" | "user" }>
+  | (Extract<OpenAiMessage, { role: "assistant" }> & { reasoning?: ReasoningBlock[] })
   | (Extract<OpenAiMessage, { role: "tool" }> & { isError?: boolean });
 
 export type ModelStreamDelta = DeepInfraStreamDelta;
@@ -27,6 +35,8 @@ export type ModelTurn = {
   toolCalls: OpenAiToolCall[];
   finishReason: string;
   usage: { input: number; output: number };
+  reasoning?: ReasoningBlock[];
+  refusal?: { category: string | null };
 };
 
 export type ModelProvider = {
@@ -38,9 +48,13 @@ export type ModelProvider = {
 };
 
 function toWireMessages(messages: ConversationMessage[]): OpenAiMessage[] {
-  return messages.map((m) =>
-    m.role === "tool" ? { role: "tool", tool_call_id: m.tool_call_id, content: m.content } : m,
-  );
+  return messages.map((m) => {
+    if (m.role === "tool") return { role: "tool", tool_call_id: m.tool_call_id, content: m.content };
+    if (m.role === "assistant") {
+      return { role: "assistant", content: m.content, ...(m.tool_calls ? { tool_calls: m.tool_calls } : {}) };
+    }
+    return m;
+  });
 }
 
 function createOpenAiCompatibleProvider(options: {
@@ -79,6 +93,8 @@ export function createModelProvider(
 ): ModelProvider {
   const model = settings.modelId;
   switch (settings.provider) {
+    case "anthropic":
+      return createAnthropicProvider({ apiKey: apiKey ?? "", model });
     case "openai":
       return createOpenAiCompatibleProvider({
         apiKey,

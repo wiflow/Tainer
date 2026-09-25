@@ -7,7 +7,9 @@ import { decryptText, encryptText } from "@/lib/crypto";
 import { createStoreMutator, writeJsonFileAtomically } from "@/lib/store-utils";
 import {
   COPILOT_MODEL_IDS,
+  isAnthropicModel,
   isCopilotProvider,
+  type AnthropicModel,
   type CopilotModel,
   type CopilotProvider,
 } from "@/lib/copilot/types";
@@ -31,6 +33,7 @@ type StoredSettings = {
   keyHint: string | null;
   provider: CopilotProvider;
   model: CopilotModel;
+  anthropicModel: AnthropicModel;
   baseUrl: string | null;
   customModelId: string | null;
   dailyTokenBudget: number;
@@ -64,6 +67,7 @@ function defaultSettings(): StoredSettings {
     keyHint: null,
     provider: "deepinfra",
     model: DEFAULT_MODEL,
+    anthropicModel: "claude-opus-5",
     baseUrl: null,
     customModelId: null,
     dailyTokenBudget: DEFAULT_DAILY_TOKEN_BUDGET,
@@ -89,6 +93,7 @@ async function readStore(): Promise<CopilotStore> {
     if (!isCopilotProvider(parsed.settings?.provider)) {
       settings.provider = settings.baseUrl ? "custom" : "deepinfra";
     }
+    if (!isAnthropicModel(settings.anthropicModel)) settings.anthropicModel = "claude-opus-5";
     return {
       settings,
       usage: Array.isArray(parsed.usage) ? parsed.usage : [],
@@ -110,6 +115,7 @@ export type CopilotSettings = {
   keyHint: string | null;
   provider: CopilotProvider;
   model: CopilotModel;
+  anthropicModel: AnthropicModel;
   modelId: string;
   baseUrl: string | null;
   customModelId: string | null;
@@ -127,6 +133,8 @@ function resolveModelId(stored: StoredSettings): string {
   switch (stored.provider) {
     case "openai":
       return stored.customModelId ?? "";
+    case "anthropic":
+      return stored.customModelId || stored.anthropicModel;
     case "custom":
       return stored.customModelId || COPILOT_MODEL_IDS[stored.model];
     default:
@@ -140,6 +148,7 @@ function toPublic(stored: StoredSettings): CopilotSettings {
     keyHint: stored.keyHint,
     provider: stored.provider,
     model: stored.model,
+    anthropicModel: stored.anthropicModel,
     modelId: resolveModelId(stored),
     baseUrl: stored.baseUrl,
     customModelId: stored.customModelId,
@@ -203,6 +212,7 @@ export type CopilotSettingsInput = {
   apiKey?: string | null;
   provider?: CopilotProvider;
   model?: CopilotModel;
+  anthropicModel?: AnthropicModel;
   baseUrl?: string | null;
   customModelId?: string | null;
   dailyTokenBudget?: number;
@@ -231,6 +241,7 @@ export async function saveCopilotSettings(
       }
     }
     if (input.model) settings.model = input.model;
+    if (input.anthropicModel) settings.anthropicModel = input.anthropicModel;
 
     const requestedBaseUrl =
       input.baseUrl === undefined ? settings.baseUrl : input.baseUrl?.trim() || null;
