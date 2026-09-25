@@ -13,7 +13,7 @@ import {
   type GroupToolPolicy,
 } from "@/lib/copilot/store";
 import { listUserGroups } from "@/lib/user-groups";
-import { isCopilotProvider, type CopilotModel } from "@/lib/copilot/types";
+import { isAnthropicModel, isCopilotProvider, type CopilotModel } from "@/lib/copilot/types";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -84,6 +84,12 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: "Invalid provider" }, { status: 400 });
     }
     update.provider = body.provider;
+  }
+  if (body.anthropicModel !== undefined) {
+    if (!isAnthropicModel(body.anthropicModel)) {
+      return NextResponse.json({ error: "Invalid model" }, { status: 400 });
+    }
+    update.anthropicModel = body.anthropicModel;
   }
   if (body.model === "fast" || body.model === "smart" || body.model === "kimi") {
     update.model = body.model;

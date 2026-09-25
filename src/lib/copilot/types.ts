@@ -55,12 +55,20 @@ export type ChatMessage =
 
 export type CopilotModel = "fast" | "smart" | "kimi";
 
-export const COPILOT_PROVIDERS = ["deepinfra", "openai", "custom"] as const;
+export const COPILOT_PROVIDERS = ["deepinfra", "openai", "anthropic", "custom"] as const;
 
 export type CopilotProvider = (typeof COPILOT_PROVIDERS)[number];
 
 export function isCopilotProvider(value: unknown): value is CopilotProvider {
   return COPILOT_PROVIDERS.includes(value as CopilotProvider);
+}
+
+export const ANTHROPIC_MODELS = ["claude-opus-5", "claude-sonnet-5", "claude-haiku-4-5"] as const;
+
+export type AnthropicModel = (typeof ANTHROPIC_MODELS)[number];
+
+export function isAnthropicModel(value: unknown): value is AnthropicModel {
+  return ANTHROPIC_MODELS.includes(value as AnthropicModel);
 }
 
 export const COPILOT_MODEL_IDS: Record<CopilotModel, string> = {

@@ -1,8 +1,13 @@
 import "server-only";
 
+import { recordAdminAudit } from "@/lib/admin-audit-log";
 import type { AuthSession } from "@/lib/auth";
 import type { OpenAiToolCall } from "@/lib/copilot/deepinfra";
-import { createModelProvider, type ConversationMessage } from "@/lib/copilot/provider";
+import {
+  createModelProvider,
+  type ConversationMessage,
+  type ModelTurn,
+} from "@/lib/copilot/provider";
 import { recordCopilotAudit } from "@/lib/copilot/audit";
 import { mintApprovalToken } from "@/lib/copilot/approval";
 import { redactCredentials } from "@/lib/copilot/redact";
@@ -193,6 +198,8 @@ export async function* runCopilotTurn(
       let visible = "";
       let toolCalls: OpenAiToolCall[] = [];
       let finishReason = "stop";
+      let reasoning: ModelTurn["reasoning"];
+      let refusal: ModelTurn["refusal"];
       try {
         const roundEvents: CopilotStreamEvent[] = [];
         const splitter = createThinkSplitter((kind, text) => {
@@ -215,6 +222,8 @@ export async function* runCopilotTurn(
               Math.min(MAX_TOOL_CALLS_PER_TURN, usage.toolCallsRemaining) - toolCallsThisTurn,
             );
             finishReason = value.finishReason;
+            reasoning = value.reasoning;
+            refusal = value.refusal;
             inputTokensAccum += value.usage.input;
             outputTokensAccum += value.usage.output;
             for (const ev of roundEvents.splice(0)) yield ev;
@@ -232,10 +241,31 @@ export async function* runCopilotTurn(
         break;
       }
 
+      if (refusal) {
+        const category = refusal.category ? ` (${refusal.category})` : "";
+        await recordAdminAudit({
+          action: "copilot-model-refused",
+          actorEmail: session.user.email,
+          actorName: session.user.name,
+          message: `Model ${settings.modelId} declined a Tainy request${category}`,
+        });
+        yield {
+          type: "error",
+          message: `The model declined this request${category}. Try rephrasing it.`,
+        };
+        yield {
+          type: "turn_end",
+          stopReason: "refusal",
+          usage: { input: inputTokensAccum, output: outputTokensAccum },
+        };
+        break;
+      }
+
       chatMessages.push({
         role: "assistant",
         content: visible.trim() || null,
         ...(toolCalls.length ? { tool_calls: toolCalls } : {}),
+        ...(reasoning?.length ? { reasoning } : {}),
       });
 
       if (toolCalls.length === 0) {

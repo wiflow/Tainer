@@ -14,6 +14,7 @@
     "copy-map-worker": "node -e \"const fs=require('fs');fs.mkdirSync('public/maplibre',{recursive:true});for(const f of ['maplibre-gl-worker.mjs','maplibre-gl-shared.mjs'])fs.copyFileSync('node_modules/maplibre-gl/dist/'+f,'public/maplibre/'+f)\""
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.128.0",
     "@next/env": "^16.3.6",
     "@novnc/novnc": "^1.7.0",
     "@radix-ui/react-icons": "^1.3.2",

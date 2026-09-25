@@ -64,6 +64,7 @@ const ACTION_META: Record<AdminAuditAction, { category: string; level: Level }> 
   "copilot-tool-executed": { category: "copilot", level: "info" },
   "copilot-tool-failed": { category: "copilot", level: "warning" },
   "copilot-budget-exceeded": { category: "copilot", level: "warning" },
+  "copilot-model-refused": { category: "copilot", level: "warning" },
   "copilot-settings-updated": { category: "copilot", level: "info" },
   "state-backup-created": { category: "settings", level: "info" },
   "state-backup-downloaded": { category: "settings", level: "warning" },

@@ -59,6 +59,7 @@ export type AdminAuditAction =
   | "copilot-tool-executed"
   | "copilot-tool-failed"
   | "copilot-budget-exceeded"
+  | "copilot-model-refused"
   | "copilot-settings-updated"
   | "state-backup-created"
   | "state-backup-downloaded"
