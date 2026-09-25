@@ -58,7 +58,7 @@ const STATUS_LABEL: Record<IntegrationStatus, string> = {
   "coming-soon": "Coming soon",
 };
 
-function StatusBadge({ status }: { status: IntegrationStatus }) {
+export function StatusBadge({ status }: { status: IntegrationStatus }) {
   return (
     <span
       className={cn(

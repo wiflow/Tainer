@@ -85,7 +85,6 @@ const TOOL_LABELS: Record<string, (args: Record<string, unknown>) => string> = {
   set_deployment_tags: () => `Update tags`,
   list_tags: (a) => `List tags: ${String(a.siteSlug ?? "?")}`,
   get_deployment_metrics: (a) => `Metrics trend (${String(a.timeframe ?? "day")})`,
-  get_network_path: () => `Trace network path`,
   get_cve_report: (a) => `Last CVE scan: ${String(a.siteSlug ?? "?")}`,
   run_cve_scan: (a) => `Run CVE scan: ${String(a.siteSlug ?? "?")}`,
   run_diagnostics: (a) => `Run diagnostics: ${String(a.siteSlug ?? "?")}`,

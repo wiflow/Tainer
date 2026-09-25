@@ -56,7 +56,7 @@ All variables are optional unless noted.
 | Variable | Description | Example |
 |---|---|---|
 | `AUTH_SECRET` | **Required.** Key for sessions and encrypted settings. The server refuses to start without it. Keep it stable across restarts and upgrades | `openssl rand -base64 32` |
-| `APP_URL` | Public base URL. Used for password reset links, the SSO `redirect_uri`, alert links and agent setup snippets. Required for password reset in production | `https://tainer.example.com` |
+| `APP_URL` | Public base URL. Used for password reset links, the SSO `redirect_uri` and alert links. Required for password reset in production | `https://tainer.example.com` |
 | `PORT` | HTTP port the server listens on | `3000` |
 | `TAINER_DATA_DIR` | Override the data directory path | `/data/tainer` |
 | `AUTH_COOKIE_SECURE` | Force the `Secure` flag on the session cookie on (`true`) or off (`false`). By default it is on, except when `APP_URL` uses http or points at a local or private address | `true` |
@@ -69,7 +69,6 @@ All variables are optional unless noted.
 | `TAINER_TRUST_PROXY_HEADERS` | `true` makes Tainer read the client IP from `X-Forwarded-For` / `X-Real-IP` and the public origin from `X-Forwarded-Proto` / `X-Forwarded-Host`. Only set it behind a proxy that overwrites these headers | `true` |
 | `TAINER_WEBHOOK_URL_ALLOWLIST` | Comma separated hosts that alert webhooks may reach even though they resolve to private addresses. `.example.com` or `*.example.com` also matches subdomains | `hooks.lan,.corp.example` |
 | `TAINER_DOWNLOAD_URL_ALLOWLIST` | Same format, for template, ISO and image downloads from a URL or registry | `mirror.lan` |
-| `TAINER_AGENT_BASE_URL` | Base URL (scheme, host, optional port, no path) that LLDP/SNMP agent snippets post to, when nodes cannot reach `APP_URL`. A per-site override in Network > Integrations wins over it | `http://10.0.0.5:3000` |
 | `TAINER_LDAP_ALLOW_INSECURE` | `true` allows plain `ldap://` server URLs. The bind password then crosses the network in cleartext | `true` |
 | `TAINER_LDAP_INSECURE_TLS` | `true` turns off certificate validation for LDAP over TLS. Logs a warning on every connection | `true` |
 | `TAINER_OIDC_ALLOW_INSECURE_ISSUER` | `true` allows `http://` issuer URLs for identity providers. For local testing only | `true` |

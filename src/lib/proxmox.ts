@@ -4781,25 +4781,6 @@ export async function getClusterFirewallRules(): Promise<unknown[]> {
   return proxmoxRequest<unknown[]>("/cluster/firewall/rules") ?? [];
 }
 
-export async function getDeploymentNetSpecs(
-  id: string,
-): Promise<{ node: string; specs: Record<string, string> } | null> {
-  const { node, vmid, type } = decodeDeploymentId(id);
-  const path =
-    type === "qemu"
-      ? `/nodes/${node}/qemu/${vmid}/config`
-      : `/nodes/${node}/lxc/${vmid}/config`;
-  const config = await safeRequest<Record<string, unknown>>(path);
-  if (!config.data) return null;
-  const specs: Record<string, string> = {};
-  for (const [key, value] of Object.entries(config.data)) {
-    if (/^net\d+$/.test(key) && typeof value === "string") {
-      specs[key] = value;
-    }
-  }
-  return { node, specs };
-}
-
 function appendParams(
   params: URLSearchParams,
   source: Record<string, unknown>,
