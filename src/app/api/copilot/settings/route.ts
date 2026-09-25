@@ -79,7 +79,12 @@ export async function PUT(request: Request) {
   } else if (typeof body.apiKey === "string") {
     update.apiKey = body.apiKey.trim() || null;
   }
-  if (isCopilotProvider(body.provider)) update.provider = body.provider;
+  if (body.provider !== undefined) {
+    if (!isCopilotProvider(body.provider)) {
+      return NextResponse.json({ error: "Invalid provider" }, { status: 400 });
+    }
+    update.provider = body.provider;
+  }
   if (body.model === "fast" || body.model === "smart" || body.model === "kimi") {
     update.model = body.model;
   }
