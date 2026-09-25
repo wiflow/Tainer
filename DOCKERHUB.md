@@ -50,13 +50,12 @@ docker compose up -d
 | Variable | Description |
 |---|---|
 | `AUTH_SECRET` | **Required.** Key for sessions and encrypted settings. Generate with `openssl rand -base64 32` and keep it stable |
-| `APP_URL` | Public base URL. Used for password reset links, the SSO redirect URI and agent snippets |
+| `APP_URL` | Public base URL. Used for password reset links and the SSO redirect URI |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM` | SMTP for password reset emails. Without SMTP the reset link goes to the container log, never to disk |
 | `TAINER_DATA_DIR` | Override data directory (default `/app/data`) |
 | `TAINER_TRUST_PROXY_HEADERS` | `true` to trust `X-Forwarded-*` headers. Only behind a proxy that sets them |
 | `TAINER_WEBHOOK_URL_ALLOWLIST` | Comma separated hosts that alert webhooks may reach on private addresses |
 | `TAINER_DOWNLOAD_URL_ALLOWLIST` | Comma separated hosts allowed for template, ISO and image downloads on private addresses |
-| `TAINER_AGENT_BASE_URL` | Base URL LLDP/SNMP agents post to when nodes cannot reach `APP_URL` |
 | `TAINER_LDAP_ALLOW_INSECURE` | `true` allows plain `ldap://` |
 | `TAINER_LDAP_INSECURE_TLS` | `true` skips LDAP certificate validation |
 | `TAINER_COPILOT_ALLOW_INSECURE_ENDPOINT` | `true` allows a plain `http://` custom Tainy endpoint |

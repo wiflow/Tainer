@@ -53,12 +53,6 @@ export type AdminAuditAction =
   | "integration-configured"
   | "integration-updated"
   | "integration-removed"
-  | "lldp-token-issued"
-  | "lldp-token-revoked"
-  | "lldp-snapshots-cleared"
-  | "lldp-ingest-rejected"
-  | "lldp-annotation-updated"
-  | "lldp-annotation-removed"
   | "login-lockout-cleared"
   | "copilot-tool-approved"
   | "copilot-tool-denied"
@@ -89,7 +83,6 @@ const DATA_FILE = "admin-audit-log.json";
 // Actions reachable without a session; capped separately so they cannot evict admin events.
 const UNAUTHENTICATED_ACTIONS = new Set<AdminAuditAction>([
   "ldap-login-failure",
-  "lldp-ingest-rejected",
   "login-failure",
   "login-password-verified",
   "password-reset-requested",

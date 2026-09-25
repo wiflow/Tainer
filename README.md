@@ -45,7 +45,6 @@ Tainer is a self-service dashboard for Proxmox VE. Teams deploy and run LXC cont
 - Updates and CVE scanner: pending package updates and known vulnerabilities per node and guest
 
 **Network:**
-- Topology: LLDP and SNMP discovery of the switches your nodes are plugged into
 - IP pools: static address allocation for new deployments, with phpIPAM integration
 - Firewall: per-guest Proxmox firewall rules
 

@@ -48,6 +48,7 @@ export async function upsertIpamIntegrationAction(
     }).catch(() => {});
 
     revalidatePath("/integrations");
+    revalidatePath("/sites/[siteSlug]/network", "page");
     return {
       message: existed ? "IPAM integration updated." : "IPAM integration configured.",
       requestId: randomUUID(),
@@ -85,6 +86,7 @@ export async function deleteIpamIntegrationAction(
     }).catch(() => {});
 
     revalidatePath("/integrations");
+    revalidatePath("/sites/[siteSlug]/network", "page");
     return {
       message: "IPAM integration removed.",
       requestId: randomUUID(),

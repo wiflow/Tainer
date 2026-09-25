@@ -14,7 +14,6 @@ import "@/lib/copilot/tools/navigation";
 import "@/lib/copilot/tools/backups";
 import "@/lib/copilot/tools/metrics";
 import "@/lib/copilot/tools/tags";
-import "@/lib/copilot/tools/network";
 import "@/lib/copilot/tools/security";
 import "@/lib/copilot/tools/observability";
 import "@/lib/copilot/tools/firewall";

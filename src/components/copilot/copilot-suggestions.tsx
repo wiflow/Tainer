@@ -111,9 +111,7 @@ export function generateSuggestions(
 
   if (pathname.match(/^\/sites\/[^/]+\/network/)) {
     return [
-      "Show me the network topology",
       "List IP pools for this site",
-      "Which switch ports are down?",
     ];
   }
 

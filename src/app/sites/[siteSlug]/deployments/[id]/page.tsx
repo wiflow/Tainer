@@ -5,7 +5,6 @@ import { notFound } from "next/navigation";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { DeploymentActivityCard } from "@/components/deployment-activity-card";
 import { DeploymentFirewallCard } from "@/components/deployment-firewall-card";
-import { DeploymentNetworkPathCard } from "@/components/deployment-network-path-card";
 import { DeploymentTagList } from "@/components/deployment-tag-list";
 import { DeploymentBackupCard } from "@/components/deployment-backup-card";
 import { DeploymentSnapshotCard } from "@/components/deployment-snapshot-card";
@@ -29,9 +28,7 @@ import { getAppSettings } from "@/lib/app-settings";
 import { getCurrentSession, hasFreshGuestShellStepUp, hasSitePermission, type Permission } from "@/lib/auth";
 import { extractSshHost } from "@/lib/guest-access";
 import { getDeploymentActivities } from "@/lib/deployment-activity-log";
-import { getDeploymentBackupInfo, getDeploymentDetail, getDeploymentNetSpecs, getGuestFirewallOptions, getLatestDeploymentActivity, getNodes, getTemplateFileInfo, listGuestFirewallRules, listSnapshots, withSiteConfig } from "@/lib/proxmox";
-import { resolveDeploymentNetworkPath } from "@/lib/lldp-deployment-path";
-import { getLldpSnapshotsForSite } from "@/lib/lldp-snapshots";
+import { getDeploymentBackupInfo, getDeploymentDetail, getGuestFirewallOptions, getLatestDeploymentActivity, getNodes, getTemplateFileInfo, listGuestFirewallRules, listSnapshots, withSiteConfig } from "@/lib/proxmox";
 import { requireSitePageAccess } from "@/lib/page-guard";
 import { ensureSiteConfig } from "@/lib/site-context";
 import { cn, formatBytes } from "@/lib/utils";
@@ -102,7 +99,7 @@ export default async function DeploymentDetailPage({
   }
 
   const tainerMeta = deployment.tainerMeta;
-  const [latestActivityResult, sourceTemplate, imageInfo, backupInfo, snapshots, generatedLocalSsh, netPath, firewallOptions, firewallRules] = await withSiteConfig(siteConfig, () =>
+  const [latestActivityResult, sourceTemplate, imageInfo, backupInfo, snapshots, generatedLocalSsh, firewallOptions, firewallRules] = await withSiteConfig(siteConfig, () =>
     Promise.all([
       getLatestDeploymentActivity(deployment.node, deployment.vmid).catch(() => null),
       tainerMeta?.templateId ? getDeploymentTemplate(tainerMeta.templateId) : Promise.resolve(null),
@@ -119,18 +116,6 @@ export default async function DeploymentDetailPage({
       tainerMeta?.localSsh?.mode === "generated"
         ? getGeneratedDeploymentSshKeyInfo(deployment.id)
         : Promise.resolve(null),
-      (async () => {
-        const [specs, lldpSnapshots] = await Promise.all([
-          getDeploymentNetSpecs(deployment.id).catch(() => null),
-          getLldpSnapshotsForSite(siteConfig.siteId).catch(() => ({ hosts: {} })),
-        ]);
-        if (!specs) return null;
-        return resolveDeploymentNetworkPath({
-          node: specs.node,
-          netConfig: specs.specs,
-          snapshots: lldpSnapshots,
-        }).catch(() => null);
-      })(),
       getGuestFirewallOptions(deployment.node, deployment.vmid, deployment.type).catch(
         () => null,
       ),
@@ -403,10 +388,6 @@ export default async function DeploymentDetailPage({
       />
 
       <DeploymentActivityCard activities={activityLog} />
-
-      {netPath ? (
-        <DeploymentNetworkPathCard path={netPath} siteSlug={siteSlug} />
-      ) : null}
 
       {firewallOptions && firewallRules ? (
         <DeploymentFirewallCard

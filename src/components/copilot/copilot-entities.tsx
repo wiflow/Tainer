@@ -963,12 +963,6 @@ export function ToolResultView({
       ) : (
         <RawJson data={result} />
       );
-    case "get_network_path":
-      return Array.isArray((result as NetworkPathResult).interfaces) ? (
-        <NetworkPathCard data={result as NetworkPathResult} siteSlug={siteSlug} />
-      ) : (
-        <RawJson data={result} />
-      );
     case "list_firewall_rules":
       return Array.isArray(result) ? (
         <FirewallRuleList rules={result as FirewallRule[]} />
@@ -1814,80 +1808,6 @@ function HeartbeatCard({ data }: { data: HeartbeatResult }) {
       </div>
       {data.alerts.slice(0, 10).map((a, i) => (
         <AlertRow key={i} a={a} />
-      ))}
-    </div>
-  );
-}
-
-type NetworkPathResult = {
-  node: string;
-  agentHost: string | null;
-  lldpObserved: boolean;
-  interfaces: Array<{
-    netKey: string;
-    bridge: string | null;
-    vlan: number | null;
-    uplinks: Array<{
-      nic: string;
-      upstreamDevice: string | null;
-      upstreamPort: string | null;
-      chassisId: string | null;
-      vlan: number | null;
-    }>;
-  }>;
-};
-
-function NetworkPathCard({ data, siteSlug }: { data: NetworkPathResult; siteSlug: string }) {
-  if (data.interfaces.length === 0) {
-    return <EmptyResult message="No network interfaces to trace." />;
-  }
-  return (
-    <div className="space-y-1.5">
-      {data.interfaces.map((iface) => (
-        <div
-          key={iface.netKey}
-          className="rounded-lg border border-white/[0.06] bg-white/[0.025] px-3 py-2"
-        >
-          <div className="flex items-center gap-1.5 text-[11.5px] text-zinc-200 flex-wrap">
-            <span className="font-medium">{iface.netKey}</span>
-            <ArrowRight className="h-3 w-3 text-zinc-600" />
-            <span className="text-zinc-400">{iface.bridge ?? "?"}</span>
-            {iface.vlan != null && (
-              <span className="text-[10px] text-zinc-500">VLAN {iface.vlan}</span>
-            )}
-          </div>
-          {iface.uplinks.map((u, i) => {
-            const chassisHref =
-              siteSlug && u.chassisId
-                ? `/sites/${siteSlug}/network/devices/${encodeURIComponent(u.chassisId)}`
-                : null;
-            return (
-              <div
-                key={i}
-                className="mt-1 flex items-center gap-1.5 text-[10.5px] text-zinc-500 flex-wrap pl-2"
-              >
-                <Network className="h-3 w-3 flex-shrink-0" />
-                <span className="text-zinc-400">{u.nic}</span>
-                {u.upstreamDevice ? (
-                  <>
-                    <ArrowRight className="h-2.5 w-2.5" />
-                    {chassisHref ? (
-                      <Link href={chassisHref} className="text-sky-300 hover:text-sky-200">
-                        {u.upstreamDevice}
-                      </Link>
-                    ) : (
-                      <span className="text-sky-300">{u.upstreamDevice}</span>
-                    )}
-                    {u.upstreamPort && <span className="text-zinc-500">port {u.upstreamPort}</span>}
-                    {u.vlan != null && <span className="text-zinc-600">VLAN {u.vlan}</span>}
-                  </>
-                ) : (
-                  <span className="text-zinc-600">(no LLDP neighbour observed)</span>
-                )}
-              </div>
-            );
-          })}
-        </div>
       ))}
     </div>
   );
