@@ -3077,9 +3077,63 @@ export async function getDeploymentDetail(id: string): Promise<LiveDeploymentDet
   return mapContainerDetail(id, node, vmid, configResult, statusResult, networkInfo);
 }
 
+function mapVmIsoFields(config: ProxmoxQemuConfigResponse) {
+  const isoVolid = extractVmIsoVolid(config);
+  const isoFileName = isoVolid.split("/").at(-1) ?? "";
+
+  return {
+    ostemplate: isoVolid || "No ISO",
+    templateName: isoFileName
+      ? titleFromTemplateFile(isoFileName)
+      : "QEMU VM",
+    vmIso: isoVolid || undefined,
+  };
+}
+
+function mapVmConfigFields(config: ProxmoxQemuConfigResponse) {
+  return {
+    environmentMode: "QEMU VM",
+    envCount: 0,
+    envText: "",
+    guestOsType: config.ostype ?? undefined,
+    networkInfo: null,
+    rootfs: config.scsi0 ?? config.ide0 ?? "Unavailable",
+    swapConfiguredMb: null,
+    type: "qemu" as const,
+    vmCpuType: config.cpu,
+    vmSockets: typeof config.sockets === "number" ? config.sockets : typeof config.sockets === "string" ? Number(config.sockets) : undefined,
+    vmMachineType: config.machine,
+    vmScsiHw: config.scsihw,
+    vmVga: config.vga,
+  };
+}
+
+function mapVmDetail(
+  id: string,
+  node: string,
+  vmid: number,
+  configResult: SafeResult<ProxmoxQemuConfigResponse>,
+  statusResult: SafeResult<ProxmoxQemuStatusResponse>,
+  runtimeIp: string | null,
+): LiveDeploymentDetail {
+  const config = configResult.data ?? {};
+  const status = statusResult.data ?? {};
+  const configuredCpu = hasConfiguredCores(config.cores)
+    ? `${Number(config.cores) * Number(config.sockets || 1)} vCPU`
+    : "Unavailable";
+
+  return {
+    ...mapGuestDetailBase(id, node, vmid, configResult, statusResult),
+    ...mapVmConfigFields(config),
+    ...mapVmIsoFields(config),
+    cpu: formatVcpuCount(status.cpus) ?? configuredCpu,
+    ipAddress: runtimeIp || "Unavailable",
+    name: status.name ?? config.name ?? `VM ${vmid}`,
+  };
+}
+
 async function getVmDetail(id: string): Promise<LiveDeploymentDetail | null> {
   const { node, vmid } = decodeDeploymentId(id);
-  const issues: ProxmoxIssue[] = [];
   const [configResult, statusResult] = await Promise.all([
     safeRequest<ProxmoxQemuConfigResponse>(`/nodes/${node}/qemu/${vmid}/config`),
     safeRequest<ProxmoxQemuStatusResponse>(
@@ -3087,91 +3141,15 @@ async function getVmDetail(id: string): Promise<LiveDeploymentDetail | null> {
     ),
   ]);
 
-  if (configResult.issue) issues.push(configResult.issue);
-  if (statusResult.issue) issues.push(statusResult.issue);
-
   if (!configResult.data && !statusResult.data) {
     return null;
   }
 
-  const config = configResult.data ?? {};
-  const status = statusResult.data ?? {};
-
-  const runtimeIp = status.status === "running"
+  const runtimeIp = statusResult.data?.status === "running"
     ? await getVmRuntimeIp(node, vmid)
     : null;
 
-  const isoVolid = extractVmIsoVolid(config);
-  const isoFileName = isoVolid.split("/").at(-1) ?? "";
-
-  const qemuCoresConfigured = toOptionalNumber(config.cores);
-  const qemuMemoryConfiguredMb = toOptionalNumber(config.memory);
-
-  return {
-    configAccessible: Boolean(configResult.data),
-    coresConfigured: qemuCoresConfigured,
-    cpu:
-      status.cpus && status.cpus > 0
-        ? `${status.cpus} vCPU`
-        : typeof config.cores === "number" || typeof config.cores === "string"
-          ? `${Number(config.cores) * Number(config.sockets || 1)} vCPU`
-          : "Unavailable",
-    cpuUsage: typeof status.cpu === "number" ? status.cpu : null,
-    description: config.description ?? "",
-    digest: config.digest ?? "",
-    disk: formatBytes(status.maxdisk ?? 0),
-    diskTotalBytes: status.maxdisk ?? null,
-    diskUsedBytes: typeof status.disk === "number" ? status.disk : null,
-    environmentMode: "QEMU VM",
-    envCount: 0,
-    envText: "",
-    guestOsType: config.ostype ?? undefined,
-    id,
-    ipAddress: runtimeIp || "Unavailable",
-    issues: dedupeIssues(issues),
-    memTotalBytes: status.maxmem ?? null,
-    memUsedBytes: typeof status.mem === "number" ? status.mem : null,
-    memory: formatBytes(
-      status.maxmem ??
-        (typeof config.memory === "number" ? config.memory * 1024 * 1024 : 0),
-    ),
-    memoryConfiguredMb: qemuMemoryConfiguredMb,
-    swapConfiguredMb: null,
-    name: status.name ?? config.name ?? `VM ${vmid}`,
-    networkInfo: null,
-    node,
-    ostemplate: isoVolid || "No ISO",
-    rawStatus: status.status ?? "unknown",
-    resourceUsage: status.status === "running"
-      ? {
-          cpuRatio: status.cpu ?? 0,
-          diskReadBytes: status.diskread ?? 0,
-          diskTotalBytes: status.maxdisk ?? 0,
-          diskUsedBytes: status.disk ?? 0,
-          diskWriteBytes: status.diskwrite ?? 0,
-          memTotalBytes: status.maxmem ?? 0,
-          memUsedBytes: status.mem ?? 0,
-          netInBytes: status.netin ?? 0,
-          netOutBytes: status.netout ?? 0,
-        }
-      : null,
-    rootfs: config.scsi0 ?? config.ide0 ?? "Unavailable",
-    statusLabel: formatStatusLabel(status.status),
-    tagList: parseTags(config.tags),
-    tainerMeta: parseTainerMeta(config.description ?? ""),
-    templateName: isoFileName
-      ? titleFromTemplateFile(isoFileName)
-      : "QEMU VM",
-    type: "qemu",
-    uptime: formatUptime(status.uptime),
-    vmid,
-    vmCpuType: config.cpu,
-    vmSockets: typeof config.sockets === "number" ? config.sockets : typeof config.sockets === "string" ? Number(config.sockets) : undefined,
-    vmMachineType: config.machine,
-    vmScsiHw: config.scsihw,
-    vmVga: config.vga,
-    vmIso: isoVolid || undefined,
-  };
+  return mapVmDetail(id, node, vmid, configResult, statusResult, runtimeIp);
 }
 
 export async function createContainer(node: string, params: URLSearchParams) {
