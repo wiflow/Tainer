@@ -722,7 +722,7 @@ function serviceIcon(service: string, port: number) {
   if (/dns|bind/.test(s)) return Globe;
   if (/ignition/.test(s)) return Workflow;
   if (/chat|discord|matrix|slack/.test(s)) return MessageSquare;
-  if (/^http|web|nginx|caddy|apache|traefik/.test(s)) return Globe;
+  if (s.startsWith("http") || /web|nginx|caddy|apache|traefik/.test(s)) return Globe;
   if (port === 22) return TerminalSquare;
   if (port === 80 || port === 443 || port === 8080 || port === 8443) return Globe;
   if (port === 3306 || port === 5432 || port === 6379 || port === 27017) return Database;

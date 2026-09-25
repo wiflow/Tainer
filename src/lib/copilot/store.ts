@@ -163,9 +163,15 @@ function toPublic(stored: StoredSettings): CopilotSettings {
   };
 }
 
+function stripTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value[end - 1] === "/") end--;
+  return value.slice(0, end);
+}
+
 // Plain http would expose the API key and cluster data, so it needs an explicit opt-in.
 export function validateCopilotBaseUrl(raw: string): string {
-  const trimmed = raw.trim().replace(/\/+$/, "");
+  const trimmed = stripTrailingSlashes(raw.trim());
   let url: URL;
   try {
     url = new URL(trimmed);
