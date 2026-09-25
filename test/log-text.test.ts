@@ -11,12 +11,13 @@ test("logText keeps a user name on one log line", () => {
     "mallory[console] admin opening vnc console[2K",
   );
   assert.equal(logText("a\u2028b\u2029c\u0085d"), "abcd");
+  assert.equal(logText("x\u202Eadmin\u202Cy\u2066z"), "xadminyz");
 });
 
 test("logText output never contains control or line separator characters", () => {
   fc.assert(
     fc.property(fc.string({ unit: "binary" }), (raw) => {
-      assert.doesNotMatch(logText(raw), /[\p{Cc}\u2028\u2029]/u);
+      assert.doesNotMatch(logText(raw), /[\p{Cc}\p{Bidi_Control}\u2028\u2029]/u);
     }),
   );
 });
