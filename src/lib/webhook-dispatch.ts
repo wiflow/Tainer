@@ -21,7 +21,11 @@ export type WebhookPayload = {
   title: string;
 };
 
-function detectWebhookKind(webhookUrl: string, preferredKind: AlertWebhookKind) {
+function isHostOrSubdomain(host: string, domain: string) {
+  return host === domain || host.endsWith(`.${domain}`);
+}
+
+export function detectWebhookKind(webhookUrl: string, preferredKind: AlertWebhookKind) {
   if (preferredKind !== "auto") {
     return preferredKind;
   }
@@ -31,20 +35,19 @@ function detectWebhookKind(webhookUrl: string, preferredKind: AlertWebhookKind) 
     const host = url.hostname.toLowerCase();
 
     if (
-      host.includes("webhook.office.com") ||
-      host.includes("office.com") ||
-      host.includes("logic.azure.com") ||
+      isHostOrSubdomain(host, "office.com") ||
+      isHostOrSubdomain(host, "logic.azure.com") ||
       url.pathname.includes("/IncomingWebhook/")
     ) {
       return "teams" as const;
     }
 
-    if (host.includes("hooks.slack.com")) {
+    if (host === "hooks.slack.com") {
       return "slack" as const;
     }
 
     if (
-      (host.includes("discord.com") || host.includes("discordapp.com")) &&
+      (isHostOrSubdomain(host, "discord.com") || isHostOrSubdomain(host, "discordapp.com")) &&
       url.pathname.includes("/api/webhooks")
     ) {
       return "discord" as const;
