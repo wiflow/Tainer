@@ -21,7 +21,7 @@ export function VmConsole({
   guestType?: "lxc" | "qemu";
 }) {
   const screenRef = useRef<HTMLDivElement>(null);
-  const rfbRef = useRef<import("@novnc/novnc/lib/rfb.js").default | null>(null);
+  const rfbRef = useRef<import("@novnc/novnc").default | null>(null);
   const consoleActiveRef = useRef(false);
   const [state, setState] = useState<ConnectionState>("connecting");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -34,7 +34,7 @@ export function VmConsole({
     }
 
     let disposed = false;
-    let rfb: import("@novnc/novnc/lib/rfb.js").default | undefined;
+    let rfb: import("@novnc/novnc").default | undefined;
 
     async function init() {
       try {
@@ -54,7 +54,7 @@ export function VmConsole({
         }
 
         const [{ default: RFB }, currentTarget] = await Promise.all([
-          import("@novnc/novnc/lib/rfb.js"),
+          import("@novnc/novnc"),
           Promise.resolve(screenRef.current),
         ]);
 

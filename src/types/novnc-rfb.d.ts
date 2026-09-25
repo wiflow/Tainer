@@ -1,4 +1,4 @@
-declare module "@novnc/novnc/lib/rfb.js" {
+declare module "@novnc/novnc" {
   type NoVncEvent = {
     detail?: {
       clean?: boolean;
