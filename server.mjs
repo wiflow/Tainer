@@ -1,6 +1,6 @@
 import { createServer } from "node:http";
 import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
-import { access, chmod, copyFile, readFile, rename, mkdir, stat, writeFile } from "node:fs/promises";
+import { access, chmod, copyFile, readFile, rename, mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import http from "node:http";
 import https from "node:https";
@@ -986,13 +986,9 @@ async function migrateLegacySiteOnBoot() {
       }],
     };
 
-    const existingSites = await stat(sitesPath).catch((error) => {
-      if (error?.code === "ENOENT") return null;
-      throw error;
-    });
-    if (existingSites?.isFile()) await chmod(sitesPath, 0o600);
-    await writeFile(sitesPath, JSON.stringify(store, null, 2) + "\n", { encoding: "utf8", mode: 0o600 });
-    await chmod(sitesPath, 0o600);
+    const tempSitesPath = `${sitesPath}.${process.pid}.tmp`;
+    await writeFile(tempSitesPath, JSON.stringify(store, null, 2) + "\n", { encoding: "utf8", mode: 0o600, flag: "wx" });
+    await rename(tempSitesPath, sitesPath);
     console.log(`[server.mjs] Created site "${slug}" from env vars.`);
 
     const dataDir = getDataDirectory();
