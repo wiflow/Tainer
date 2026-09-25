@@ -8,6 +8,7 @@ import type { ProxmoxActionState } from "@/lib/action-states";
 import { getAppSettings } from "@/lib/app-settings";
 import { requireSitePermission, requireSession } from "@/lib/auth";
 import { recordDeploymentActivity } from "@/lib/deployment-activity-log";
+import { logSafe } from "@/lib/log-safe";
 import { createRateLimiterOrThrow } from "@/lib/rate-limit";
 
 const enforceRateLimit = createRateLimiterOrThrow("backup-actions", 10, 5 * 60_000);
@@ -228,8 +229,8 @@ export async function restoreBackupAction(
         })
         .catch((error) => {
           console.error(
-            `Post-restore custom LXC config replay failed for VMID ${targetVmid}:`,
-            error,
+            `Post-restore custom LXC config replay failed for VMID ${logSafe(targetVmid)}:`,
+            logSafe(error),
           );
         });
     }

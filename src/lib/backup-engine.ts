@@ -12,6 +12,7 @@ import {
   type BackupRunRecord,
   type BackupWorkloadResult,
 } from "@/lib/backup-run-log";
+import { logSafe } from "@/lib/log-safe";
 import {
   deleteBackup,
   getDeploymentIndex,
@@ -106,7 +107,7 @@ async function enforceRetention(
       await deleteBackup(archive.node, archive.storage, archive.volid);
       pruned.push(archive.volid);
     } catch (err) {
-      console.error(`[backup-engine] Failed to prune ${archive.volid}:`, err);
+      console.error(`[backup-engine] Failed to prune ${logSafe(archive.volid)}:`, logSafe(err));
     }
   }
 
