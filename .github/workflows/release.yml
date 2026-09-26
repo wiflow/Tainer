@@ -16,17 +16,24 @@ concurrency:
   group: release
   cancel-in-progress: false
 
+env:
+  IMAGE: tainersh/tainer
+  TAG: ${{ inputs.tag || github.ref_name }}
+
 jobs:
-  release:
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    permissions:
-      contents: write
-      id-token: write
-      attestations: write
-    env:
-      IMAGE: tainersh/tainer
-      TAG: ${{ inputs.tag || github.ref_name }}
+  build:
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-24.04
+            slug: amd64
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+            slug: arm64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
     steps:
       - name: Validate tag
         id: version
@@ -39,20 +46,20 @@ jobs:
           ref: refs/tags/${{ env.TAG }}
           persist-credentials: false
 
-      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
-
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
-      - name: Build amd64 image for the layer check
+      - name: Build image for the layer check
+        if: matrix.slug == 'amd64'
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
-          platforms: linux/amd64
+          platforms: ${{ matrix.platform }}
           load: true
           tags: tainer:gate
           build-args: TAINER_VERSION=${{ steps.version.outputs.version }}
 
       - name: Check image layers
+        if: matrix.slug == 'amd64'
         run: scripts/check-image-layers.sh tainer:gate
 
       - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
@@ -60,32 +67,89 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and push
+      - name: Build and push by digest
         id: push
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: |
-            ${{ env.IMAGE }}:${{ steps.version.outputs.version }}
-            ${{ env.IMAGE }}:latest
+          platforms: ${{ matrix.platform }}
           build-args: TAINER_VERSION=${{ steps.version.outputs.version }}
+          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
           provenance: mode=max
           sbom: true
+
+      - name: Record digest
+        env:
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          mkdir -p digests
+          touch "digests/${DIGEST#sha256:}"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: digest-${{ matrix.slug }}
+          path: digests/*
+          retention-days: 1
+
+  publish:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - name: Validate tag
+        id: version
+        run: |
+          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Not a release tag: $TAG"; exit 1; }
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/tags/${{ env.TAG }}
+          persist-credentials: false
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: digest-*
+          path: digests
+          merge-multiple: true
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Create the multi-arch tags
+        id: manifest
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          sources=()
+          for digest in digests/*; do sources+=("$IMAGE@sha256:$(basename "$digest")"); done
+          [ "${#sources[@]}" -eq 2 ] || { echo "Expected 2 platform digests, got ${#sources[@]}"; exit 1; }
+          docker buildx imagetools create -t "$IMAGE:$VERSION" -t "$IMAGE:latest" "${sources[@]}"
+          digest=$(docker buildx imagetools inspect "$IMAGE:$VERSION" --format '{{json .Manifest}}' | jq -r .digest)
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
 
       - name: Attest image provenance
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-name: index.docker.io/${{ env.IMAGE }}
-          subject-digest: ${{ steps.push.outputs.digest }}
+          subject-digest: ${{ steps.manifest.outputs.digest }}
           push-to-registry: true
 
       - name: Source archive
         id: archive
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          name="tainer-${{ steps.version.outputs.version }}.tar.gz"
-          git archive --format=tar.gz --prefix="tainer-${{ steps.version.outputs.version }}/" -o "$name" HEAD
+          name="tainer-$VERSION.tar.gz"
+          git archive --format=tar.gz --prefix="tainer-$VERSION/" -o "$name" HEAD
           echo "file=$name" >> "$GITHUB_OUTPUT"
 
       - name: Attest source archive
@@ -95,14 +159,17 @@ jobs:
           subject-path: ${{ steps.archive.outputs.file }}
 
       - name: Release notes
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          DIGEST: ${{ steps.manifest.outputs.digest }}
         run: |
-          awk -v v="${{ steps.version.outputs.version }}" '
+          awk -v v="$VERSION" '
             $0 ~ "^## \\[" v "\\]" { found = 1; next }
             found && /^## \[/ { exit }
             found { print }
           ' CHANGELOG.md > notes.md
-          printf '\n**Docker image:** `%s:%s` (`%s`)\n' "$IMAGE" "${{ steps.version.outputs.version }}" "${{ steps.push.outputs.digest }}" >> notes.md
           [ -s notes.md ] || { echo "No CHANGELOG section for this version"; exit 1; }
+          printf '\n**Docker image:** `%s:%s` (`%s`), linux/amd64 and linux/arm64\n' "$IMAGE" "$VERSION" "$DIGEST" >> notes.md
 
       - name: Publish GitHub release
         env:
