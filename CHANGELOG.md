@@ -20,11 +20,12 @@ Sections per release:
 
 ### Fixed
 
-## [2.0.0] - 2026-09-24
+## [2.0.0] - 2026-09-26
 
 ### Upgrade notes
 
-- **Set AUTH_SECRET before you upgrade.** Production still refuses to run without it and now checks at boot. The stock `docker-compose.yml` and the README examples will not start until it is set (for example in `.env`). Generate one with `openssl rand -base64 32` and keep it the same across upgrades. Installs that ran without it used a generated `auth-secret.txt`: the first start with AUTH_SECRET set re-encrypts everything stored under that key (site passwords, 2FA secrets, SSO, LDAP, SNMP and IPAM secrets, the Tainy API key, Storage Box and SSH keys) with the new one and removes the file, so nothing has to be entered again. Everyone is signed out once, and the migration is summarised in the server log and the audit log. The old key and the original files are kept in `pre-2.0-key-migration-<timestamp>/` in the data directory and left out of state backups; delete that folder once sign-in and your sites work, because it holds the old key.
+- **Uninstall the network discovery agents from your nodes.** Network discovery is removed (see Removed). On each Proxmox node where you installed the agent, run `systemctl disable --now tainer-lldp.timer tainer-snmp.timer`, delete the `tainer-lldp` and `tainer-snmp` unit files, `/usr/local/sbin/tainer-snmp-poll.sh` and `/etc/tainer-lldp.env`, then run `systemctl daemon-reload`. Stored discovery data stays in the data directory and can be deleted.
+- **Set AUTH_SECRET before you upgrade.** Production still refuses to run without it and now checks at boot. The stock `docker-compose.yml` and the README examples will not start until it is set (for example in `.env`). Generate one with `openssl rand -base64 32` and keep it the same across upgrades. Installs that ran without it used a generated `auth-secret.txt`: the first start with AUTH_SECRET set re-encrypts everything stored under that key (site passwords, 2FA secrets, SSO, LDAP, SNMP (from 1.x) and IPAM secrets, the Tainy API key, Storage Box and SSH keys) with the new one and removes the file, so nothing has to be entered again. Everyone is signed out once, and the migration is summarised in the server log and the audit log. The old key and the original files are kept in `pre-2.0-key-migration-<timestamp>/` in the data directory and left out of state backups; delete that folder once sign-in and your sites work, because it holds the old key.
 - **Password reset no longer turns off 2FA.** A user who lost both their authenticator and their recovery codes needs an admin to clear 2FA with the new Reset 2FA button on the Users page.
 - **Providers that leave out email_verified need a checkbox.** For Microsoft Entra ID and similar providers, linked users still sign in, but matching an existing account by email and auto-creating accounts are refused until you enable "Trust email without email_verified claim" on the provider. The same setting is needed to use preferred_username or upn as the email.
 - **Behind a reverse proxy, set APP_URL or TAINER_TRUST_PROXY_HEADERS=true.** SSO no longer trusts X-Forwarded-Proto/Host by default. Without one of these the redirect URI falls back to the request URL and your identity provider may reject it.
@@ -38,6 +39,8 @@ Sections per release:
 
 ### Added
 
+- **Tainy works with OpenAI and with Opus, Sonnet and Haiku models.** In Settings > Tainy, admins can pick OpenAI or the Opus 5, Sonnet 5 and Haiku 4.5 models (or any other model id) next to DeepInfra and custom endpoints. Reasoning still shows under Thought process.
+- **Clearer refusals.** When a model declines a request, Tainy says so in the chat and records it in the admin audit log. Opus 5 requests move to a fallback model automatically when possible.
 - **Load balancer: dry-run mode.** Auto-migration can record every move it *would* make as a "dry-run" entry in the activity log, using the same decision pipeline and pacing without touching anything, so you can check the balancer's choices for a few days before letting it act. On by default when auto-migration is enabled; turn it off in the settings form once the recommendations look right.
 - **Load balancer: containers are protected from surprise downtime.** Proxmox can't live-migrate LXC containers, so every automatic move is a restart migration (stop → transfer → start) with real downtime. Containers are now left out of automatic balancing by default. You can allow them always, or only inside downtime windows you define (e.g. `22:00-06:00`, server time, windows past midnight work). VMs still live-migrate freely.
 - **Load balancer: maintenance mode (node drain).** Add a node to the new Maintenance Nodes list and the balancer moves its guests off one at a time to healthy nodes (capacity-checked, about one a minute), stops placing new deployments on it and never picks it as a migration target. Guests it can't move (pinned or excluded) raise a drain warning so you can move them by hand.
@@ -67,6 +70,10 @@ Sections per release:
 
 ### Changed
 
+- **Switching the Tainy provider asks for the API key again.** A stored key is never sent to a different provider or endpoint, and existing setups keep working after the upgrade.
+- **The Network page holds IP pools and integrations.** It has an IP pools tab and an Integrations tab where admins connect phpIPAM.
+- **Tainy settings are shorter.** The permissions and safety notes moved into an info tooltip next to the heading.
+- **A tidier sidebar.** Overview now sits at the top, the navigation groups start expanded, search and Tainy share one row, and the site name is no longer repeated above the site sections because the site switcher already shows it.
 - **Load balancer settings explain themselves inline.** Every setting, score column and rebalance-plan field has a small ⓘ you can hover, focus or tap for a short explanation of what it does and what changing it means. The helper paragraphs it replaced are gone, and "How it works" is now a collapsed six-line summary. The full write-up is still in `docs/load-balancer.md`.
 - **Auto-migration starts in dry-run and leaves containers alone until you opt in.** Existing sites with auto-migration enabled get dry-run recommendations until Dry-Run Mode is unchecked, and containers are no longer auto-migrated until allowed. Both defaults moved to the safe side because container moves cause downtime (see Added). Review the new settings on the load-balancer page after upgrading.
 - **Load balancer default score weights are now memory first.** Memory 50%, CPU 25%, disk 15%, latency 10% (was CPU 40%, memory 30%, latency 20%, disk 10%). CPU contention degrades gracefully but memory exhaustion OOM-kills, and Proxmox's own scheduler weights memory 5:1 over CPU for the same reason. Only sites that never saved custom weights are affected.
@@ -78,7 +85,11 @@ Sections per release:
 - **Status badges flip right after start and stop.** The status pill on the deployments list and the badge on the container page change as soon as a lifecycle task completes, together with the action buttons, instead of a few seconds later.
 - **The deployments list and site dashboard refresh themselves.** They reload every 15s and 30s respectively while the tab is visible, so changes made outside Tainer, or that lag behind an action, show up without a browser reload.
 - **Site operators can manage their own site.** Users with the matching site permission can now delete, migrate and recreate deployments, manage backup policies, refresh the package index, and open the updates, diagnostics and CVE scanner pages for that site. Before, these were admin only. The delete, recreate, migrate, backup, snapshot and firewall controls on the deployment and backups pages now show for users who hold the matching permission and stay hidden from those who don't.
-- **The Docker image runs on Node 24.** Node 20 is end of life, so both build stages use `node:24-alpine`, and dependencies were updated (see Security). The overview map moved to maplibre-gl 6, which needs a browser with WebGL2.
+- **The Docker image runs on Node 24.** Node 20 is end of life, so both build stages use `node:24-alpine`, and dependencies were updated (see Security). The overview map moved to maplibre-gl 6, which needs a browser with WebGL2. The base image is pinned by digest, so every build of a release uses the same Node image.
+
+### Removed
+
+- **Network discovery.** Topology, the Devices list, switch detail pages, the network path card on deployments and Tainy's network path tool are gone, along with the LLDP and SNMP node agents and the `TAINER_AGENT_BASE_URL` setting.
 
 ### Fixed
 
@@ -95,6 +106,10 @@ Sections per release:
 
 ### Security
 
+- **Log lines cannot be faked.** Values that users, SSO names or the Proxmox API control are stripped of line breaks and control characters before they reach the server log.
+- **The legacy sites file is private from the start.** On first boot with the `PROXMOX_*` variables, `sites.json` is created with mode 0600 instead of being tightened afterwards.
+- **Webhook services are matched by exact hostname**, and a crafted custom Tainy endpoint URL can no longer tie up the server with a slow regex.
+- **Stricter SSO flow cookie check.** The short-lived cookie that carries SSO sign-in state is now compared exactly, so a re-encoded or extended value is rejected. The value was already signed, so this closes a loose end rather than a forgery path.
 - **Site pages check sign-in and site access themselves.** Every page under a site now checks the session and access to that site before loading data. A crafted request that skipped the layouts could read cluster data without signing in, or read another site's data. Page requests without a session cookie are also redirected to /login early.
 - **Console access checks the site.** Web and mobile console tickets and the console websocket require access to the guest's site, and unknown or disabled sites no longer fall back to the environment Proxmox credentials.
 - **Password reset keeps two-factor authentication.** Resetting a password no longer turns off 2FA, so a reset link alone cannot take over an account. Sign-in after a reset still asks for an authenticator or recovery code.
