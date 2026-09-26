@@ -711,22 +711,35 @@ type ScanResult = {
   ports: PortResult[];
 };
 
+const SERVICE_ICONS: Array<[RegExp, typeof Network]> = [
+  [/grafana/, BarChart3],
+  [/prometheus|node[ -]?exporter/, LineChart],
+  [/postgres|mysql|mariadb|mongodb|redis|mssql/, Database],
+  [/ssh/, TerminalSquare],
+  [/mqtt|mosquitto|cedalo|rabbit|kafka|nats/, Radio],
+  [/smtp|imap|pop3|mail/, Mail],
+  [/dns|bind/, Globe],
+  [/ignition/, Workflow],
+  [/chat|discord|matrix|slack/, MessageSquare],
+  [/^http/, Globe],
+  [/web|nginx|caddy|apache|traefik/, Globe],
+];
+
+const PORT_ICONS = new Map<number, typeof Network>([
+  [22, TerminalSquare],
+  [80, Globe],
+  [443, Globe],
+  [8080, Globe],
+  [8443, Globe],
+  [3306, Database],
+  [5432, Database],
+  [6379, Database],
+  [27017, Database],
+]);
+
 function serviceIcon(service: string, port: number) {
   const s = service.toLowerCase();
-  if (/grafana/.test(s)) return BarChart3;
-  if (/prometheus|node[ -]?exporter/.test(s)) return LineChart;
-  if (/postgres|mysql|mariadb|mongodb|redis|mssql/.test(s)) return Database;
-  if (/ssh/.test(s)) return TerminalSquare;
-  if (/mqtt|mosquitto|cedalo|rabbit|kafka|nats/.test(s)) return Radio;
-  if (/smtp|imap|pop3|mail/.test(s)) return Mail;
-  if (/dns|bind/.test(s)) return Globe;
-  if (/ignition/.test(s)) return Workflow;
-  if (/chat|discord|matrix|slack/.test(s)) return MessageSquare;
-  if (s.startsWith("http") || /web|nginx|caddy|apache|traefik/.test(s)) return Globe;
-  if (port === 22) return TerminalSquare;
-  if (port === 80 || port === 443 || port === 8080 || port === 8443) return Globe;
-  if (port === 3306 || port === 5432 || port === 6379 || port === 27017) return Database;
-  return Network;
+  return SERVICE_ICONS.find(([pattern]) => pattern.test(s))?.[1] ?? PORT_ICONS.get(port) ?? Network;
 }
 
 function serviceTone(port: number): string {

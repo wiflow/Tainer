@@ -230,87 +230,103 @@ export type CopilotSettingsInput = {
   costPerMOutputUsd?: number | null;
 };
 
+async function applyApiKey(settings: StoredSettings, apiKey: string | null | undefined) {
+  if (apiKey === undefined) return;
+  const trimmed = apiKey?.trim() ?? "";
+  settings.encryptedKey = trimmed ? await encryptText(trimmed) : null;
+  settings.keyHint = trimmed ? trimmed.slice(-4) : null;
+}
+
+function resolveEndpoint(settings: StoredSettings, input: CopilotSettingsInput) {
+  const requestedBaseUrl =
+    input.baseUrl === undefined ? settings.baseUrl : input.baseUrl?.trim() || null;
+  const provider = input.provider ?? inferProvider(settings.provider, requestedBaseUrl);
+  const baseUrl = provider === "custom" ? requestedBaseUrl : null;
+  if (provider === "custom" && !baseUrl) {
+    throw new CopilotSettingsError("Enter the endpoint URL for the custom provider.");
+  }
+  return { provider, baseUrl };
+}
+
+function applyCustomModelId(
+  settings: StoredSettings,
+  customModelId: string | null | undefined,
+  providerChanged: boolean,
+) {
+  if (customModelId !== undefined) {
+    settings.customModelId = customModelId?.trim().slice(0, MAX_CUSTOM_MODEL_ID_LENGTH) || null;
+  } else if (providerChanged) {
+    settings.customModelId = null;
+  }
+  if (settings.provider === "openai" && !settings.customModelId) {
+    throw new CopilotSettingsError("Enter a model id for OpenAI.");
+  }
+}
+
+function applyEndpoint(settings: StoredSettings, input: CopilotSettingsInput) {
+  const { provider, baseUrl } = resolveEndpoint(settings, input);
+  // A stored key must never reach a different endpoint unless it is entered again.
+  const providerChanged = provider !== settings.provider;
+  if ((providerChanged || baseUrl !== settings.baseUrl) && input.apiKey === undefined) {
+    settings.encryptedKey = null;
+    settings.keyHint = null;
+  }
+  settings.provider = provider;
+  settings.baseUrl = baseUrl;
+  applyCustomModelId(settings, input.customModelId, providerChanged);
+}
+
+function positiveInteger(value: number | undefined): number | null {
+  return typeof value === "number" && value > 0 ? Math.floor(value) : null;
+}
+
+function applyLimits(settings: StoredSettings, input: CopilotSettingsInput) {
+  settings.dailyTokenBudget = positiveInteger(input.dailyTokenBudget) ?? settings.dailyTokenBudget;
+  settings.dailyToolCallBudget =
+    positiveInteger(input.dailyToolCallBudget) ?? settings.dailyToolCallBudget;
+  if (typeof input.enabled === "boolean") settings.enabled = input.enabled;
+  if (typeof input.operatorNotes === "string") {
+    settings.operatorNotes = input.operatorNotes.slice(0, MAX_OPERATOR_NOTES_LENGTH);
+  }
+}
+
+function cleanGroupPolicies(
+  policies: NonNullable<CopilotSettingsInput["groupPolicies"]>,
+): Record<string, GroupToolPolicy> {
+  const clean: Record<string, GroupToolPolicy> = {};
+  for (const [groupId, policy] of Object.entries(policies)) {
+    if (!policy || typeof policy !== "object") continue;
+    if (policy.allowWrite !== false && policy.allowDestructive !== false) continue;
+    clean[groupId] = {
+      allowWrite: policy.allowWrite !== false,
+      allowDestructive: policy.allowDestructive !== false,
+    };
+  }
+  return clean;
+}
+
+function priceOrNull(value: number | null | undefined): number | null {
+  return typeof value === "number" && value >= 0 ? value : null;
+}
+
 export async function saveCopilotSettings(
   input: CopilotSettingsInput,
 ): Promise<CopilotSettings> {
   return mutateStore(async (store) => {
     const settings = store.settings;
-
-    if (input.apiKey !== undefined) {
-      if (input.apiKey === null || input.apiKey.trim() === "") {
-        settings.encryptedKey = null;
-        settings.keyHint = null;
-      } else {
-        const trimmed = input.apiKey.trim();
-        settings.encryptedKey = await encryptText(trimmed);
-        settings.keyHint = trimmed.slice(-4);
-      }
-    }
+    await applyApiKey(settings, input.apiKey);
     if (input.model) settings.model = input.model;
     if (input.anthropicModel) settings.anthropicModel = input.anthropicModel;
-
-    const requestedBaseUrl =
-      input.baseUrl === undefined ? settings.baseUrl : input.baseUrl?.trim() || null;
-    const nextProvider = input.provider ?? inferProvider(settings.provider, requestedBaseUrl);
-    const nextBaseUrl = nextProvider === "custom" ? requestedBaseUrl : null;
-    if (nextProvider === "custom" && !nextBaseUrl) {
-      throw new CopilotSettingsError("Enter the endpoint URL for the custom provider.");
-    }
-    // A stored key must never reach a different endpoint unless it is entered again.
-    const providerChanged = nextProvider !== settings.provider;
-    const endpointChanged = providerChanged || nextBaseUrl !== settings.baseUrl;
-    if (endpointChanged && input.apiKey === undefined) {
-      settings.encryptedKey = null;
-      settings.keyHint = null;
-    }
-    settings.provider = nextProvider;
-    settings.baseUrl = nextBaseUrl;
-
-    if (input.customModelId !== undefined) {
-      settings.customModelId =
-        input.customModelId?.trim().slice(0, MAX_CUSTOM_MODEL_ID_LENGTH) || null;
-    } else if (providerChanged) {
-      settings.customModelId = null;
-    }
-    if (settings.provider === "openai" && !settings.customModelId) {
-      throw new CopilotSettingsError("Enter a model id for OpenAI.");
-    }
-    if (typeof input.dailyTokenBudget === "number" && input.dailyTokenBudget > 0) {
-      settings.dailyTokenBudget = Math.floor(input.dailyTokenBudget);
-    }
-    if (typeof input.dailyToolCallBudget === "number" && input.dailyToolCallBudget > 0) {
-      settings.dailyToolCallBudget = Math.floor(input.dailyToolCallBudget);
-    }
-    if (typeof input.enabled === "boolean") settings.enabled = input.enabled;
-    if (typeof input.operatorNotes === "string") {
-      settings.operatorNotes = input.operatorNotes.slice(0, MAX_OPERATOR_NOTES_LENGTH);
-    }
-    if (input.groupPolicies) {
-      const clean: Record<string, GroupToolPolicy> = {};
-      for (const [groupId, policy] of Object.entries(input.groupPolicies)) {
-        if (!policy || typeof policy !== "object") continue;
-        if (policy.allowWrite !== false && policy.allowDestructive !== false) continue;
-        clean[groupId] = {
-          allowWrite: policy.allowWrite !== false,
-          allowDestructive: policy.allowDestructive !== false,
-        };
-      }
-      settings.groupPolicies = clean;
-    }
+    applyEndpoint(settings, input);
+    applyLimits(settings, input);
+    if (input.groupPolicies) settings.groupPolicies = cleanGroupPolicies(input.groupPolicies);
     if (input.costPerMInputUsd !== undefined) {
-      settings.costPerMInputUsd =
-        typeof input.costPerMInputUsd === "number" && input.costPerMInputUsd >= 0
-          ? input.costPerMInputUsd
-          : null;
+      settings.costPerMInputUsd = priceOrNull(input.costPerMInputUsd);
     }
     if (input.costPerMOutputUsd !== undefined) {
-      settings.costPerMOutputUsd =
-        typeof input.costPerMOutputUsd === "number" && input.costPerMOutputUsd >= 0
-          ? input.costPerMOutputUsd
-          : null;
+      settings.costPerMOutputUsd = priceOrNull(input.costPerMOutputUsd);
     }
     settings.updatedAt = new Date().toISOString();
-
     return toPublic(settings);
   });
 }
